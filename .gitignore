@@ -1,0 +1,25 @@
+# Credenciales y archivos sensibles
+car-rugby-club-a0c763e39e4c.json
+credentials/
+*.json
+client_secret_*.json
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Datos sensibles (CSV con informacion personal)
+*.csv
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*.class
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
