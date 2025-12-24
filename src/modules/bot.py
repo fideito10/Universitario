@@ -22,8 +22,8 @@ def get_credentials():
     """Obtiene credenciales de GCP"""
     try:
         # 1. Intentar desde st.secrets
-        if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
-            return dict(st.secrets["gcp_service_account"])
+        if hasattr(st, 'secrets') and "google" in st.secrets:
+            return dict(st.secrets["google"])
             
         # 2. Intentar desde archivos locales
         possible_paths = [
