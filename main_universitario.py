@@ -302,6 +302,14 @@ def login_page():
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
     }}
     
+
+    /* Centrar el contenedor del botón */
+    /* Centrar el contenedor del botón */
+    div.stButton {{
+        display: flex;
+        justify-content: center;
+    }}
+
     /* Botón de ingresar */
     .stButton > button {{
         background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
