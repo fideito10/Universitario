@@ -7,9 +7,21 @@ from datetime import datetime, date
 from google.oauth2 import service_account
 
 def get_gcp_credentials():
-    """Obtener credenciales desde service_account.json SIN MENSAJES DEBUG"""
+    """Obtener credenciales desde st.secrets (Streamlit Cloud) o archivo local"""
     try:
-        # Ruta al archivo real de credenciales
+        # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
+        if hasattr(st, 'secrets') and "google" in st.secrets:
+            credentials_info = dict(st.secrets["google"])
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info,
+                scopes=[
+                    "https://www.googleapis.com/auth/spreadsheets",
+                    "https://www.googleapis.com/auth/drive"
+                ]
+            )
+            return credentials
+        
+        # Si no hay st.secrets, intentar archivo local (desarrollo local)
         credentials_path = 'credentials/service_account.json'
         
         if os.path.exists(credentials_path):
@@ -26,6 +38,7 @@ def get_gcp_credentials():
         else:
             st.error(f"❌ No se encontró el archivo de credenciales: {credentials_path}")
             st.info("💡 Asegúrese de que el archivo service_account.json esté en la carpeta credentials/")
+            st.info("💡 O configure st.secrets en Streamlit Cloud")
             return None
             
     except json.JSONDecodeError:
