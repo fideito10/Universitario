@@ -18,8 +18,8 @@ def get_google_credentials():
     """
     try:
         # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
-        if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
-            return dict(st.secrets["gcp_service_account"])
+        if hasattr(st, 'secrets') and "google" in st.secrets:
+            return dict(st.secrets["google"])
     except Exception:
         pass
     
