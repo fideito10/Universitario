@@ -60,9 +60,11 @@ class FormulariosGoogleSheets:
                 'https://www.googleapis.com/auth/drive'
             ]
             
-            # Cargar credenciales
-            credentials = Credentials.from_service_account_file(
-                credentials_path, 
+            import streamlit as st
+            # Cargar credenciales desde st.secrets (Streamlit Cloud)
+            service_account_info = st.secrets["google"]
+            credentials = Credentials.from_service_account_info(
+                service_account_info,
                 scopes=SCOPES
             )
             
