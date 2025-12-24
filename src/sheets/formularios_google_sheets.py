@@ -19,20 +19,15 @@ class FormulariosGoogleSheets:
     def __init__(self):
         """Inicializar conexión con Google Sheets"""
         
-        # CONFIGURACIÓN CON RUTA ABSOLUTA CORREGIDA
-        # Obtener la ruta base del proyecto
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        credentials_path = os.path.join(project_root, 'credentials', 'service_account.json')
-        
         self.sheet_config = {
             'sheet_id': '1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w',
-            'worksheet_name': 'Hoja 1',
-            'credentials_file': credentials_path  # USAR RUTA ABSOLUTA
+            'worksheet_name': 'Hoja 1'
         }
         
         self.gc = None
+        self.client = None  # Alias para compatibilidad
         self.worksheet = None
-        self.credentials_loaded = False  # ASEGURAR QUE EXISTE
+        self.credentials_loaded = False
         
         # Intentar configurar conexión
         try:
@@ -47,35 +42,44 @@ class FormulariosGoogleSheets:
     def _setup_connection(self):
         """Configurar conexión autenticada con Google Sheets"""
         try:
-            # USAR LA RUTA CORREGIDA
-            credentials_path = self.sheet_config['credentials_file']
-            
-            # Verificar que el archivo existe
-            if not os.path.exists(credentials_path):
-                raise FileNotFoundError(f"Archivo de credenciales no encontrado: {credentials_path}")
-            
             # Scopes necesarios
             SCOPES = [
                 'https://www.googleapis.com/auth/spreadsheets',
                 'https://www.googleapis.com/auth/drive'
             ]
             
-            import streamlit as st
-            # Cargar credenciales desde st.secrets (Streamlit Cloud)
-            service_account_info = st.secrets["google"]
-            credentials = Credentials.from_service_account_info(
-                service_account_info,
-                scopes=SCOPES
-            )
+            # Intentar cargar credenciales desde st.secrets (Streamlit Cloud)
+            try:
+                service_account_info = st.secrets["google"]
+                credentials = Credentials.from_service_account_info(
+                    service_account_info,
+                    scopes=SCOPES
+                )
+            except Exception as e:
+                # Si falla st.secrets, intentar archivo local
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                credentials_path = os.path.join(project_root, 'credentials', 'service_account.json')
+                
+                if not os.path.exists(credentials_path):
+                    raise FileNotFoundError(
+                        f"No se encontró el archivo de credenciales: credentials/service_account.json\n"
+                        f"💡 Asegúrese de que el archivo service_account.json esté en la carpeta credentials/"
+                    )
+                
+                credentials = Credentials.from_service_account_file(
+                    credentials_path,
+                    scopes=SCOPES
+                )
             
             # Autorizar cliente
             self.gc = gspread.authorize(credentials)
+            self.client = self.gc  # Alias para compatibilidad
             self.credentials_loaded = True
             
             return True, "Conexión establecida exitosamente"
             
         except FileNotFoundError as e:
-            return False, f"Error: Archivo de credenciales no encontrado - {e}"
+            return False, str(e)
         except Exception as e:
             return False, f"Error configurando conexión: {e}"
     def _ensure_worksheet_exists(self) -> bool:
