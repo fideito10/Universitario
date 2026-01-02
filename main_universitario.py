@@ -519,6 +519,11 @@ def main_dashboard():
     
     st.sidebar.markdown("---")
     
+    if st.sidebar.button("⬅️ Volver a Portada", use_container_width=True):
+        st.session_state.current_page = "dashboard"
+        st.rerun()
+        
+    st.sidebar.markdown("---")
     if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -602,7 +607,9 @@ def dashboard_main():
     
     with col1:
         st.markdown('<div class="area-card">', unsafe_allow_html=True)
-        st.markdown("### 🏥 Área Médica")
+        if st.button("🏥 Área Médica", use_container_width=True, key="main_medica_btn"):
+            st.session_state.current_page = "medica"
+            st.rerun()
         st.write("- Registro de lesiones")
         st.write("- Historial médico")
         st.write("- Seguimiento de recuperación")
@@ -611,7 +618,9 @@ def dashboard_main():
     
     with col2:
         st.markdown('<div class="area-card">', unsafe_allow_html=True)
-        st.markdown("### 🥗 Área Nutrición")
+        if st.button("🥗 Área Nutrición", use_container_width=True, key="main_nutricion_btn"):
+            st.session_state.current_page = "nutricion"
+            st.rerun()
         st.write("- Planes nutricionales")
         st.write("- Seguimiento de dietas")
         st.write("- Análisis de composición")
@@ -620,7 +629,9 @@ def dashboard_main():
     
     with col3:
         st.markdown('<div class="area-card">', unsafe_allow_html=True)
-        st.markdown("### 🏋️ Área Física")
+        if st.button("🏋️ Área Física", use_container_width=True, key="main_fisica_btn"):
+            st.session_state.current_page = "fisica"
+            st.rerun()
         st.write("- Planes de entrenamiento")
         st.write("- Evaluaciones físicas")
         st.write("- Métricas de rendimiento")

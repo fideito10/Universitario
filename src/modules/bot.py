@@ -4,6 +4,7 @@ import requests
 import os
 import json
 import gspread
+import google.generativeai as genai
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -16,10 +17,10 @@ def check_standalone():
         pass
 
 # ==========================================
-# GESTIÓN DE CREDENCIALES (Reutilizada)
+# GESTIÓN DE CREDENCIALES
 # ==========================================
 def get_credentials():
-    """Obtiene credenciales de GCP"""
+    """Obtiene credenciales de GCP para Google Sheets"""
     try:
         # 1. Intentar desde st.secrets
         if hasattr(st, 'secrets') and "google" in st.secrets:
@@ -56,105 +57,121 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 # ==========================================
-# CARGA DE DATOS
+# CARGA DE DATOS (Optimizada)
 # ==========================================
 @st.cache_data(ttl=3600)
 def load_all_data():
-    """Carga y consolida datos de todas las áreas"""
+    """Carga y consolida datos de todas las áreas de forma resumida y OPTIMIZADA"""
     client = get_gspread_client()
     if not client:
         return "No se pudieron cargar credenciales."
 
-    context_text = "INFORMACIÓN ACTUAL DEL CLUB:\n\n"
+    context_text = "DATOS DEL CLUB:\n\n"
 
     try:
-        # 1. MÓDULO ADMINISTRACIÓN (Jugadores)
-        # ID: 1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw
+        # 1. MÓDULO ADMINISTRACIÓN (JUGADORES) - REDUCIDO
         sheet_admin = client.open_by_key("1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw")
         ws_jugadores = sheet_admin.worksheet("Jugadores_Maestro")
         data_jugadores = ws_jugadores.get_all_records()
         df_jugadores = pd.DataFrame(data_jugadores)
         
-        context_text += f"=== BASE DE JUGADORES ({len(df_jugadores)} registros) ===\n"
-        # Resumen simplificado para no saturar tokens
         if not df_jugadores.empty:
-            summary = df_jugadores[['Nombre', 'Apellido', 'Posicion', 'Categoria', 'Estado']].to_string(index=False)
-            context_text += summary + "\n\n"
+            context_text += f"JUGADORES ({len(df_jugadores)} total):\n"
+            # Solo 50 jugadores más recientes para reducir tamaño
+            cols_adm = [c for c in ['Nombre', 'Apellido', 'Posicion', 'Categoria', 'Estado'] if c in df_jugadores.columns]
+            context_text += df_jugadores[cols_adm].head(50).to_string(index=False)
+            context_text += "\n\n"
         
-        # 2. ÁREA MÉDICA
-        # ID: 1ham2WSMQa3eEv0V0TtHcAa55R3WLGoBje6pSOoNxcBQ (Default en area_medica.py)
+        # 2. ÁREA MÉDICA - REDUCIDO
         try:
             sheet_medica = client.open_by_key("1ham2WSMQa3eEv0V0TtHcAa55R3WLGoBje6pSOoNxcBQ")
-            ws_medica = sheet_medica.get_worksheet(0) # Primera hoja
+            ws_medica = sheet_medica.get_worksheet(0)
             data_medica = ws_medica.get_all_records()
             df_medica = pd.DataFrame(data_medica)
             
-            context_text += f"=== REGISTRO MÉDICO/LESIONES ({len(df_medica)} casos) ===\n"
             if not df_medica.empty:
-                # Filtrar columnas relevantes si existen
-                cols_med = [c for c in ['Nombre del Paciente', 'Diagnóstico', 'Severidad de la lesión', 'Fecha de la lesión', 'Estado'] if c in df_medica.columns]
-                context_text += df_medica[cols_med].to_string(index=False) + "\n\n"
-        except Exception as e:
-            context_text += f"Error cargando Área Médica: {str(e)}\n\n"
+                context_text += f"MÉDICO (Últimos 30 casos):\n"
+                cols_med = [c for c in ['Nombre del Paciente', 'Diagnóstico', 'Severidad de la lesión', 'Estado'] if c in df_medica.columns]
+                context_text += df_medica[cols_med].tail(30).to_string(index=False)
+                context_text += "\n\n"
+        except: pass
 
-        # 3. ÁREA FÍSICA
-        # ID: 1sR4wWsA0_nZGS011d6QV84znTnRW4d7iS65y2oBjvYI
+        # 3. ÁREA FÍSICA - REDUCIDO
         try:
             sheet_fisica = client.open_by_key("1sR4wWsA0_nZGS011d6QV84znTnRW4d7iS65y2oBjvYI")
-            # Buscar hoja "Base Test"
-            try:
-                ws_fisica = sheet_fisica.worksheet("Base Test")
-            except:
-                ws_fisica = sheet_fisica.get_worksheet(0)
-                
+            ws_fisica = sheet_fisica.worksheet("Base Test")
             data_fisica = ws_fisica.get_all_records()
             df_fisica = pd.DataFrame(data_fisica)
             
-            context_text += f"=== DATOS FÍSICOS/TESTS ({len(df_fisica)} registros) ===\n"
             if not df_fisica.empty:
-                # Seleccionar columnas clave
-                cols_fis = [c for c in ['Nombre y Apellido', 'Test', 'valor', 'unidad', 'Fecha'] if c in df_fisica.columns]
-                context_text += df_fisica[cols_fis].head(100).to_string(index=False) + "\n(Limitado a los primeros 100 registros físicos por espacio)\n\n"
+                context_text += f"FÍSICA (Últimos 50 tests):\n"
+                # Solo últimos 50 registros
+                df_resumen_fis = df_fisica[['Nombre y Apellido', 'Test', 'valor', 'unidad', 'Fecha']].tail(50)
+                context_text += df_resumen_fis.to_string(index=False)
+            else:
+                context_text += "FÍSICA: Sin datos."
         except Exception as e:
-            context_text += f"Error cargando Área Física: {str(e)}\n\n"
+            context_text += f"FÍSICA: Error ({str(e)})"
             
         return context_text
 
     except Exception as e:
-        return f"Error general cargando datos: {str(e)}"
+        return f"Error cargando datos: {str(e)}"
 
 # ==========================================
 # INTERFAZ PRINCIPAL
 # ==========================================
 def main_bot():
+    # Estilos específicos para el chat
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem; border: 1px solid #334155;">
-        <h1 style="color: white; text-align: center; margin: 0;">🤖 Asistente Inteligente Universitario</h1>
-        <p style="color: #94a3b8; text-align: center; margin: 0.5rem 0 0 0;">Consulta sobre Jugadores, Salud y Rendimiento Físico</p>
+    <style>
+    .chat-header {
+        background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        border: 2px solid white;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="chat-header">
+        <h1 style="color: white; margin: 0;">✨ Asistente Inteligente Universitario</h1>
+        <p style="color: #E0E0E0; margin: 0.5rem 0 0 0;">Potenciado por Google Gemini (Ultra Rápido)</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Configuración Ollama ---
+    # --- Configuración Gemini en Sidebar ---
     with st.sidebar:
-        st.markdown("### 🦙 Configuración Ollama")
+        st.markdown("### 🔑 Configuración IA")
         
-        # Selección de modelo
-        model_options = ["llama3.1", "mistral", "gemma2", "phi3", "llama3", "llama2"]
-        selected_model = st.selectbox("Seleccionar Modelo", model_options, index=0)
+        # Intentar obtener API Key de secrets
+        gemini_api_key = ""
+        if hasattr(st, 'secrets') and "google" in st.secrets:
+            # A veces se guarda como 'gemini_api_key' dentro de 'google' o solo en el root
+            gemini_api_key = st.secrets["google"].get("gemini_api_key", "")
         
-        # Configuración de URL (por defecto localhost)
-        ollama_url = st.text_input("URL del Servidor Ollama", value="http://localhost:11434")
+        if not gemini_api_key and "gemini_api_key" in st.secrets:
+             gemini_api_key = st.secrets["gemini_api_key"]
+
+        api_key_input = st.text_input("Gemini API Key", value="AIzaSyBEN8C00vWYXq4UGjFkGCRmyIjgoSSoSCQ", type="password", help="Consíguela gratis en Google AI Studio")
+        
+        if not api_key_input:
+            st.warning("⚠️ Ingresa tu API Key para usar el asistente.")
+            st.markdown("[Obtener API Key Gratis](https://aistudio.google.com/app/apikey)")
+        else:
+            genai.configure(api_key=api_key_input)
+            st.success("✅ IA Conectada")
         
         st.markdown("---")
-        st.caption("Asegúrate de tener Ollama corriendo (`ollama serve`) y el modelo descargado (`ollama pull llama3.1`).")
+        if st.button("🗑️ Limpiar Conversación", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
-        # Verificación rápida de conexión (opcional)
-        status_placeholder = st.empty()
-        
-        st.info("💡 Puedes preguntar:\n- ¿Quiénes son los pilares de la M19?\n- ¿Qué jugadores están lesionados actualmente?\n- ¿Cuál es el récord de Press Banca?\n- Resumen médico de Juan Perez")
-
-    # Intentar verificar conexión al inicio (silencioso) o cuando se presiona un botón
-    # Mantener simple: solo intentar llamar a la API cuando se pregunta.
+        st.info("💡 Pregunta sobre jugadores, lesiones o métricas físicas.")
 
     # --- Historial de Chat ---
     if "messages" not in st.session_state:
@@ -162,12 +179,12 @@ def main_bot():
 
     # --- Cargar Contexto ---
     if "data_context" not in st.session_state:
-        with st.spinner("🔄 Conectando con las bases de datos del club..."):
+        with st.spinner("🔄 Conectando con bases de datos..."):
             st.session_state.data_context = load_all_data()
             if "Error" not in st.session_state.data_context:
-                st.success("✅ Datos cargados correctamente en la memoria del agente.")
+                st.success("✅ Información cargada.")
             else:
-                st.error("⚠️ Hubo problemas cargando algunos datos.")
+                st.error("⚠️ Problemas cargando datos.")
 
     # --- Mostrar Chat ---
     for message in st.session_state.messages:
@@ -176,61 +193,75 @@ def main_bot():
 
     # --- Input de Usuario ---
     if prompt := st.chat_input("Escribe tu consulta aquí..."):
-        # 1. Mostrar mensaje usuario
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        if not api_key_input:
+            st.error("❌ Por favor, ingresa una API Key en la barra lateral.")
+        else:
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            st.session_state.messages.append({"role": "user", "content": prompt})
 
-        # 2. Generar respuesta
-        with st.chat_message("assistant"):
-            with st.spinner(f"Pensando con {selected_model}..."):
+            with st.chat_message("assistant"):
+                response_placeholder = st.empty()
+                full_response = ""
+                
                 try:
-                    # Construir prompt con contexto
-                    full_prompt = f"""
-                    Eres el asistente virtual oficial del Club Universitario de La Plata.
-                    Tu misión es ayudar al cuerpo técnico y directivos respondiendo preguntas basadas en los datos del club.
+                    # 1. Buscar dinámicamente qué modelos están disponibles
+                    available_models = []
+                    for m in genai.list_models():
+                        if 'generateContent' in m.supported_generation_methods:
+                            available_models.append(m.name)
                     
-                    DATOS DISPONIBLES:
+                    if not available_models:
+                        raise Exception("No se encontraron modelos disponibles.")
+                    
+                    # 2. Priorizar modelos Flash
+                    target_model = None
+                    for m in available_models:
+                        if "1.5-flash" in m:
+                            target_model = m
+                            break
+                    
+                    if not target_model:
+                        target_model = available_models[0]
+                        
+                    model = genai.GenerativeModel(target_model)
+                    
+                    # 3. Preparar el envío con la nueva personalidad de Consultor/Analista
+                    full_prompt = f"""ERES: Consultor Estratégico y Analista Deportivo Senior del Club Universitario de La Plata.
+                    OBJETIVO: Brindar análisis precisos, sintetizar información clave y generar reportes ejecutivos para reuniones de comisión directiva o cuerpo técnico.
+                    
+                    DATOS DEL CLUB (CONTEXTO REAL):
                     {st.session_state.data_context}
                     
-                    PREGUNTA DEL USUARIO:
-                    {prompt}
+                    SOLICITUD DEL USUARIO: {prompt}
                     
-                    INSTRUCCIONES:
-                    - Responde de forma amable, profesional y concisa.
-                    - Si la respuesta está en los datos, cítala.
-                    - Si no encuentras la información, dilo honestamente.
-                    - Formatea la respuesta usando Markdown (tablas, listas, negritas) para que sea legible.
-                    """
-                    
-                    # Llamada a Ollama API
-                    payload = {
-                        "model": selected_model,
-                        "prompt": full_prompt,
-                        "stream": False
-                    }
-                    
-                    try:
-                        response = requests.post(f"{ollama_url}/api/generate", json=payload)
-                        if response.status_code == 200:
-                            response_text = response.json().get('response', "⚠️ La respuesta vino vacía.")
-                            st.markdown(response_text)
-                            st.session_state.messages.append({"role": "assistant", "content": response_text})
-                        else:
-                            st.error(f"Error Ollama ({response.status_code}): {response.text}")
-                    except requests.exceptions.ConnectionError:
-                        st.error(f"❌ No se pudo conectar a Ollama en {ollama_url}. \n\nAsegurate de:\n1. Tener [Ollama](https://ollama.com/) instalado.\n2. Estar ejecutando la aplicación (`ollama serve`).\n3. Haber descargado el modelo (ej: `ollama pull {selected_model}`).")
-                    except Exception as req_err:
-                         st.error(f"Error en la petición: {req_err}")
+                    REGLAS DE ORO PARA TUS REPORTES:
+                    1. PROFESIONALISMO: Usa un tono formal, ejecutivo y directo.
+                    2. ESTRUCTURA DE REUNIÓN: Si te piden un reporte, usa:
+                       - 📋 **Resumen Ejecutivo**: (Lo más importante en 2 párrafos)
+                       - 📊 **Métricas Clave**: (Datos numéricos comparativos)
+                       - ⚠️ **Puntos Críticos**: (Alertas médicas o bajas de rendimiento)
+                       - ✅ **Conclusión/Sugerencia**: (Pasos a seguir)
+                    3. CONCISIÓN: Evita párrafos largos. Usa listas (bullet points) y tablas.
+                    4. VERACIDAD: Solo usa los datos proporcionados. Si no hay datos, indica: "Sin registros disponibles para análisis".
+                    5. IDIOMA: Responde siempre en ESPAÑOL."""
 
+                    response = model.generate_content(full_prompt, stream=True)
+                    
+                    # Generar respuesta
+                    for chunk in response:
+                        try:
+                            if chunk.text:
+                                full_response += chunk.text
+                                response_placeholder.markdown(full_response + "▌")
+                        except Exception:
+                            break
+                    
+                    response_placeholder.markdown(full_response)
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    
                 except Exception as e:
-                    st.error(f"Error generando respuesta: {e}")
-
-    # Botón limpiar historial
-    if len(st.session_state.messages) > 0:
-        if st.button("🗑️ Borrar Historial", type="primary"):
-            st.session_state.messages = []
-            st.rerun()
+                    st.error(f"Error Gemini: {e}")
 
 if __name__ == "__main__":
     check_standalone()
