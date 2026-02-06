@@ -106,6 +106,91 @@ def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.
         return pd.DataFrame()
 
 # ==========================================
+# FUNCIONES DE CONVERSIÓN DE DATOS
+# ==========================================
+
+def convertir_valor_a_numero(valor):
+    """
+    Convierte un valor a número, manejando tanto formatos numéricos como de tiempo.
+    
+    Formatos soportados:
+    - Números decimales: "10.5", "10,5"
+    - Tiempos: "5'30''", "6'40''", "5'30\"", "6'40\"" (minutos'segundos)
+    
+    Returns:
+        float: Valor numérico (para tiempos, retorna segundos totales)
+        None: Si no se puede convertir
+    """
+    if pd.isna(valor) or valor == '':
+        return None
+    
+    valor_str = str(valor).strip()
+    
+    # Detectar formato de tiempo (M'S'' o M'S")
+    if "'" in valor_str:
+        try:
+            # Normalizar: reemplazar comillas dobles (") y comillas simples dobles ('') por espacio
+            valor_normalizado = valor_str.replace("''", "").replace('"', "").replace("'", " ")
+            partes = valor_normalizado.split()
+            
+            if len(partes) >= 2:
+                minutos = float(partes[0])
+                segundos = float(partes[1])
+                return minutos * 60 + segundos
+            elif len(partes) == 1:
+                # Solo minutos
+                return float(partes[0]) * 60
+        except:
+            pass
+    
+    # Intentar conversión numérica normal
+    try:
+        return float(valor_str.replace(',', '.'))
+    except:
+        return None
+
+
+def formatear_valor_display(valor_original, valor_numerico, unidad):
+    """
+    Formatea el valor para mostrar, preservando el formato original si es tiempo.
+    
+    Args:
+        valor_original: Valor original del dataframe
+        valor_numerico: Valor convertido a número
+        unidad: Unidad de medida
+    
+    Returns:
+        str: Valor formateado para mostrar
+    """
+    if pd.isna(valor_numerico):
+        return ""
+    
+    # Si la unidad es "Tiempo" o el valor original contiene ', mantener formato original
+    if unidad == "Tiempo" or "'" in str(valor_original):
+        return str(valor_original)
+    
+    # Para valores numéricos normales
+    return f"{valor_numerico:.2f} {unidad}"
+
+def segundos_a_formato_tiempo(segundos_totales):
+    """
+    Convierte segundos totales a formato M'S"
+    
+    Args:
+        segundos_totales: Número total de segundos (float)
+    
+    Returns:
+        str: Formato M'S" (ejemplo: "3'21\"")
+    """
+    if pd.isna(segundos_totales):
+        return ""
+    
+    minutos = int(segundos_totales // 60)
+    segundos = int(segundos_totales % 60)
+    return f"{minutos}'{segundos:02d}\""
+
+
+# ==========================================
 # FUNCIONES DE VISUALIZACIÓN Y ESTILO
 # ==========================================
 
@@ -119,7 +204,7 @@ def resaltar_valores(s):
     is_low = s_float < s_float.quantile(0.25)
     return ['background-color: #b6fcd5' if h else 'background-color: #ffb6b6' if l else '' for h, l in zip(is_high, is_low)]
 
-def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col):
+def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="", subtest_sel=""):
     """
     Crea visualización de alto impacto mostrando TOP 3 y BOTTOM 3 jugadores en contenedores separados
     """
@@ -127,19 +212,32 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col):
         # No mostrar warning si hay pocos datos, simplemente no renderizar el gráfico grande
         return
     
-    # Calcular promedio por jugador
-    df_promedio = df_filtrado.groupby(jugador_col)[valor_col].mean().reset_index()
-    df_promedio = df_promedio.sort_values(valor_col, ascending=False)
+    # Crear columna auxiliar con valores originales para display
+    df_filtrado['valor_original'] = df_filtrado[valor_col]
+    
+    # Calcular promedio por jugador (usando valores numéricos)
+    df_promedio = df_filtrado.groupby(jugador_col).agg({
+        valor_col: 'mean',
+        'valor_original': 'first'  # Mantener un valor original para referencia
+    }).reset_index()
+    
+    # Obtener unidad
+    unidad = df_filtrado['unidad'].iloc[0] if 'unidad' in df_filtrado.columns else ""
+    es_tiempo = unidad == "Tiempo"
+    
+    # Para tiempos, menor es mejor (invertir orden)
+    df_promedio = df_promedio.sort_values(valor_col, ascending=es_tiempo)
     
     # Obtener TOP 3 y BOTTOM 3
     top_3 = df_promedio.head(3).copy()
     bottom_3 = df_promedio.tail(3).copy()
     
-    # Obtener nombre del test y unidad
-    nombre_test = df_filtrado['Test'].iloc[0] if 'Test' in df_filtrado.columns else "Test"
-    unidad = df_filtrado['unidad'].iloc[0] if 'unidad' in df_filtrado.columns else ""
+    # Construir título dinámico
+    titulo_display = test_sel
+    if subtest_sel and subtest_sel != "":
+        titulo_display = f"{test_sel} ({subtest_sel})"
     
-    st.markdown(f"## 🏆 Top Rendimiento - {nombre_test}")
+    st.markdown(f"## 🏆 Top Rendimiento - {titulo_display}")
     
     col_top, col_bottom = st.columns(2)
     
@@ -159,10 +257,27 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col):
         
         for idx, (_, row) in enumerate(top_3.iterrows(), 1):
             medalla = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉"
+            
+            # Obtener el valor original guardado
+            jugador_data = df_filtrado[df_filtrado[jugador_col] == row[jugador_col]]
+            valor_display = jugador_data['valor_original'].iloc[0] if not jugador_data.empty else row[valor_col]
+            
+            # DETERMINAR FORMATO DE SALIDA
+            valor_display_str = str(valor_display)
+            if "'" in valor_display_str:
+                # Caso A: Texto original tipo 5'08"
+                texto_valor = valor_display_str
+            elif unidad == "Tiempo":
+                # Caso B: Convertir segundos a formato M'S"
+                texto_valor = segundos_a_formato_tiempo(row[valor_col])
+            else:
+                # Caso C: Valor numérico normal
+                texto_valor = f"{row[valor_col]:.2f} {unidad}"
+            
             st.markdown(f"""
                 <div style='background-color: #E8F5E9; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #2E7D32;'>
                     <strong>{medalla} {row[jugador_col]}</strong><br>
-                    <span style='font-size: 1.2em; font-weight: bold; color: #1B5E20;'>{row[valor_col]:.2f} {unidad}</span>
+                    <span style='font-size: 1.2em; font-weight: bold; color: #1B5E20;'>{texto_valor}</span>
                 </div>
             """, unsafe_allow_html=True)
     
@@ -181,17 +296,30 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col):
         """, unsafe_allow_html=True)
         
         for idx, (_, row) in enumerate(bottom_3.iloc[::-1].iterrows(), 1):
-             st.markdown(f"""
+            # Obtener el valor original guardado
+            jugador_data = df_filtrado[df_filtrado[jugador_col] == row[jugador_col]]
+            valor_display = jugador_data['valor_original'].iloc[0] if not jugador_data.empty else row[valor_col]
+            
+            # DETERMINAR FORMATO DE SALIDA
+            valor_display_str = str(valor_display)
+            if "'" in valor_display_str:
+                texto_valor = valor_display_str
+            elif unidad == "Tiempo":
+                texto_valor = segundos_a_formato_tiempo(row[valor_col])
+            else:
+                texto_valor = f"{row[valor_col]:.2f} {unidad}"
+            
+            st.markdown(f"""
                 <div style='background-color: #FFEBEE; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #C62828;'>
                     <strong>{row[jugador_col]}</strong><br>
-                    <span style='font-size: 1.2em; font-weight: bold; color: #B71C1C;'>{row[valor_col]:.2f} {unidad}</span>
+                    <span style='font-size: 1.2em; font-weight: bold; color: #B71C1C;'>{texto_valor}</span>
                 </div>
             """, unsafe_allow_html=True)
 
 def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
     """
     Muestra una tabla con código de colores según rendimiento vs promedio.
-    Versión robusta que maneja errores de visualización.
+    Versión robusta que maneja errores de visualización y formatos de tiempo.
     """
     if df.empty:
         st.warning("⚠️ No hay datos para mostrar con los filtros seleccionados")
@@ -199,9 +327,16 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
     
     # Obtener unidad del dataframe si existe
     unidad = df['unidad'].iloc[0] if 'unidad' in df.columns else ""
+    es_tiempo = unidad == "Tiempo"
     
-    # 1. Preparar datos y asegurar tipos numéricos
+    
+    # 1. Preparar datos
     df_calc = df.copy()
+    
+    # NOTA: valor_original ya viene guardado desde la función principal (physical_area)
+    # No sobrescribir aquí para preservar el formato original de tiempo
+    
+    # Convertir a numérico (ya está convertido desde la función principal)
     df_calc[valor_col] = pd.to_numeric(df_calc[valor_col], errors='coerce')
     
     # Calcular estadísticas
@@ -220,21 +355,47 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
     cols_existentes = [c for c in cols_map.keys() if c in df_calc.columns]
     
     # Crear DF para vista incluyendo la columna de valor para el styling
-    df_view = df_calc[cols_existentes + [valor_col]].copy()
+    df_view = df_calc[cols_existentes + [valor_col, 'valor_original']].copy()
     df_view = df_view.rename(columns=cols_map)
     
     # Crear columna de texto formateado "Resultado"
-    df_view['Resultado'] = df_view[valor_col].apply(
-        lambda x: f"{x:.2f} {unidad}" if pd.notna(x) else ""
-    )
+    def formatear_resultado(row):
+        if pd.isna(row[valor_col]):
+            return ""
+        
+        # Detectar si el valor original tiene formato de tiempo (contiene ')
+        valor_orig_str = str(row['valor_original'])
+        if "'" in valor_orig_str:
+            # Es un tiempo con formato, mostrar original
+            return valor_orig_str
+        
+        # Si la unidad es "Tiempo", convertir segundos a formato M'S"
+        if unidad == "Tiempo":
+            return segundos_a_formato_tiempo(row[valor_col])
+        
+        # Para valores numéricos normales
+        return f"{row[valor_col]:.2f} {unidad}"
     
-    # Reordenar columnas: Las renombradas primero, luego Resultado, luego valor (oculto)
-    cols_ordenadas = [cols_map[c] for c in cols_existentes] + ['Resultado', valor_col]
+    df_view['Resultado'] = df_view.apply(formatear_resultado, axis=1)
+    
+    # Reordenar columnas: Las renombradas primero, luego Resultado, luego columnas auxiliares (ocultas)
+    cols_ordenadas = [cols_map[c] for c in cols_existentes] + ['Resultado', valor_col, 'valor_original']
     df_view = df_view[cols_ordenadas]
     
     # Mostrar estadísticas como métricas antes de la tabla
     c1, c2, c3 = st.columns(3)
-    c1.metric("Promedio", f"{promedio:.2f} {unidad}")
+    
+    # Detectar si algún valor original tiene formato de tiempo
+    tiene_formato_tiempo = df_calc['valor_original'].astype(str).str.contains("'").any()
+    
+    if tiene_formato_tiempo:
+        # Mostrar promedio en formato M'S"
+        promedio_formateado = segundos_a_formato_tiempo(promedio)
+        c1.metric("Promedio", promedio_formateado)
+    else:
+        # Mostrar promedio numérico normal
+        c1.metric("Promedio", f"{promedio:.2f} {unidad}")
+    
     if not pd.isna(desviacion):
         c2.metric("Desviación Estándar", f"{desviacion:.2f}")
     
@@ -246,15 +407,29 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
                 return [''] * len(row)
                 
             estilo = ''
-            if val > promedio + (0.5 * desviacion):
-                # Verde (Encima del promedio)
-                estilo = 'background-color: #C8E6C9; color: #1B5E20'
-            elif val < promedio - (0.5 * desviacion):
-                # Rojo (Debajo del promedio)
-                estilo = 'background-color: #FFCDD2; color: #B71C1C'
+            
+            # Para tiempos, menor es mejor (invertir lógica)
+            if es_tiempo:
+                if val < promedio - (0.5 * desviacion):
+                    # Verde (Mejor que el promedio - menos tiempo)
+                    estilo = 'background-color: #C8E6C9; color: #1B5E20'
+                elif val > promedio + (0.5 * desviacion):
+                    # Rojo (Peor que el promedio - más tiempo)
+                    estilo = 'background-color: #FFCDD2; color: #B71C1C'
+                else:
+                    # Amarillo (Promedio)
+                    estilo = 'background-color: #FFF9C4; color: #F57F17'
             else:
-                # Amarillo (Promedio)
-                estilo = 'background-color: #FFF9C4; color: #F57F17'
+                # Para valores numéricos normales, mayor es mejor
+                if val > promedio + (0.5 * desviacion):
+                    # Verde (Encima del promedio)
+                    estilo = 'background-color: #C8E6C9; color: #1B5E20'
+                elif val < promedio - (0.5 * desviacion):
+                    # Rojo (Debajo del promedio)
+                    estilo = 'background-color: #FFCDD2; color: #B71C1C'
+                else:
+                    # Amarillo (Promedio)
+                    estilo = 'background-color: #FFF9C4; color: #F57F17'
                 
             return [estilo] * len(row)
         except Exception:
@@ -275,11 +450,12 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
         # Aplicar estilo
         styler = df_view.style.apply(aplicar_estilo_fila, axis=1)
         
-        # Ocultar columna auxiliar 'valor' de forma compatible
+        # Ocultar columnas auxiliares de forma compatible
+        columnas_ocultar = [valor_col, 'valor_original']
         if hasattr(styler, "hide"):
-            styler.hide(subset=[valor_col], axis=1, names=False) # names=False oculta header tb si es necesario en pandas nuevos
+            styler.hide(subset=columnas_ocultar, axis=1, names=False)
         elif hasattr(styler, "hide_columns"):
-            styler.hide_columns([valor_col])
+            styler.hide_columns(columnas_ocultar)
             
         # Formateo general
         styler.set_properties(**{
@@ -297,7 +473,7 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
         st.error(f"Error al aplicar estilos: {e}")
         # Fallback sin estilos de fila pero funcional
         st.dataframe(
-            df_view.drop(columns=[valor_col]), 
+            df_view.drop(columns=[valor_col, 'valor_original']), 
             use_container_width=True,
             hide_index=True
         )
@@ -422,7 +598,8 @@ def physical_area():
 
     # 5. Subtest (si aplica)
     subtests = sorted(df_jug[subtest_col].dropna().unique())
-    if len(subtests) > 0 and subtests[0] != "":
+    subtest_sel = ""
+    if len(subtests) > 0 and any(s != "" for s in subtests):
         subtest_sel = st.selectbox("⚙️ Selecciona el subtest", options=subtests)
         df_final = df_jug[df_jug[subtest_col] == subtest_sel]
     else:
@@ -432,14 +609,16 @@ def physical_area():
     # PROCESAMIENTO Y VISUALIZACIÓN
     # ==========================================
     
-    # Convertir valores a números para análisis
-    df_final[valor_col] = df_final[valor_col].astype(str).str.replace(',', '.')
-    df_final[valor_col] = pd.to_numeric(df_final[valor_col], errors='coerce')
+    # Guardar valores originales antes de convertir
+    df_final['valor_original'] = df_final[valor_col]
+    
+    # Convertir valores a números para análisis (maneja tiempos y números)
+    df_final[valor_col] = df_final[valor_col].apply(convertir_valor_a_numero)
 
     if not df_final.empty:
         st.markdown("<br>", unsafe_allow_html=True)
-        # 1. Gráfico de Top/Bottom
-        mostrar_grafico_top_bottom(df_final, jugador_col, valor_col)
+        # 1. Gráfico de Top/Bottom (Pasando el Test y Subtest para el título)
+        mostrar_grafico_top_bottom(df_final, jugador_col, valor_col, test_sel, subtest_sel)
         
         st.markdown("---")
         
