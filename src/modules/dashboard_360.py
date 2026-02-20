@@ -356,7 +356,7 @@ def cargar_estilos_profesionales():
     """Cargar estilos CSS profesionales para el club de rugby Universitario (Negro y Blanco)"""
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&family=Outfit:wght@500;600;700;800&display=swap');
     
     :root {
         --rugby-primary: #000000;
@@ -779,25 +779,25 @@ def mostrar_ficha_personal_simple(datos_jugador):
     
     with col_peso:
         st.markdown(f"""
-        <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 10px;">
-            <div style="font-size: 0.85rem; color: #6c757d; font-weight: 600; margin-bottom: 0.5rem;">PESO</div>
-            <div style="font-size: 1.8rem; color: #000000; font-weight: 800;">{peso_str}</div>
+        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+            <div style="font-size: 0.9rem; color: #6c757d; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 1px; font-family: 'Inter', sans-serif;">PESO</div>
+            <div style="font-size: 2.2rem; color: #000000; font-weight: 900; font-family: 'Montserrat', sans-serif; line-height: 1;">{peso_str}</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col_altura:
         st.markdown(f"""
-        <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 10px;">
-            <div style="font-size: 0.85rem; color: #6c757d; font-weight: 600; margin-bottom: 0.5rem;">ALTURA</div>
-            <div style="font-size: 1.8rem; color: #000000; font-weight: 800;">{altura_str}</div>
+        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+            <div style="font-size: 0.9rem; color: #6c757d; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 1px; font-family: 'Inter', sans-serif;">ALTURA</div>
+            <div style="font-size: 2.2rem; color: #000000; font-weight: 900; font-family: 'Montserrat', sans-serif; line-height: 1;">{altura_str}</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col_estado:
         st.markdown(f"""
-        <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 10px;">
-            <div style="font-size: 0.85rem; color: #6c757d; font-weight: 600; margin-bottom: 0.5rem;">ESTADO</div>
-            <div style="font-size: 1.8rem; color: #198754; font-weight: 800;">Activo</div>
+        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+            <div style="font-size: 0.9rem; color: #6c757d; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 1px; font-family: 'Inter', sans-serif;">ESTADO</div>
+            <div style="font-size: 2.2rem; color: #2d7a4d; font-weight: 900; font-family: 'Montserrat', sans-serif; line-height: 1;">Activo</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1006,15 +1006,16 @@ def crear_panel_areas_unificado(datos_jugador):
     # Crear las 3 columnas principales
     col1, col2, col3 = st.columns(3)
     
-    # COLUMNA 1: PREPARACIÓN FÍSICA CON SOMBRA GRIS
+    # COLUMNA 1: PREPARACIÓN FÍSICA
     with col1:
-        contenido_html = '<div style="padding: 1.5rem; background: #f8f9fa; border-radius: 10px; min-height: 250px; border: 1px solid #dee2e6;">'
-        contenido_html += '<h4 style="color: #000000; margin-top: 0;">💪 PREPARACIÓN FÍSICA</h4>'
+        contenido_html = '<div style="padding: 1.5rem; background: #ffffff; border-radius: 15px; min-height: 280px; border: 1px solid #e9ecef; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
+        contenido_html += '<h4 style="color: #000000; margin-top: 0; font-family: \'Montserrat\', sans-serif; font-weight: 700; display: flex; align-items: center; gap: 10px;"><span style="font-size: 1.5rem;">💪</span> PREPARACIÓN FÍSICA</h4>'
+        contenido_html += '<div style="margin-top: 1rem; font-family: \'Inter\', sans-serif; color: #4a5568;">'
         
         if datos_fisicos.empty:
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Banco Plano:</strong> —</p>'
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Dominadas:</strong> —</p>'
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Test Bronco:</strong> —</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Banco Plano:</strong> —</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Dominadas:</strong> —</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Test Bronco:</strong> —</p>'
         else:
             tiene_test = 'Test' in datos_fisicos.columns
             tiene_subtest = 'Subtest' in datos_fisicos.columns
@@ -1049,107 +1050,123 @@ def crear_panel_areas_unificado(datos_jugador):
                             elif unidad.lower() == 's': resultado = f"{valor} s"
                             else: resultado = f"{valor} {unidad}".strip() if unidad else str(valor)
                             
-                            contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>{test_display}:</strong> {resultado}</p>'
+                            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>{test_display}:</strong> {resultado}</p>'
                             resultado_encontrado = True
                             break
                     
                     if not resultado_encontrado:
-                        contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>{test_display}:</strong> —</p>'
+                        contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>{test_display}:</strong> —</p>'
             else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Banco Plano:</strong> —</p>'
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Dominadas:</strong> —</p>'
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Test Bronco:</strong> —</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Banco Plano:</strong> —</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Dominadas:</strong> —</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Test Bronco:</strong> —</p>'
         contenido_html += '</div>'
         st.markdown(contenido_html, unsafe_allow_html=True)
     
-    # COLUMNA 2: MEDICINA CON SOMBRA GRIS
+    # COLUMNA 2: MEDICINA
     with col2:
-        contenido_html = '<div style="padding: 1.5rem; background: #f8f9fa; border-radius: 10px; min-height: 250px; border: 1px solid #dee2e6;">'
-        contenido_html += '<h4 style="color: #000000; margin-top: 0;">🏥 MEDICINA</h4>'
+        contenido_html = '<div style="padding: 1.5rem; background: #ffffff; border-radius: 15px; min-height: 280px; border: 1px solid #e9ecef; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
+        contenido_html += '<h4 style="color: #000000; margin-top: 0; font-family: \'Montserrat\', sans-serif; font-weight: 700; display: flex; align-items: center; gap: 10px;"><span style="font-size: 1.5rem;">🏥</span> MEDICINA</h4>'
+        contenido_html += '<div style="margin-top: 1rem; font-family: \'Inter\', sans-serif; color: #4a5568;">'
         
         if datos_medicos.empty:
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Estado actual:</strong> Sin datos</p>'
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Último control:</strong> —</p>'
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Lesión activa:</strong> —</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> Sin datos</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> —</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> —</p>'
         else:
             if '¿Puede participar en entrenamientos?' in datos_medicos.columns:
                 participacion = datos_medicos['¿Puede participar en entrenamientos?'].iloc[-1]
                 if participacion == "Solo entrenamiento diferenciado":
-                    contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Estado actual:</strong> 🟡 Limitado</p>'
+                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🟡 Limitado</p>'
                 elif participacion == "No puede entrenar":
-                    contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Estado actual:</strong> 🔴 No disponible</p>'
+                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🔴 No disponible</p>'
                 else:
-                    contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Estado actual:</strong> 🟢 Disponible</p>'
+                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🟢 Disponible</p>'
             else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Estado actual:</strong> 🟢 Disponible</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🟢 Disponible</p>'
             
             if 'Marca temporal' in datos_medicos.columns:
                 ultimo_control = datos_medicos['Marca temporal'].max()
                 try:
                     fecha_legible = pd.to_datetime(ultimo_control).strftime('%d/%m/%y')
-                    contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>Último control:</strong> {fecha_legible}</p>'
+                    contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> {fecha_legible}</p>'
                 except:
-                    contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>Último control:</strong> {ultimo_control}</p>'
+                    contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> {ultimo_control}</p>'
             else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Último control:</strong> —</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> —</p>'
             
             if 'Tipo de lesión' in datos_medicos.columns:
                 lesion_reciente = datos_medicos['Tipo de lesión'].iloc[-1]
                 if pd.notna(lesion_reciente) and lesion_reciente.strip():
-                    contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>Lesión activa:</strong> {lesion_reciente}</p>'
+                    contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> {lesion_reciente}</p>'
                 else:
-                    contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Lesión activa:</strong> Ninguna</p>'
+                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> Ninguna</p>'
             else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Lesión activa:</strong> —</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> —</p>'
         
         contenido_html += '</div>'
         st.markdown(contenido_html, unsafe_allow_html=True)
     
-    # COLUMNA 3: NUTRICIÓN CON SOMBRA GRIS
+    # COLUMNA 3: NUTRICIÓN
     with col3:
-        contenido_html = '<div style="padding: 1.5rem; background: #f8f9fa; border-radius: 10px; min-height: 250px; border: 1px solid #dee2e6;">'
-        contenido_html += '<h4 style="color: #000000; margin-top: 0;">🥗 NUTRICIÓN</h4>'
+        contenido_html = '<div style="padding: 1.5rem; background: #ffffff; border-radius: 15px; min-height: 280px; border: 1px solid #e9ecef; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
+        contenido_html += '<h4 style="color: #000000; margin-top: 0; font-family: \'Montserrat\', sans-serif; font-weight: 700; display: flex; align-items: center; gap: 10px;"><span style="font-size: 1.5rem;">🥗</span> NUTRICIÓN</h4>'
+        contenido_html += '<div style="margin-top: 1rem; font-family: \'Inter\', sans-serif; color: #4a5568;">'
         
         if datos_nutricionales.empty:
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Peso actual:</strong> — kg</p>'
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>% grasa corporal:</strong> — %</p>'
-            contenido_html += '<p style="margin: 0.5rem 0;">• <strong>IMC:</strong> —</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> — kg</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> — %</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> —</p>'
+            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> —</p>'
         else:
-            if 'Peso (kg): [Número con decimales 88,5]' in datos_nutricionales.columns:
-                peso = datos_nutricionales['Peso (kg): [Número con decimales 88,5]'].iloc[-1]
-                if pd.notna(peso):
-                    contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>Peso actual:</strong> {peso} kg</p>'
-                else:
-                    contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Peso actual:</strong> — kg</p>'
-            else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Peso actual:</strong> — kg</p>'
+            # Ordenar por fecha para asegurar que el último registro es el más reciente
+            df_nut_ord = datos_nutricionales.copy()
+            col_fecha_busqueda = next((c for c in df_nut_ord.columns if any(p in str(c).lower() for p in ['marca', 'fecha'])), None)
+            if col_fecha_busqueda:
+                df_nut_ord[col_fecha_busqueda] = pd.to_datetime(df_nut_ord[col_fecha_busqueda], errors='coerce')
+                df_nut_ord = df_nut_ord.dropna(subset=[col_fecha_busqueda]).sort_values(col_fecha_busqueda)
             
-            if '% grasa corporal' in datos_nutricionales.columns:
-                grasa = datos_nutricionales['% grasa corporal'].iloc[-1]
-                if pd.notna(grasa):
-                    contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>% grasa corporal:</strong> {grasa}%</p>'
-                else:
-                    contenido_html += '<p style="margin: 0.5rem 0;">• <strong>% grasa corporal:</strong> — %</p>'
-            else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>% grasa corporal:</strong> — %</p>'
+            ultimo_registro = df_nut_ord.iloc[-1]
             
-            if 'IMC' in datos_nutricionales.columns:
-                imc_raw = datos_nutricionales['IMC'].iloc[-1]
-                imc = normalizar_valor_numerico(imc_raw)
-                if imc is not None:
-                    contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>IMC:</strong> {imc:.1f}</p>'
-                else:
-                    contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>IMC:</strong> {imc_raw if pd.notna(imc_raw) else "—"}</p>'
-            else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>IMC:</strong> —</p>'
+            # 1. Peso (Exacto o Flexible)
+            col_peso_f = 'Peso (kg): [Número con decimales 88,5]'
+            if col_peso_f not in df_nut_ord.columns:
+                col_peso_f = next((c for c in df_nut_ord.columns if 'peso' in str(c).lower() and 'kg' in str(c).lower()), None)
             
-            if 'fecha' in datos_nutricionales.columns:
-                ultima_evaluacion = datos_nutricionales['fecha'].max()
-                contenido_html += f'<p style="margin: 0.5rem 0;">• <strong>Última evaluación:</strong> {ultima_evaluacion}</p>'
-            else:
-                contenido_html += '<p style="margin: 0.5rem 0;">• <strong>Última evaluación:</strong> —</p>'
+            peso_val = normalizar_valor_numerico(ultimo_registro.get(col_peso_f))
+            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> {f"{peso_val:.1f}" if peso_val else "—"} kg</p>'
+            
+            # 2. % Grasa (Exacto o Flexible)
+            col_grasa_f = '% MA: [Número con decimales]'
+            if col_grasa_f not in df_nut_ord.columns:
+                col_grasa_f = next((c for c in df_nut_ord.columns if '%' in str(c).lower() and ('ma' in str(c).lower() or 'adip' in str(c).lower())), None)
+            
+            grasa_val = normalizar_valor_numerico(ultimo_registro.get(col_grasa_f)) if col_grasa_f else None
+            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> {f"{grasa_val:.1f}" if grasa_val else "—"} %</p>'
+            
+            # 3. IMC (Exacto o Flexible)
+            col_imc_f = 'IMC'
+            if col_imc_f not in df_nut_ord.columns:
+                col_imc_f = next((c for c in df_nut_ord.columns if 'imc' in str(c).lower()), None)
+            
+            imc_val = normalizar_valor_numerico(ultimo_registro.get(col_imc_f))
+            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> {f"{imc_val:.1f}" if imc_val else "—"}</p>'
+            
+            # 4. Última evaluación (Mostrar solo el mes)
+            fecha_val = ultimo_registro.get(col_fecha_busqueda) if col_fecha_busqueda else None
+            try:
+                fecha_dt = pd.to_datetime(fecha_val)
+                if pd.notna(fecha_dt):
+                    meses_es = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 
+                                7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
+                    fecha_str = meses_es.get(fecha_dt.month, "—")
+                else:
+                    fecha_str = "—"
+            except:
+                fecha_str = str(fecha_val) if pd.notna(fecha_val) else "—"
+            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> {fecha_str}</p>'
         
-        contenido_html += '</div>'
+        contenido_html += '</div></div>'
         st.markdown(contenido_html, unsafe_allow_html=True)
         
                 

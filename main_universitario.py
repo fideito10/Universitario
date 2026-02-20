@@ -502,7 +502,7 @@ def main_dashboard():
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🤖 Asistente")
 
-    if st.sidebar.button("🧠 Asistente AI", use_container_width=True):
+    if st.sidebar.button("🧠 Asistente IA", use_container_width=True):
         st.session_state.current_page = "bot"
         st.rerun()
     

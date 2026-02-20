@@ -120,6 +120,26 @@ def format_df_ar(df):
             df_fmt[col] = df_fmt[col].apply(lambda x: str(x).replace('.', ',') if isinstance(x, str) and re.match(r'^-?\d+\.\d+$', x) else x)
     return df_fmt
 
+def style_nutricion_df(df):
+    """Aplica colores de fondo a las filas según el objetivo nutricional."""
+    if df is None or df.empty: return df
+    
+    col_obj = next((c for c in df.columns if 'objetivo' in c.lower()), None)
+    if not col_obj: return df
+
+    def highlight_rows(row):
+        val = str(row.get(col_obj, '')).strip()
+        # Usamos colores con transparencia (rgba) para que el texto sea legible y se vea premium
+        if "Aumento MM" in val:
+            return ['background-color: rgba(255, 193, 7, 0.25)'] * len(row)
+        elif "Descenso MA" in val:
+            return ['background-color: rgba(235, 87, 87, 0.25)'] * len(row)
+        elif "Mantenimiento" in val:
+            return ['background-color: rgba(39, 174, 96, 0.25)'] * len(row)
+        return [''] * len(row)
+
+    return df.style.apply(highlight_rows, axis=1)
+
 def obtener_columna_fecha(df):
     posibles = ['Marca temporal', 'Fecha']
     for col in df.columns:
@@ -286,24 +306,92 @@ def grafico_torta_antropometria(df_hist):
 # 📊 EQUIPO & SEGUIMIENTO
 # =============================================================================
 
-def crear_grafico_objetivos_equipo(df):
-    """Gráfico de barras apiladas por categorías y objetivos."""
+def crear_grafico_objetivos_equipo(df, categoria_filtro="Todas", mes_filtro="Todos"):
+    """Gráfico de bloques sólidos por categoría, con filtros de división y mes."""
     col_obj = next((c for c in df.columns if 'objetivo' in c.lower()), None)
+    col_nombre = 'Nombre y Apellido'
+    
     if not col_obj or df.empty: return None
     
-    # Limpiar nombres de categorías y objetivos
     df_plot = df.copy()
-    df_plot['Categoría'] = df_plot['Categoría'].fillna('Sin Categoría')
-    df_plot[col_obj] = df_plot[col_obj].fillna('Sin Definir')
     
-    fig = px.bar(df_plot, x='Categoría', color=col_obj, 
-                 title="Objetivos Nutricionales por Categoría",
-                 color_discrete_sequence=px.colors.qualitative.Pastel)
+    # 1. Asegurar formato de fecha
+    col_fecha = obtener_columna_fecha(df_plot)
+    if not col_fecha: return None
+    
+    df_plot[col_fecha] = pd.to_datetime(df_plot[col_fecha], dayfirst=True, errors='coerce')
+    df_plot = df_plot.dropna(subset=[col_fecha])
+    
+    # 2. Crear columna de Mes para filtrar
+    meses_es = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 
+                7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
+    df_plot['periodo'] = df_plot[col_fecha].dt.month.map(meses_es) + " " + df_plot[col_fecha].dt.year.astype(str)
+    
+    # 3. Aplicar Filtros
+    if categoria_filtro != "Todas":
+        df_plot = df_plot[df_plot['Categoría'] == categoria_filtro]
+    
+    if mes_filtro != "Todos":
+        df_plot = df_plot[df_plot['periodo'] == mes_filtro]
+        
+    if df_plot.empty: 
+        st.info(f"No hay registros para {categoria_filtro} en {mes_filtro}")
+        return None
+
+    # 4. Última foto de cada jugador DENTRO del filtro seleccionado
+    df_plot = df_plot.sort_values(col_fecha).drop_duplicates(subset=[col_nombre], keep='last')
+    
+    # 5. Agrupar por bloques sólidos
+    df_resumen = df_plot.groupby(['Categoría', col_obj]).size().reset_index(name='Cantidad')
+    
+    # 6. Mapa de colores actualizado
+    color_map = {
+        "Aumento MM": "#FFC107",
+        "Descenso MA": "#EB5757",
+        "Mantenimiento": "#27AE60",
+        "Sin Definir": "#828282"
+    }
+    
+    fig = px.bar(
+        df_resumen, 
+        x='Categoría', 
+        y='Cantidad',
+        color=col_obj,
+        text=col_obj,
+        title=f"Distribución: {categoria_filtro} | Período: {mes_filtro}",
+        labels={col_obj: 'Objetivo', 'Cantidad': 'N° Jugadores', 'Categoría': 'División'},
+        color_discrete_map=color_map,
+        category_orders={"Categoría": sorted(df_plot['Categoría'].unique())}
+    )
     
     fig.update_layout(
-        plot_bgcolor='#1a1a1a', paper_bgcolor='#1a1a1a', font=dict(color='white'),
-        legend=dict(orientation="h", y=-0.2), height=450
+        barmode='stack',
+        plot_bgcolor='#1a1a1a', 
+        paper_bgcolor='#1a1a1a', 
+        font=dict(color='white', size=16),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+        height=550,
+        margin=dict(t=80, b=120),
+        yaxis=dict(
+            title=dict(text="Cantidad de Jugadores", font=dict(size=18)),
+            gridcolor='rgba(255,255,255,0.1)',
+            dtick=1
+        ),
+        xaxis=dict(
+            title=None,
+            tickfont=dict(size=18),
+            gridcolor='rgba(255,255,255,0.1)'
+        )
     )
+    
+    fig.update_traces(
+        textposition='inside',
+        insidetextanchor='middle',
+        textfont=dict(size=16, color='white'),
+        hovertemplate="<b>%{x}</b><br>Objetivo: %{fullData.name}<br>Cantidad: %{y} jugadores<extra></extra>"
+    )
+
     return fig
 
 # =============================================================================
@@ -335,11 +423,17 @@ def main_nutricion():
             nombres = sorted([j['nombre'] for j in filtrados])
             jugador_sel = st.selectbox(f"👤 Jugador ({len(nombres)})", options=nombres)
 
-        if st.button("➕ Nuevo Reporte", type="primary"):
-            st.session_state['show_form'] = not st.session_state.get('show_form', False)
+        if not st.session_state.get('show_form', False):
+            if st.button("➕ Nuevo Reporte", type="primary"):
+                st.session_state['show_form'] = True
+                st.rerun()
 
         if st.session_state.get('show_form', False):
-            with st.expander("📝 Formulario de Evaluación", expanded=True):
+            if st.button("⬅️ Volver al Reporte / Cancelar"):
+                st.session_state['show_form'] = False
+                st.rerun()
+
+            with st.container():
                 with st.form("form_nutricion"):
                     j_data = next((j for j in jugadores_bc if j['nombre'] == jugador_sel), {})
                     st.info(f"DNI: {j_data.get('dni')} | Cat: {j_data.get('categoria')} | Pos: {j_data.get('posicion')}")
@@ -348,7 +442,6 @@ def main_nutricion():
                         peso = st.number_input("Peso (kg)", step=0.1)
                         talla = st.number_input("Talla (cm)", step=0.1)
                         talla_s = st.number_input("Talla sentado (cm)", step=0.1)
-                        kg_mm_base = st.number_input("Kilos Masa Muscular", step=0.1)
                     with c2:
                         imc = st.number_input("IMC", step=0.1)
                         pct_ma = st.number_input("% Masa Adiposa", step=0.1)
@@ -370,18 +463,16 @@ def main_nutricion():
                         fecha_hoy = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                         
                         # MANDAMOS NÚMEROS PUROS (Sin f_ar)
-                        # Al usar value_input_option="RAW", Google los recibe como números
-                        # y tu planilla les pone la coma automáticamente.
                         row = [
                             fecha_hoy,                  # 1. Marca temporal
                             jugador_sel,                # 2. Nombre y Apellido
-                            str(j_data.get('dni', '')), # 3. DNI (como string para evitar decimales)
+                            str(j_data.get('dni', '')), # 3. DNI
                             str(j_data.get('categoria', '')),
                             str(j_data.get('posicion', '')),
-                            float(peso),                # 6. Peso (kg) - NÚMERO PURO
+                            float(peso),                # 6. Peso (kg)
                             float(talla),               # 7. Talla (cm)
                             float(talla_s),             # 8. Talla sentado (cm)
-                            float(kg_mm_base),          # 9. Kilos Masa Muscular
+                            float(kg_mm),               # 9. Kilos Masa Muscular (Antes kg_mm_base)
                             float(imc),                 # 10. IMC
                             float(pct_ma),              # 11. % Masa Adiposa
                             float(z_adi),               # 12. Z Adiposo
@@ -397,10 +488,12 @@ def main_nutricion():
                         
                         if guardar_reporte_seguro(row):
                             st.success(f"✅ Reporte guardado: {jugador_sel} con {peso} kg")
+                            st.session_state['show_form'] = False
                             st.rerun()
 
         st.markdown("---")
-        if jugador_sel and df_nutricion is not None and not df_nutricion.empty:
+        # SOLO mostrar el reporte si el formulario NO está abierto
+        if not st.session_state.get('show_form', False) and jugador_sel and df_nutricion is not None and not df_nutricion.empty:
             j_data = next((j for j in jugadores_bc if j['nombre'] == jugador_sel), {})
             dni_val = str(j_data.get('dni', '')).strip()
             
@@ -429,21 +522,52 @@ def main_nutricion():
                 
                 st.markdown("#### 📜 Historial de Mediciones")
                 # Mostramos la tabla formateada con comas
-                st.dataframe(format_df_ar(df_j), use_container_width=True)
+                st.dataframe(style_nutricion_df(format_df_ar(df_j)), use_container_width=True)
             else: st.info(f"No hay registros para {jugador_sel}")
 
     with tab2:
         st.markdown("### 👥 Análisis de Equipo")
         if df_nutricion is not None and not df_nutricion.empty:
-            st.metric("Total Mediciones", len(df_nutricion))
+            # Preparar datos de tiempo para el filtro de mes
+            df_temp = df_nutricion.copy()
+            col_fecha = obtener_columna_fecha(df_temp)
+            meses_disp = ["Todos"]
+            if col_fecha:
+                df_temp[col_fecha] = pd.to_datetime(df_temp[col_fecha], dayfirst=True, errors='coerce')
+                df_temp = df_temp.dropna(subset=[col_fecha]).sort_values(col_fecha, ascending=False)
+                meses_es = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 
+                            7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
+                df_temp['periodo'] = df_temp[col_fecha].dt.month.map(meses_es) + " " + df_temp[col_fecha].dt.year.astype(str)
+                meses_disp += df_temp['periodo'].unique().tolist()
+
+            c1, c2, c3 = st.columns([1, 1.5, 1.5])
+            with c1:
+                st.metric("Mediciones", len(df_nutricion))
+            with c2:
+                categorias_unicas = sorted(df_nutricion['Categoría'].unique().tolist()) if 'Categoría' in df_nutricion.columns else []
+                cat_equipo = st.selectbox("📂 División", options=["Todas"] + categorias_unicas, key="filt_cat_equipo")
+            with c3:
+                mes_equipo = st.selectbox("📅 Mes/Año", options=meses_disp, key="filt_mes_equipo")
             
-            # Gráfico de objetivos por equipo
-            fig_team = crear_grafico_objetivos_equipo(df_nutricion)
+            # Filtrar DataFrame para la tabla según los selectores
+            df_tabla = df_nutricion.copy()
+            if col_fecha:
+                df_tabla[col_fecha] = pd.to_datetime(df_tabla[col_fecha], dayfirst=True, errors='coerce')
+                df_tabla['periodo'] = df_tabla[col_fecha].dt.month.map(meses_es) + " " + df_tabla[col_fecha].dt.year.astype(str)
+            
+            if cat_equipo != "Todas":
+                df_tabla = df_tabla[df_tabla['Categoría'] == cat_equipo]
+            if mes_equipo != "Todos":
+                df_tabla = df_tabla[df_tabla['periodo'] == mes_equipo]
+
+            # Gráfico de objetivos con ambos filtros
+            fig_team = crear_grafico_objetivos_equipo(df_nutricion, cat_equipo, mes_equipo)
             if fig_team: st.plotly_chart(fig_team, use_container_width=True)
             
-            st.markdown("#### 📋 Todos los registros")
-            # Mostramos la tabla formateada con comas
-            st.dataframe(format_df_ar(df_nutricion), use_container_width=True)
+            st.markdown(f"#### 📋 Registros Filtrados ({len(df_tabla)})")
+            # Mostramos la tabla filtrada, formateada y COLOREADA
+            if 'periodo' in df_tabla.columns: df_tabla = df_tabla.drop(columns=['periodo'])
+            st.dataframe(style_nutricion_df(format_df_ar(df_tabla)), use_container_width=True)
 
 if __name__ == "__main__":
     main_nutricion()

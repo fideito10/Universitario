@@ -139,39 +139,41 @@ def main_bot():
 
     st.markdown("""
     <div class="chat-header">
-        <h1 style="color: white; margin: 0;">✨ Asistente Inteligente Universitario</h1>
-        <p style="color: #E0E0E0; margin: 0.5rem 0 0 0;">Potenciado por Google Gemini (Ultra Rápido)</p>
+        <h1 style="color: white; margin: 0;">Asistente Inteligente Universitario</h1>
+        <p style="color: #E0E0E0; margin: 0.5rem 0 0 0;">Analiza datos de jugadores, informes médicos y métricas físicas en tiempo real para brindarte respuestas precisas.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Configuración Gemini en Sidebar ---
-    with st.sidebar:
-        st.markdown("### 🔑 Configuración IA")
-        
-        # Intentar obtener API Key de secrets
-        gemini_api_key = ""
-        if hasattr(st, 'secrets') and "google" in st.secrets:
-            # A veces se guarda como 'gemini_api_key' dentro de 'google' o solo en el root
+    # --- Configuración de IA (Limpia) ---
+    gemini_api_key = ""
+    
+    # 1. Intentar obtener de st.secrets (Prioridad)
+    if hasattr(st, 'secrets'):
+        if "gemini_api_key" in st.secrets:
+            gemini_api_key = st.secrets["gemini_api_key"]
+        elif "google" in st.secrets:
             gemini_api_key = st.secrets["google"].get("gemini_api_key", "")
-        
-        if not gemini_api_key and "gemini_api_key" in st.secrets:
-             gemini_api_key = st.secrets["gemini_api_key"]
 
-        api_key_input = st.text_input("Gemini API Key", value="AIzaSyBEN8C00vWYXq4UGjFkGCRmyIjgoSSoSCQ", type="password", help="Consíguela gratis en Google AI Studio")
-        
-        if not api_key_input:
-            st.warning("⚠️ Ingresa tu API Key para usar el asistente.")
-            st.markdown("[Obtener API Key Gratis](https://aistudio.google.com/app/apikey)")
-        else:
-            genai.configure(api_key=api_key_input)
-            st.success("✅ IA Conectada")
-        
-        st.markdown("---")
+    # --- Sidebar ---
+    with st.sidebar:
         if st.button("🗑️ Limpiar Conversación", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
 
         st.info("💡 Pregunta sobre jugadores, lesiones o métricas físicas.")
+        
+        # Configuración discreta si falla la conexión automática
+        with st.expander("⚙️ Configuración Avanzada", expanded=False):
+            manual_key = st.text_input("Ingresar nueva Gemini API Key:", type="password", help="Si el asistente no responde, ingresa una clave válida aquí.")
+            if manual_key:
+                gemini_api_key = manual_key
+                st.success("Clave manual activada")
+
+        if gemini_api_key:
+            genai.configure(api_key=gemini_api_key)
+            st.success("✨ IA (Gemini) Conectada")
+        else:
+            st.warning("⚠️ Sin API Key configurada")
 
     # --- Historial de Chat ---
     if "messages" not in st.session_state:
@@ -181,10 +183,6 @@ def main_bot():
     if "data_context" not in st.session_state:
         with st.spinner("🔄 Conectando con bases de datos..."):
             st.session_state.data_context = load_all_data()
-            if "Error" not in st.session_state.data_context:
-                st.success("✅ Información cargada.")
-            else:
-                st.error("⚠️ Problemas cargando datos.")
 
     # --- Mostrar Chat ---
     for message in st.session_state.messages:
@@ -193,74 +191,66 @@ def main_bot():
 
     # --- Input de Usuario ---
     if prompt := st.chat_input("Escribe tu consulta aquí..."):
-        if not api_key_input:
-            st.error("❌ Por favor, ingresa una API Key en la barra lateral.")
-        else:
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-            with st.chat_message("assistant"):
-                response_placeholder = st.empty()
-                full_response = ""
-                
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            full_response = ""
+            
+            try:
+                # 1. Selección robusta de modelo
                 try:
-                    # 1. Buscar dinámicamente qué modelos están disponibles
+                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                except:
                     available_models = []
-                    for m in genai.list_models():
-                        if 'generateContent' in m.supported_generation_methods:
-                            available_models.append(m.name)
-                    
-                    if not available_models:
-                        raise Exception("No se encontraron modelos disponibles.")
-                    
-                    # 2. Priorizar modelos Flash
-                    target_model = None
-                    for m in available_models:
-                        if "1.5-flash" in m:
-                            target_model = m
-                            break
-                    
-                    if not target_model:
-                        target_model = available_models[0]
-                        
-                    model = genai.GenerativeModel(target_model)
-                    
-                    # 3. Preparar el envío con la nueva personalidad de Consultor/Analista
-                    full_prompt = f"""ERES: Consultor Estratégico y Analista Deportivo Senior del Club Universitario de La Plata.
-                    OBJETIVO: Brindar análisis precisos, sintetizar información clave y generar reportes ejecutivos para reuniones de comisión directiva o cuerpo técnico.
-                    
-                    DATOS DEL CLUB (CONTEXTO REAL):
-                    {st.session_state.data_context}
-                    
-                    SOLICITUD DEL USUARIO: {prompt}
-                    
-                    REGLAS DE ORO PARA TUS REPORTES:
-                    1. PROFESIONALISMO: Usa un tono formal, ejecutivo y directo.
-                    2. ESTRUCTURA DE REUNIÓN: Si te piden un reporte, usa:
-                       - 📋 **Resumen Ejecutivo**: (Lo más importante en 2 párrafos)
-                       - 📊 **Métricas Clave**: (Datos numéricos comparativos)
-                       - ⚠️ **Puntos Críticos**: (Alertas médicas o bajas de rendimiento)
-                       - ✅ **Conclusión/Sugerencia**: (Pasos a seguir)
-                    3. CONCISIÓN: Evita párrafos largos. Usa listas (bullet points) y tablas.
-                    4. VERACIDAD: Solo usa los datos proporcionados. Si no hay datos, indica: "Sin registros disponibles para análisis".
-                    5. IDIOMA: Responde siempre en ESPAÑOL."""
+                
+                # Prioridades: flash-latest -> flash -> pro
+                target_model = "gemini-pro" # Fallback ultra-seguro
+                
+                if available_models:
+                    # Buscamos la versión más moderna de flash primero
+                    flash_variants = [m for m in available_models if "1.5-flash" in m]
+                    if flash_variants:
+                        target_model = flash_variants[0]
+                    else:
+                        pro_variants = [m for m in available_models if "pro" in m]
+                        if pro_variants:
+                            target_model = pro_variants[0]
 
-                    response = model.generate_content(full_prompt, stream=True)
-                    
-                    # Generar respuesta
-                    for chunk in response:
-                        try:
-                            if chunk.text:
-                                full_response += chunk.text
-                                response_placeholder.markdown(full_response + "▌")
-                        except Exception:
-                            break
-                    
-                    response_placeholder.markdown(full_response)
-                    st.session_state.messages.append({"role": "assistant", "content": full_response})
-                    
-                except Exception as e:
+                model = genai.GenerativeModel(target_model)
+                
+                # 2. Preparar el envío con la personalidad de Consultor
+                full_prompt = f"""ERES: Consultor Estratégico y Analista Deportivo Senior del Club Universitario de La Plata.
+                {st.session_state.data_context}
+                
+                SOLICITUD: {prompt}
+                
+                REGLAS:
+                - Tono formal y ejecutivo.
+                - Usa tablas y listas si es necesario.
+                - Responde siempre en ESPAÑOL."""
+
+                response = model.generate_content(full_prompt, stream=True)
+                
+                for chunk in response:
+                    try:
+                        if chunk.text:
+                            full_response += chunk.text
+                            response_placeholder.markdown(full_response + "▌")
+                    except Exception:
+                        break
+                
+                response_placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+            except Exception as e:
+                error_msg = str(e)
+                if "403" in error_msg and "leaked" in error_msg:
+                    st.error("🔒 **Error de Seguridad:** Tu API Key ha sido bloqueada por Google por estar filtrada en internet.")
+                    st.info("👉 **Solución:** Genera una clave nueva gratis aquí: [Google AI Studio](https://aistudio.google.com/app/apikey) y pégala en 'Configuración Avanzada' de la barra lateral.")
+                else:
                     st.error(f"Error Gemini: {e}")
 
 if __name__ == "__main__":
