@@ -1,5 +1,8 @@
 # Credenciales y archivos sensibles
 car-rugby-club-a0c763e39e4c.json
+fix_secrets.py
+dump_profiles.py
+profiles_dump.txt
 credentials/
 *.json
 client_secret_*.json

@@ -1124,47 +1124,56 @@ def crear_panel_areas_unificado(datos_jugador):
             col_fecha_busqueda = next((c for c in df_nut_ord.columns if any(p in str(c).lower() for p in ['marca', 'fecha'])), None)
             if col_fecha_busqueda:
                 df_nut_ord[col_fecha_busqueda] = pd.to_datetime(df_nut_ord[col_fecha_busqueda], errors='coerce')
-                df_nut_ord = df_nut_ord.dropna(subset=[col_fecha_busqueda]).sort_values(col_fecha_busqueda)
+                df_nut_ord_sorted = df_nut_ord.dropna(subset=[col_fecha_busqueda]).sort_values(col_fecha_busqueda)
+                # Si dropna dejó el df vacío (todas las fechas son NaN), usar el df sin filtrar
+                if not df_nut_ord_sorted.empty:
+                    df_nut_ord = df_nut_ord_sorted
             
-            ultimo_registro = df_nut_ord.iloc[-1]
-            
-            # 1. Peso (Exacto o Flexible)
-            col_peso_f = 'Peso (kg): [Número con decimales 88,5]'
-            if col_peso_f not in df_nut_ord.columns:
-                col_peso_f = next((c for c in df_nut_ord.columns if 'peso' in str(c).lower() and 'kg' in str(c).lower()), None)
-            
-            peso_val = normalizar_valor_numerico(ultimo_registro.get(col_peso_f))
-            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> {f"{peso_val:.1f}" if peso_val else "—"} kg</p>'
-            
-            # 2. % Grasa (Exacto o Flexible)
-            col_grasa_f = '% MA: [Número con decimales]'
-            if col_grasa_f not in df_nut_ord.columns:
-                col_grasa_f = next((c for c in df_nut_ord.columns if '%' in str(c).lower() and ('ma' in str(c).lower() or 'adip' in str(c).lower())), None)
-            
-            grasa_val = normalizar_valor_numerico(ultimo_registro.get(col_grasa_f)) if col_grasa_f else None
-            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> {f"{grasa_val:.1f}" if grasa_val else "—"} %</p>'
-            
-            # 3. IMC (Exacto o Flexible)
-            col_imc_f = 'IMC'
-            if col_imc_f not in df_nut_ord.columns:
-                col_imc_f = next((c for c in df_nut_ord.columns if 'imc' in str(c).lower()), None)
-            
-            imc_val = normalizar_valor_numerico(ultimo_registro.get(col_imc_f))
-            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> {f"{imc_val:.1f}" if imc_val else "—"}</p>'
-            
-            # 4. Última evaluación (Mostrar solo el mes)
-            fecha_val = ultimo_registro.get(col_fecha_busqueda) if col_fecha_busqueda else None
-            try:
-                fecha_dt = pd.to_datetime(fecha_val)
-                if pd.notna(fecha_dt):
-                    meses_es = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 
-                                7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
-                    fecha_str = meses_es.get(fecha_dt.month, "—")
-                else:
-                    fecha_str = "—"
-            except:
-                fecha_str = str(fecha_val) if pd.notna(fecha_val) else "—"
-            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> {fecha_str}</p>'
+            if df_nut_ord.empty: # This check is now correctly placed after potential re-assignment
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> — kg</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> — %</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> —</p>'
+                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> —</p>'
+            else:
+                ultimo_registro = df_nut_ord.iloc[-1]
+                
+                # 1. Peso (Exacto o Flexible)
+                col_peso_f = 'Peso (kg): [Número con decimales 88,5]'
+                if col_peso_f not in df_nut_ord.columns:
+                    col_peso_f = next((c for c in df_nut_ord.columns if 'peso' in str(c).lower() and 'kg' in str(c).lower()), None)
+                
+                peso_val = normalizar_valor_numerico(ultimo_registro.get(col_peso_f))
+                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> {f"{peso_val:.1f}" if peso_val else "—"} kg</p>'
+                
+                # 2. % Grasa (Exacto o Flexible)
+                col_grasa_f = '% MA: [Número con decimales]'
+                if col_grasa_f not in df_nut_ord.columns:
+                    col_grasa_f = next((c for c in df_nut_ord.columns if '%' in str(c).lower() and ('ma' in str(c).lower() or 'adip' in str(c).lower())), None)
+                
+                grasa_val = normalizar_valor_numerico(ultimo_registro.get(col_grasa_f)) if col_grasa_f else None
+                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> {f"{grasa_val:.1f}" if grasa_val else "—"} %</p>'
+                
+                # 3. IMC (Exacto o Flexible)
+                col_imc_f = 'IMC'
+                if col_imc_f not in df_nut_ord.columns:
+                    col_imc_f = next((c for c in df_nut_ord.columns if 'imc' in str(c).lower()), None)
+                
+                imc_val = normalizar_valor_numerico(ultimo_registro.get(col_imc_f))
+                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> {f"{imc_val:.1f}" if imc_val else "—"}</p>'
+                
+                # 4. Última evaluación (Mostrar solo el mes)
+                fecha_val = ultimo_registro.get(col_fecha_busqueda) if col_fecha_busqueda else None
+                try:
+                    fecha_dt = pd.to_datetime(fecha_val)
+                    if pd.notna(fecha_dt):
+                        meses_es = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 
+                                    7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
+                        fecha_str = meses_es.get(fecha_dt.month, "—")
+                    else:
+                        fecha_str = "—"
+                except:
+                    fecha_str = str(fecha_val) if pd.notna(fecha_val) else "—"
+                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> {fecha_str}</p>'
         
         contenido_html += '</div></div>'
         st.markdown(contenido_html, unsafe_allow_html=True)
@@ -1235,35 +1244,66 @@ def panel_profesional_jugador():
         st.info("💡 Verifica las credenciales de Google Sheets y la conexión a internet")
         return
     
-    # Selectores superiores
-    st.markdown("### 🎯 Selección de Jugador")
+    # Identificar si es un jugador (Filtro automático por DNI)
+    from src.security.auth import AuthManager
+    am = AuthManager()
     
-    col1, col2 = st.columns(2)
+    user_dni = st.session_state.user.get('dni', '')
+    is_player = am.is_role("Jugador")
+    jugador_seleccionado = None
     
-    with col1:
-        # Selector de categoría
-        categorias_disponibles, col_categoria = obtener_categorias_disponibles(df_combinado)
-        categoria_seleccionada = st.selectbox(
-            "📋 Seleccionar Categoría:",
-            categorias_disponibles,
-            key="categoria_selector"
-        )
-    
-    with col2:
-        # Selector de jugador
-        jugadores_disponibles = obtener_jugadores_por_categoria(
-            df_combinado, categoria_seleccionada, col_categoria
-        )
-        
-        if not jugadores_disponibles:
-            st.warning("No hay jugadores disponibles en esta categoría")
+    if is_player and user_dni:
+        # Buscar el nombre del jugador que coincide con el DNI en el dataframe
+        col_dni = buscar_columna_dni(df_combinado)
+        if col_dni:
+            # Asegurar que comparamos strings limpios y normalizados (sin puntos ni decimales)
+            df_combinado[col_dni] = df_combinado[col_dni].apply(normalizar_dni)
+            dni_busqueda = normalizar_dni(user_dni)
+            
+            player_row = df_combinado[df_combinado[col_dni] == dni_busqueda]
+            if not player_row.empty:
+                col_nombre = buscar_columna_jugador(df_combinado) or df_combinado.columns[0]
+                jugador_seleccionado = player_row.iloc[0][col_nombre]
+                st.info(f"📊 Visualizando ficha de: **{jugador_seleccionado}**")
+            else:
+                st.warning(f"⚠️ No se encontraron registros para tu DNI ({user_dni}) en las bases de datos.")
+                if st.button("Reintentar con administrador"):
+                    st.session_state.user['rol'] = 'Administrador'
+                    st.rerun()
+                return
+        else:
+            st.error("No se pudo identificar la columna de DNI en los datos.")
             return
+    else:
+        # Selectores superiores para otros roles
+        st.markdown("### 🎯 Selección de Jugador")
         
-        jugador_seleccionado = st.selectbox(
-            "👤 Seleccionar Jugador:",
-            jugadores_disponibles,
-            key="jugador_selector"
-        )
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Selector de categoría
+            categorias_disponibles, col_categoria = obtener_categorias_disponibles(df_combinado)
+            categoria_seleccionada = st.selectbox(
+                "📋 Seleccionar Categoría:",
+                categorias_disponibles,
+                key="categoria_selector"
+            )
+        
+        with col2:
+            # Selector de jugador
+            jugadores_disponibles = obtener_jugadores_por_categoria(
+                df_combinado, categoria_seleccionada, col_categoria
+            )
+            
+            if not jugadores_disponibles:
+                st.warning("No hay jugadores disponibles en esta categoría")
+                return
+            
+            jugador_seleccionado = st.selectbox(
+                "👤 Seleccionar Jugador:",
+                jugadores_disponibles,
+                key="jugador_selector"
+            )
     
     if not jugador_seleccionado:
         st.info("👆 Selecciona un jugador para ver su ficha completa")

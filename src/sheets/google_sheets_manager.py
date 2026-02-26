@@ -66,64 +66,69 @@ class GoogleSheetsManager:
             bool: True si las credenciales se cargaron correctamente
         """
         try:
+            # Primero intentar con secrets si están disponibles
             if self.use_secrets and hasattr(st, 'secrets'):
-                # Usar st.secrets (recomendado para producción)
-                return self._setup_from_secrets()
-            else:
-                # Usar archivo de credenciales local
-                return self._setup_from_file()
+                try:
+                    if self._setup_from_secrets():
+                        return True
+                except:
+                    pass # Fallback al archivo
+            
+            # Si fallan los secrets o no están disponibles, intentar con archivo local
+            return self._setup_from_file()
                 
         except Exception as e:
-            st.error(f"❌ Error configurando credenciales: {str(e)}")
+            # Solo mostrar error si ambos métodos fallaron
             return False
     
     def _setup_from_secrets(self) -> bool:
         """
-        Configurar credenciales usando st.secrets
+        Configurar credenciales usando st.secrets (soporta 'google' y 'google_sheets')
         
         Returns:
             bool: True si se configuró correctamente
         """
         try:
-            # Verificar que existan las secrets necesarias
-            required_secrets = [
-                "google_sheets.type",
-                "google_sheets.project_id", 
-                "google_sheets.private_key_id",
-                "google_sheets.private_key",
-                "google_sheets.client_email",
-                "google_sheets.client_id",
-                "google_sheets.auth_uri",
-                "google_sheets.token_uri",
-                "google_sheets.sheet_id"
-            ]
+            # Intentar encontrar una sección válida en secrets
+            secrets_data = None
             
-            missing_secrets = []
-            for secret in required_secrets:
-                if not self._get_secret_value(secret):
-                    missing_secrets.append(secret)
+            # Probar primero con 'google'
+            if "google" in st.secrets:
+                temp_data = st.secrets["google"]
+                if hasattr(temp_data, "sheet_id") or "sheet_id" in temp_data:
+                    secrets_data = temp_data
             
-            if missing_secrets:
-                st.error(f"❌ Secrets faltantes: {', '.join(missing_secrets)}")
-                st.info("💡 Configura st.secrets con las credenciales de Google Sheets")
+            # Si no sirvió, probar con 'google_sheets'
+            if not secrets_data and "google_sheets" in st.secrets:
+                temp_data = st.secrets["google_sheets"]
+                if hasattr(temp_data, "sheet_id") or "sheet_id" in temp_data:
+                    secrets_data = temp_data
+            
+            if not secrets_data:
                 return False
+            
+            # Verificar campos mínimos requeridos
+            required = ["type", "project_id", "private_key", "client_email", "sheet_id"]
+            for field in required:
+                if not (hasattr(secrets_data, field) or field in secrets_data):
+                    return False
             
             # Crear diccionario de credenciales
             credentials_dict = {
-                "type": st.secrets.google_sheets.type,
-                "project_id": st.secrets.google_sheets.project_id,
-                "private_key_id": st.secrets.google_sheets.private_key_id,
-                "private_key": st.secrets.google_sheets.private_key.replace('\\n', '\n'),
-                "client_email": st.secrets.google_sheets.client_email,
-                "client_id": st.secrets.google_sheets.client_id,
-                "auth_uri": st.secrets.google_sheets.auth_uri,
-                "token_uri": st.secrets.google_sheets.token_uri,
+                "type": secrets_data.type,
+                "project_id": secrets_data.project_id,
+                "private_key_id": getattr(secrets_data, "private_key_id", ""),
+                "private_key": secrets_data.private_key.replace('\\n', '\n'),
+                "client_email": secrets_data.client_email,
+                "client_id": getattr(secrets_data, "client_id", ""),
+                "auth_uri": getattr(secrets_data, "auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+                "token_uri": getattr(secrets_data, "token_uri", "https://oauth2.googleapis.com/token"),
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{st.secrets.google_sheets.client_email.replace('@', '%40')}"
+                "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{secrets_data.client_email.replace('@', '%40')}"
             }
             
             # Configurar Sheet ID
-            self.sheet_config["sheet_id"] = st.secrets.google_sheets.sheet_id
+            self.sheet_config["sheet_id"] = secrets_data.sheet_id
             
             # Crear credenciales y autorizar cliente
             creds = Credentials.from_service_account_info(
@@ -137,7 +142,7 @@ class GoogleSheetsManager:
             return True
             
         except Exception as e:
-            st.error(f"❌ Error con st.secrets: {str(e)}")
+            # Fallback silencioso al archivo local
             return False
     
     def _setup_from_file(self) -> bool:
@@ -152,7 +157,10 @@ class GoogleSheetsManager:
             credentials_paths = [
                 "car_google_credentials.json",
                 "google_credentials.json",
-                "credentials.json"
+                "credentials.json",
+                "credentials/service_account.json",
+                "credentials/google_credentials.json",
+                "service_account.json"
             ]
             
             credentials_path = None
@@ -162,8 +170,6 @@ class GoogleSheetsManager:
                     break
             
             if not credentials_path:
-                st.error("❌ Archivo de credenciales no encontrado")
-                st.info("💡 Coloca car_google_credentials.json en la carpeta del proyecto")
                 return False
             
             # Cargar configuración si existe
@@ -173,8 +179,8 @@ class GoogleSheetsManager:
                     config = json.load(f)
                     self.sheet_config.update(config)
             else:
-                # Usar configuración por defecto
-                self.sheet_config["sheet_id"] = "1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w"
+                # Usar configuración de Universitario por defecto
+                self.sheet_config["sheet_id"] = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
             
             # Cargar y validar credenciales
             creds = Credentials.from_service_account_file(

@@ -19,8 +19,14 @@ class FormulariosGoogleSheets:
     def __init__(self):
         """Inicializar conexión con Google Sheets"""
         
+        # Intentar obtener sheet_id de secrets
+        try:
+            current_sheet_id = st.secrets.google_sheets.get("sheet_id", "1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w")
+        except:
+            current_sheet_id = "1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w"
+
         self.sheet_config = {
-            'sheet_id': '1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w',
+            'sheet_id': current_sheet_id,
             'worksheet_name': 'Hoja 1'
         }
         

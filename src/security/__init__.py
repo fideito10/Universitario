@@ -1,3 +1,4 @@
+from .auth import AuthManager
 import json
 import os
 

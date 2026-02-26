@@ -7,6 +7,7 @@ import streamlit as st
 import os
 from datetime import datetime
 import base64
+from src.security.auth import AuthManager
 
 def get_base64_image(image_path):
     try:
@@ -427,6 +428,7 @@ def login_page():
     """, unsafe_allow_html=True)
     
     # Formulario de login (sin contenedor blanco)
+    auth_manager = AuthManager()
     
     username = st.text_input("USUARIO", placeholder="Ingresa tu usuario", label_visibility="collapsed", key="username_input")
     st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
@@ -434,10 +436,13 @@ def login_page():
     password = st.text_input("CONTRASEÑA", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed", key="password_input")
     
     if st.button("INGRESAR"):
-        if username == "admin" and password == "admin123":
-            st.session_state.authenticated = True
-            st.session_state.username = username
+        if auth_manager.login(username, password):
             st.success("✅ Acceso exitoso")
+            # Si el usuario es un jugador, enviarlo directo a su perfil
+            if st.session_state.user.get('rol') == "Jugador":
+                st.session_state.current_page = "perfil"
+            else:
+                st.session_state.current_page = "dashboard"
             st.rerun()
         else:
             st.error("❌ Usuario o contraseña incorrectos")
@@ -448,24 +453,25 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
     
-
-    
     # Credenciales de prueba (pequeño y discreto)
     st.markdown("""
     <div style="text-align: center; margin-top: 2rem; color: rgba(255,255,255,0.7); font-size: 0.85rem;">
-        <p>🔑 Credenciales de prueba: <strong>admin</strong> / <strong>admin123</strong></p>
+        <p>🔑 Acceso Seguro mediante Google Sheets</p>
     </div>
     """, unsafe_allow_html=True)
 
 def main_dashboard():
     load_universitario_styles()
+    auth_manager = AuthManager()
+    user = st.session_state.user
     
     # Sidebar
     st.sidebar.markdown(f"""
     <div style="text-align: center; padding: 1rem; background: linear-gradient(135deg, #000000, #2C2C2C); 
                 color: white; border-radius: 10px; margin-bottom: 1rem; border: 2px solid white;">
         <h3>👋 Bienvenido</h3>
-        <p><strong>{st.session_state.username}</strong></p>
+        <p><strong>{user['nombre']}</strong></p>
+        <p>🏷️ {user['rol']}</p>
         <p>🏉 Universitario - Sistema Digital</p>
     </div>
     """, unsafe_allow_html=True)
@@ -476,46 +482,50 @@ def main_dashboard():
         st.session_state.current_page = "dashboard"
         st.rerun()
     
+    if auth_manager.has_permission("perfil"):
+        label_perfil = "👤 Mi Perfil" if st.session_state.user.get('rol') == "Jugador" else "👤 Perfil de Usuario"
+        if st.sidebar.button(label_perfil, use_container_width=True):
+            st.session_state.current_page = "perfil"
+            st.rerun()
+    
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📋 Módulos")
     
-    if st.sidebar.button("🏥 Área Médica", use_container_width=True):
-        st.session_state.current_page = "medica"
-        st.rerun()
+    # Mapeo de botones a sus IDs de página
+    modules = [
+        ("🏥 Área Médica", "medica"),
+        ("🥗 Área Nutrición", "nutricion"),
+        ("🏋️ Área Física", "fisica"),
+        ("📊 Dashboard 360°", "dashboard_360"),
+        ("📝 Reporte Médico", "reporte_medico")
+    ]
     
-    if st.sidebar.button("🥗 Área Nutrición", use_container_width=True):
-        st.session_state.current_page = "nutricion"
-        st.rerun()
-    
-    if st.sidebar.button("🏋️ Área Física", use_container_width=True):
-        st.session_state.current_page = "fisica"
-        st.rerun()
-    
-    if st.sidebar.button("📊 Dashboard 360°", use_container_width=True):
-        st.session_state.current_page = "dashboard_360"
-        st.rerun()
-    
-    if st.sidebar.button("📝 Reporte Médico", use_container_width=True):
-        st.session_state.current_page = "reporte_medico"
-        st.rerun()
+    for label, page_id in modules:
+        if auth_manager.has_permission(page_id):
+            if st.sidebar.button(label, use_container_width=True):
+                st.session_state.current_page = page_id
+                st.rerun()
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🤖 Asistente")
 
-    if st.sidebar.button("🧠 Asistente IA", use_container_width=True):
-        st.session_state.current_page = "bot"
-        st.rerun()
+    if auth_manager.has_permission("bot"):
+        if st.sidebar.button("🧠 Asistente IA", use_container_width=True):
+            st.session_state.current_page = "bot"
+            st.rerun()
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### ⚙️ Administración")
     
-    if st.sidebar.button("👥 Gestión Jugadores", use_container_width=True):
-        st.session_state.current_page = "administracion"
-        st.rerun()
+    if auth_manager.has_permission("administracion"):
+        if st.sidebar.button("👥 Gestión Jugadores", use_container_width=True):
+            st.session_state.current_page = "administracion"
+            st.rerun()
     
-    if st.sidebar.button("📋 Pasar Lista", use_container_width=True):
-        st.session_state.current_page = "lista"
-        st.rerun()
+    if auth_manager.has_permission("lista"):
+        if st.sidebar.button("📋 Pasar Lista", use_container_width=True):
+            st.session_state.current_page = "lista"
+            st.rerun()
     
     st.sidebar.markdown("---")
     
@@ -525,13 +535,17 @@ def main_dashboard():
         
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
+        auth_manager.logout()
     
     # Contenido principal - Enrutamiento
     page = st.session_state.get('current_page', 'dashboard')
     
+    # Verificación de seguridad adicional
+    if not auth_manager.has_permission(page):
+        st.error("🚫 No tienes permiso para acceder a este módulo.")
+        st.session_state.current_page = "dashboard"
+        st.rerun()
+
     if page == "dashboard":
         dashboard_main()
     elif page == "medica":
@@ -561,12 +575,16 @@ def main_dashboard():
     elif page == "administracion":
         from src.modules.administracion import main_administracion
         main_administracion()
+    elif page == "perfil":
+        from src.modules.perfil_jugador import main_perfil_jugador
+        main_perfil_jugador()
     elif page == "lista":
         from src.modules.Lista import main_lista
         main_lista()
 
 def dashboard_main():
     """Dashboard principal del Club Universitario"""
+    auth_manager = AuthManager()
     
     # Cargar logo
     logo_b64 = get_base64_image("escudo uni.jpg")
@@ -583,60 +601,53 @@ def dashboard_main():
         <p>Centralización de datos médicos, físicos y nutricionales</p>
         <div style="margin-top: 2rem; padding: 2rem; background: rgba(255,255,255,0.05); border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
             <p style="font-size: 1.15rem; line-height: 1.8; max-width: 900px; margin: 0 auto; color: #E0E0E0; font-weight: 300;">
-                Esta plataforma integral unifica el seguimiento de nuestros atletas, permitiendo una colaboración fluida entre los departamentos 
-                <strong style="color: #FFFFFF; border-bottom: 2px solid #FFFFFF;">Médico</strong>, 
-                <strong style="color: #FFFFFF; border-bottom: 2px solid #FFFFFF;">Nutricional</strong> y 
-                <strong style="color: #FFFFFF; border-bottom: 2px solid #FFFFFF;">Físico</strong>. 
-                <br><br>
-                Nuestro objetivo es potenciar el rendimiento deportivo y prevenir lesiones mediante el análisis de datos en tiempo real 
-                y la gestión personalizada de cada jugador.
+                Bienvenido al sistema integral del Club Universitario. 
+                Tu rol como <strong>{st.session_state.user['rol']}</strong> te permite acceder a los módulos de gestión habilitados para tu perfil.
             </p>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Secciones informativas
+    # Secciones informativas dinámicas según permisos
     st.markdown("---")
     st.markdown("""
     <h2 style='color: #000000; text-align: center; margin: 2rem 0 1rem 0;'>
-        🎯 Módulos del Sistema
+        🎯 Módulos Habilitados
     </h2>
     """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
+    # Módulos informativos para el dashboard
+    all_modules_info = [
+        {
+            "id": "medica",
+            "label": "🏥 Área Médica",
+            "desc": ["Registro de lesiones", "Historial médico", "Seguimiento de recuperación"]
+        },
+        {
+            "id": "nutricion",
+            "label": "🥗 Área Nutrición",
+            "desc": ["Planes nutricionales", "Seguimiento de dietas", "Análisis de composición"]
+        },
+        {
+            "id": "fisica",
+            "label": "🏋️ Área Física",
+            "desc": ["Planes de entrenamiento", "Evaluaciones físicas", "Métricas de rendimiento"]
+        }
+    ]
     
-    with col1:
-        st.markdown('<div class="area-card">', unsafe_allow_html=True)
-        if st.button("🏥 Área Médica", use_container_width=True, key="main_medica_btn"):
-            st.session_state.current_page = "medica"
-            st.rerun()
-        st.write("- Registro de lesiones")
-        st.write("- Historial médico")
-        st.write("- Seguimiento de recuperación")
-        st.write("- Reportes médicos")
-        st.markdown('</div>', unsafe_allow_html=True)
+    allowed_info = [m for m in all_modules_info if auth_manager.has_permission(m["id"])]
     
-    with col2:
-        st.markdown('<div class="area-card">', unsafe_allow_html=True)
-        if st.button("🥗 Área Nutrición", use_container_width=True, key="main_nutricion_btn"):
-            st.session_state.current_page = "nutricion"
-            st.rerun()
-        st.write("- Planes nutricionales")
-        st.write("- Seguimiento de dietas")
-        st.write("- Análisis de composición")
-        st.write("- Recomendaciones personalizadas")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown('<div class="area-card">', unsafe_allow_html=True)
-        if st.button("🏋️ Área Física", use_container_width=True, key="main_fisica_btn"):
-            st.session_state.current_page = "fisica"
-            st.rerun()
-        st.write("- Planes de entrenamiento")
-        st.write("- Evaluaciones físicas")
-        st.write("- Métricas de rendimiento")
-        st.write("- Progreso individual")
-        st.markdown('</div>', unsafe_allow_html=True)
+    if allowed_info:
+        cols = st.columns(len(allowed_info))
+        for i, mod in enumerate(allowed_info):
+            with cols[i]:
+                st.markdown('<div class="area-card">', unsafe_allow_html=True)
+                if st.button(mod["label"], use_container_width=True, key=f"dash_{mod['id']}_btn"):
+                    st.session_state.current_page = mod["id"]
+                    st.rerun()
+                for d in mod["desc"]:
+                    st.write(f"- {d}")
+                st.markdown('</div>', unsafe_allow_html=True)
     
     # Footer
     st.markdown("---")
