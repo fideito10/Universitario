@@ -83,36 +83,39 @@ class GoogleSheetsManager:
     
     def _setup_from_secrets(self) -> bool:
         """
-        Configurar credenciales usando st.secrets (soporta 'google' y 'google_sheets')
+        Configurar credenciales usando st.secrets.
+        Acepta sección [google] con o sin sheet_id.
+        Si sheet_id no está en secrets, usa el ID hardcodeado por defecto.
         
         Returns:
             bool: True si se configuró correctamente
         """
         try:
-            # Intentar encontrar una sección válida en secrets
             secrets_data = None
-            
-            # Probar primero con 'google'
-            if "google" in st.secrets:
-                temp_data = st.secrets["google"]
-                if hasattr(temp_data, "sheet_id") or "sheet_id" in temp_data:
-                    secrets_data = temp_data
-            
-            # Si no sirvió, probar con 'google_sheets'
-            if not secrets_data and "google_sheets" in st.secrets:
-                temp_data = st.secrets["google_sheets"]
-                if hasattr(temp_data, "sheet_id") or "sheet_id" in temp_data:
-                    secrets_data = temp_data
-            
+
+            # Buscar en las secciones más comunes
+            for section in ["google", "google_sheets", "gcp_service_account"]:
+                if section in st.secrets:
+                    temp_data = st.secrets[section]
+                    # Solo necesita las credenciales de servicio (type, private_key, client_email)
+                    has_creds = (
+                        (hasattr(temp_data, "type") or "type" in temp_data) and
+                        (hasattr(temp_data, "private_key") or "private_key" in temp_data) and
+                        (hasattr(temp_data, "client_email") or "client_email" in temp_data)
+                    )
+                    if has_creds:
+                        secrets_data = temp_data
+                        break
+
             if not secrets_data:
                 return False
-            
-            # Verificar campos mínimos requeridos
-            required = ["type", "project_id", "private_key", "client_email", "sheet_id"]
+
+            # Verificar campos mínimos requeridos (sin sheet_id, es opcional)
+            required = ["type", "project_id", "private_key", "client_email"]
             for field in required:
                 if not (hasattr(secrets_data, field) or field in secrets_data):
                     return False
-            
+
             # Crear diccionario de credenciales
             credentials_dict = {
                 "type": secrets_data.type,
@@ -126,23 +129,26 @@ class GoogleSheetsManager:
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
                 "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{secrets_data.client_email.replace('@', '%40')}"
             }
-            
-            # Configurar Sheet ID
-            self.sheet_config["sheet_id"] = secrets_data.sheet_id
-            
+
+            # Configurar Sheet ID: desde secrets si está disponible, si no usar el hardcodeado
+            if hasattr(secrets_data, "sheet_id") or "sheet_id" in secrets_data:
+                self.sheet_config["sheet_id"] = secrets_data.sheet_id
+            else:
+                # ID fijo de la planilla del Club Universitario
+                self.sheet_config["sheet_id"] = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
+
             # Crear credenciales y autorizar cliente
             creds = Credentials.from_service_account_info(
-                credentials_dict, 
+                credentials_dict,
                 scopes=self.scope
             )
-            
+
             self.client = gspread.authorize(creds)
             self.credentials_loaded = True
-            
+
             return True
-            
+
         except Exception as e:
-            # Fallback silencioso al archivo local
             return False
     
     def _setup_from_file(self) -> bool:
