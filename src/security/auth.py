@@ -106,59 +106,101 @@ class AuthManager:
                 (users_df['Clave'].astype(str).str.strip() == password_raw)
             ]
         
-        # 2. Búsqueda alternativa para Jugadores: DNI (limpio) como usuario y contraseña
+        # 2. Búsqueda alternativa para Jugadores: DNI como usuario y contraseña
         if valid_user.empty:
-            # Limpiar entradas de puntos, espacios y otros caracteres no numéricos
+            # Limpiar entradas: solo dígitos, sin puntos ni espacios
             clean_u = "".join(filter(str.isdigit, username_raw))
             clean_p = "".join(filter(str.isdigit, password_raw))
-            
-            # Solo proceder si ambos son iguales (DNI como usuario y pass) y no están vacíos
+
+            # Aceptar DNI en ambos campos O solo en el campo usuario (usando DNI como contraseña también)
+            dni_login = clean_u != "" and (clean_u == clean_p or password_raw.strip() == "")
+
             if clean_u != "" and clean_u == clean_p:
-                # A. Buscar en la tabla Usuarios por DNI (limpio)
+                # A. Buscar en la tabla Usuarios por DNI
                 if not users_df.empty and 'DNI' in users_df.columns:
                     for idx, row in users_df.iterrows():
                         stored_dni = str(row.get('DNI', '')).strip()
-                        if stored_dni.endswith('.0'): stored_dni = stored_dni[:-2]
+                        if stored_dni.endswith('.0'):
+                            stored_dni = stored_dni[:-2]
                         stored_dni_clean = "".join(filter(str.isdigit, stored_dni))
                         stored_rol = str(row.get('Rol', '')).strip()
-                        
-                        # Si el DNI coincide y es un Jugador
+
                         if stored_dni_clean == clean_u and normalize_text(stored_rol) == "jugador":
                             valid_user = users_df.loc[[idx]]
                             break
-                
-                # B. SI NO SE ENCONTRÓ EN USUARIOS, BUSCAR EN JUGADORES_MAESTRO
+
+                # B. Si no está en Usuarios, buscar en Jugadores_Maestro
                 if valid_user.empty:
                     if not self.gs_manager.credentials_loaded:
+                        st.warning("⚠️ Sin conexión a Google Sheets. Verificá los secrets en Streamlit Cloud.")
                         return False
                     try:
-                        # Usar el ID de la base maestra directamente para asegurar
                         spreadsheet = self.gs_manager.client.open_by_key(self.sheet_id)
-                        master_sheet = spreadsheet.worksheet("Jugadores_Maestro")
+
+                        # Intentar obtener la hoja (manejar variantes de nombre)
+                        master_sheet = None
+                        for sheet_name in ["Jugadores_Maestro", "Jugadores", "jugadores_maestro", "jugadores"]:
+                            try:
+                                master_sheet = spreadsheet.worksheet(sheet_name)
+                                break
+                            except:
+                                continue
+
+                        if master_sheet is None:
+                            st.warning("⚠️ No se encontró la hoja 'Jugadores_Maestro' en el Google Sheet.")
+                            return False
+
                         master_records = master_sheet.get_all_records()
                         master_df = pd.DataFrame(master_records)
-                        
-                        if not master_df.empty and 'DNI' in master_df.columns:
-                            # Stricter cleaning of the column
-                            master_df['DNI_CLEAN'] = master_df['DNI'].astype(str).apply(lambda x: "".join(filter(str.isdigit, x.replace('.0', ''))))
-                            
-                            for _, row in master_df.iterrows():
-                                stored_dni_clean = row['DNI_CLEAN']
-                                
-                                if stored_dni_clean == clean_u:
-                                    # Jugador encontrado en Base Maestra, creamos sesión activa
-                                    st.session_state.authenticated = True
-                                    nombre = str(row.get('Nombre', '')).strip()
-                                    apellido = str(row.get('Apellido', '')).strip()
-                                    st.session_state.user = {
-                                        "username": clean_u,
-                                        "rol": "Jugador",
-                                        "nombre": f"{nombre} {apellido}".strip() or f"Jugador {clean_u}",
-                                        "dni": clean_u
-                                    }
-                                    return True
+
+                        if master_df.empty:
+                            st.warning("⚠️ La hoja de jugadores está vacía.")
+                            return False
+
+                        # Buscar columna DNI con variantes de nombre
+                        dni_col = None
+                        for col in master_df.columns:
+                            if normalize_text(col) == "dni":
+                                dni_col = col
+                                break
+
+                        if dni_col is None:
+                            st.warning(f"⚠️ No se encontró columna 'DNI'. Columnas disponibles: {list(master_df.columns)}")
+                            return False
+
+                        # Limpiar DNIs y buscar coincidencia
+                        master_df['DNI_CLEAN'] = master_df[dni_col].astype(str).apply(
+                            lambda x: "".join(filter(str.isdigit, x.replace('.0', '')))
+                        )
+
+                        for _, row in master_df.iterrows():
+                            if row['DNI_CLEAN'] == clean_u:
+                                # Buscar columnas Nombre y Apellido con variantes
+                                nombre = ""
+                                apellido = ""
+                                for col in master_df.columns:
+                                    col_norm = normalize_text(col)
+                                    if col_norm == "nombre":
+                                        nombre = str(row[col]).strip()
+                                    elif col_norm == "apellido":
+                                        apellido = str(row[col]).strip()
+
+                                st.session_state.authenticated = True
+                                st.session_state.user = {
+                                    "username": clean_u,
+                                    "rol": "Jugador",
+                                    "nombre": f"{nombre} {apellido}".strip() or f"Jugador {clean_u}",
+                                    "dni": clean_u
+                                }
+                                return True
+
+                        # DNI no encontrado en la planilla
+                        st.warning(f"⚠️ DNI {clean_u} no encontrado en la base de jugadores.")
+                        return False
+
                     except Exception as e:
-                        pass
+                        st.error(f"❌ Error al buscar jugador: {str(e)}")
+                        return False
         
         # 3. Finalizar sesión si se encontró un usuario válido en la tabla Usuarios
         if not valid_user.empty:
