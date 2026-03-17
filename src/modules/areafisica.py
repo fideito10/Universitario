@@ -8,6 +8,7 @@ from typing import Dict, List
 import gspread
 from google.oauth2.service_account import Credentials
 import os
+from src.modules.administracion import JugadoresMaestroManager
 
 # ==========================================
 # GESTIÓN DE CREDENCIALES Y CONEXIÓN
@@ -204,7 +205,7 @@ def resaltar_valores(s):
     is_low = s_float < s_float.quantile(0.25)
     return ['background-color: #b6fcd5' if h else 'background-color: #ffb6b6' if l else '' for h, l in zip(is_high, is_low)]
 
-def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="", subtest_sel=""):
+def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="", subtest_sel="", categoria_sel="", posicion_sel=""):
     """
     Crea visualización de alto impacto mostrando TOP 3 y BOTTOM 3 jugadores en contenedores separados
     """
@@ -233,11 +234,19 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="",
     bottom_3 = df_promedio.tail(3).copy()
     
     # Construir título dinámico
-    titulo_display = test_sel
+    titulo_test = test_sel.upper() if test_sel else ""
     if subtest_sel and subtest_sel != "":
-        titulo_display = f"{test_sel} ({subtest_sel})"
+        titulo_test = f"{titulo_test} ({subtest_sel.upper()})"
+        
+    filtros_extra = []
+    if categoria_sel and categoria_sel != "Todas" and categoria_sel != "":
+        filtros_extra.append(categoria_sel)
+    if posicion_sel and posicion_sel != "Todas" and posicion_sel != "":
+        filtros_extra.append(posicion_sel)
+        
+    detalle_filtros = f" | {' - '.join(filtros_extra)}" if filtros_extra else ""
     
-    st.markdown(f"## 🏆 Top Rendimiento - {titulo_display}")
+    st.markdown(f"## 🏆 Máximo rendimiento - {titulo_test}{detalle_filtros}")
     
     col_top, col_bottom = st.columns(2)
     
@@ -344,18 +353,31 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
     desviacion = df_calc[valor_col].std()
     
     # 2. Configurar visualización
-    # Mapeo de columnas para renombrar
+    # Convertir Marca Temporal a tipo fecha para formateo de MM-YYYY
+    if 'Marca temporal' in df_calc.columns:
+        df_calc['Fecha Test'] = pd.to_datetime(df_calc['Marca temporal'], format='mixed', dayfirst=True, errors='coerce').dt.strftime('%m-%Y').fillna("")
+    else:
+        df_calc['Fecha Test'] = ""
+        
+    # Mapeo de columnas para renombrar (el orden define la prioridad al elegir columnas)
     cols_map = {
         'Nombre y Apellido': 'Nombre',
-        'Posición del jugador': 'Posición',
-        'Categoría': 'Categoría'
+        'Posicion': 'Posición',              # Prioridad 1: Viene de la base maestra central
+        'Posición del jugador': 'Posición',  # Prioridad 2: Viene de la base Test Físico
+        'Categoria': 'Categoría',            # Prioridad 1: Viene de la base maestra central
+        'Categoría': 'Categoría'             # Prioridad 2: Viene de la base Test Físico
     }
     
-    # Asegurar que las columnas existen
-    cols_existentes = [c for c in cols_map.keys() if c in df_calc.columns]
+    # Asegurar que las columnas existen, eligiendo solo una por cada destino lógico
+    cols_existentes = []
+    destinos_agregados = set()
+    for source, dest in cols_map.items():
+        if source in df_calc.columns and dest not in destinos_agregados:
+            cols_existentes.append(source)
+            destinos_agregados.add(dest)
     
-    # Crear DF para vista incluyendo la columna de valor para el styling
-    df_view = df_calc[cols_existentes + [valor_col, 'valor_original']].copy()
+    # Crear DF para vista incluyendo la columna de valor para el styling y la Fecha
+    df_view = df_calc[cols_existentes + [valor_col, 'valor_original', 'Fecha Test']].copy()
     df_view = df_view.rename(columns=cols_map)
     
     # Crear columna de texto formateado "Resultado"
@@ -378,26 +400,15 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
     
     df_view['Resultado'] = df_view.apply(formatear_resultado, axis=1)
     
-    # Reordenar columnas: Las renombradas primero, luego Resultado, luego columnas auxiliares (ocultas)
-    cols_ordenadas = [cols_map[c] for c in cols_existentes] + ['Resultado', valor_col, 'valor_original']
+    # Como cols_existentes puede tener duplicados lógicos (ej. Categoria y Categoría), filtramos las renombradas finales
+    cols_renombradas = [cols_map[c] for c in cols_existentes]
+    # Quitamos duplicados manteniendo el orden
+    cols_unicas = list(dict.fromkeys(cols_renombradas))
+    
+    # Reordenar columnas: Solo información deseada
+    # Las renombradas primero, luego Resultado, luego Fecha Test, luego columnas auxiliares (ocultas)
+    cols_ordenadas = cols_unicas + ['Resultado', 'Fecha Test', valor_col, 'valor_original']
     df_view = df_view[cols_ordenadas]
-    
-    # Mostrar estadísticas como métricas antes de la tabla
-    c1, c2, c3 = st.columns(3)
-    
-    # Detectar si algún valor original tiene formato de tiempo
-    tiene_formato_tiempo = df_calc['valor_original'].astype(str).str.contains("'").any()
-    
-    if tiene_formato_tiempo:
-        # Mostrar promedio en formato M'S"
-        promedio_formateado = segundos_a_formato_tiempo(promedio)
-        c1.metric("Promedio", promedio_formateado)
-    else:
-        # Mostrar promedio numérico normal
-        c1.metric("Promedio", f"{promedio:.2f} {unidad}")
-    
-    if not pd.isna(desviacion):
-        c2.metric("Desviación Estándar", f"{desviacion:.2f}")
     
     # Función de estilo
     def aplicar_estilo_fila(row):
@@ -450,13 +461,6 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
         # Aplicar estilo
         styler = df_view.style.apply(aplicar_estilo_fila, axis=1)
         
-        # Ocultar columnas auxiliares de forma compatible
-        columnas_ocultar = [valor_col, 'valor_original']
-        if hasattr(styler, "hide"):
-            styler.hide(subset=columnas_ocultar, axis=1, names=False)
-        elif hasattr(styler, "hide_columns"):
-            styler.hide_columns(columnas_ocultar)
-            
         # Formateo general
         styler.set_properties(**{
             'text-align': 'center',
@@ -467,15 +471,23 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
             styler,
             use_container_width=True,
             hide_index=True,
-            height=500
+            height=500,
+            column_config={
+                valor_col: None,          # Ocultar visualmente la columna valor
+                "valor_original": None    # Ocultar visualmente la columna valor original
+            }
         )
     except Exception as e:
         st.error(f"Error al aplicar estilos: {e}")
         # Fallback sin estilos de fila pero funcional
         st.dataframe(
-            df_view.drop(columns=[valor_col, 'valor_original']), 
+            df_view, 
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            column_config={
+                valor_col: None,          # Ocultar visualmente la columna valor
+                "valor_original": None    # Ocultar visualmente la columna original
+            }
         )
 
 # ==========================================
@@ -521,20 +533,46 @@ def physical_area():
     nombre_hoja = "Base Test"
     
     # Cargar datos
-    with st.spinner("📊 Cargando datos desde Google Sheets..."):
-        df = cargar_hoja(sheet_id, nombre_hoja)
+    with st.spinner("📊 Cargando datos centralizados..."):
+        df_test = cargar_hoja(sheet_id, nombre_hoja)
+        admin_manager = JugadoresMaestroManager()
+        df_players = admin_manager.get_all_players()
     
-    if df.empty:
+    if df_test.empty:
         st.error("❌ No se pudo cargar la hoja 'Base Test'.")
         return
+        
+    if df_players.empty:
+        st.error("❌ No se pudo cargar la base maestra de jugadores.")
+        return
+
+    # Limpiar nombres de columnas por posibles espacios
+    df_test.columns = df_test.columns.str.strip()
+    
+    # Asegurar DNI como string para el merge
+    col_dni_test = 'Dni' if 'Dni' in df_test.columns else 'DNI' if 'DNI' in df_test.columns else None
+    
+    if col_dni_test:
+        df_test['DNI_merge'] = df_test[col_dni_test].astype(str).str.strip()
+    else:
+        st.error(f"❌ No se encontró columna DNI en Test Físico. Columnas: {df_test.columns.tolist()}")
+        return
+        
+    df_players['DNI_merge'] = df_players['DNI'].astype(str).str.strip()
+    
+    # Unificar DataFrames (INNER JOIN para mostrar solo tests de jugadores en BD central)
+    df = pd.merge(df_test, df_players, on='DNI_merge', how='inner', suffixes=('_test', '_central'))
+    
+    # Construir campos combinados y mapear columnas
+    df['Nombre y Apellido'] = df['Nombre'].astype(str) + " " + df['Apellido'].astype(str)
 
     # Definición de Columnas
-    categoria_col = "Categoría"
+    categoria_col = "Categoria" # Viene de la base central, sin tilde
     jugador_col = "Nombre y Apellido"
     test_col = "Test"
     subtest_col = "Subtest"
     valor_col = "valor"
-    posicion_col = "Posición del jugador"
+    posicion_col = "Posicion" # Viene de la base central, sin tilde
 
     # ==========================================
     # SISTEMA DE FILTROS CASCADA
@@ -618,7 +656,7 @@ def physical_area():
     if not df_final.empty:
         st.markdown("<br>", unsafe_allow_html=True)
         # 1. Gráfico de Top/Bottom (Pasando el Test y Subtest para el título)
-        mostrar_grafico_top_bottom(df_final, jugador_col, valor_col, test_sel, subtest_sel)
+        mostrar_grafico_top_bottom(df_final, jugador_col, valor_col, test_sel, subtest_sel, categoria_sel, posicion_sel)
         
         st.markdown("---")
         
