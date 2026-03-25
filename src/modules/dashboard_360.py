@@ -258,6 +258,35 @@ def crear_dataframe_integrado():
                     columnas_a_mantener = [c for c in df_filtrado.columns if c not in [c_dni, c_nom, c_cat] or c in [col_dni_central, col_nom_central, col_cat_central]]
                     registros_finales.append(df_filtrado[columnas_a_mantener])
 
+    def limpiar_df_para_concat(df):
+        """Elimina columnas duplicadas y normaliza nombres con sufijos del merge."""
+        # 1. Quitar sufijos _test / _central generados por pd.merge en areafisica
+        nuevos_nombres = {}
+        for col in df.columns:
+            if col.endswith('_test') or col.endswith('_central'):
+                base = col.rsplit('_', 1)[0]
+                # Solo renombrar si la versión base no existe ya
+                if base not in df.columns:
+                    nuevos_nombres[col] = base
+                else:
+                    nuevos_nombres[col] = None  # marcar para eliminar
+        # Eliminar columnas marcadas para quitar
+        cols_eliminar = [c for c, v in nuevos_nombres.items() if v is None]
+        df = df.drop(columns=cols_eliminar, errors='ignore')
+        # Renombrar las que quedaron
+        df = df.rename(columns={k: v for k, v in nuevos_nombres.items() if v is not None})
+
+        # 2. Eliminar columnas con nombre duplicado (quedarse con la primera aparición)
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        return df.reset_index(drop=True)
+
+    # Limpiar y resetear índices antes de concatenar para evitar InvalidIndexError
+    registros_finales = [limpiar_df_para_concat(df) for df in registros_finales if not df.empty]
+
+    if not registros_finales:
+        return pd.DataFrame()
+
     return pd.concat(registros_finales, ignore_index=True, sort=False)
 
 def obtener_categorias_disponibles(df_combinado):
