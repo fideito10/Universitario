@@ -291,7 +291,7 @@ def grafico_torta_antropometria(df_hist):
         fig.update_layout(
             title=dict(text="Composición corporal (última antropometría)", x=0.5, font=dict(color='white', size=22)),
             height=380, plot_bgcolor='#1a1a1a', paper_bgcolor='#1a1a1a', font=dict(color='white'),
-            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12, color='white')),
             margin=dict(l=20, r=20, t=60, b=40)
         )
         # Centro del donut
@@ -370,7 +370,7 @@ def crear_grafico_objetivos_equipo(df, categoria_filtro="Todas", mes_filtro="Tod
         paper_bgcolor='#1a1a1a', 
         font=dict(color='white', size=16),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(color='white')),
         height=550,
         margin=dict(t=80, b=120),
         yaxis=dict(
