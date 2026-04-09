@@ -42,7 +42,7 @@ class AuthManager:
                 "administracion", "lista"
             ],
             "Entrenador": [
-                "dashboard", "perfil", "fisica", "nutricion"
+                "dashboard", "fisica", "nutricion", "dashboard_360"
             ],
             "Preparador Físico": [
                 "dashboard", "perfil", "fisica", "dashboard_360", "bot", "lista"
