@@ -611,7 +611,21 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
     
-    # Credenciales de prueba (pequeño y discreto)
+    # Estado de la conexión (Solo visible para diagnóstico si falla)
+    if not auth_manager.gs_manager.credentials_loaded:
+        st.error("⚠️ Error: No se detectaron credenciales de Google. Los jugadores no podrán ingresar.")
+        st.info("Asegúrate de haber configurado las variables GOOGLE_CLIENT_EMAIL y GOOGLE_PRIVATE_KEY en Railway.")
+    else:
+        # Mostrar discretamente el email de servicio para verificar permisos
+        try:
+            email = auth_manager.gs_manager.client.auth.signer_email
+            st.markdown(f"""
+            <div style="text-align: center; margin-top: 1rem; color: rgba(255,255,255,0.4); font-size: 0.7rem;">
+                Conectado como: {email}
+            </div>
+            """, unsafe_allow_html=True)
+        except: pass
+
     st.markdown("""
     <div style="text-align: center; margin-top: 2rem; color: rgba(255,255,255,0.7); font-size: 0.85rem;">
         <p>🔑 Acceso Seguro mediante Google Sheets</p>
