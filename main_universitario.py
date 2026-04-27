@@ -544,14 +544,18 @@ def login_page():
     auth_manager = AuthManager()
     
     username = st.text_input("USUARIO", placeholder="Ingresa tu usuario", label_visibility="collapsed", key="username_input")
-    st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
-    
+    st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
     password = st.text_input("CONTRASEÑA", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed", key="password_input")
-    
-    if st.button("INGRESAR"):
+    st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
+
+    # Botón centrado usando columnas
+    col_l, col_btn, col_r = st.columns([1, 2, 1])
+    with col_btn:
+        login_clicked = st.button("INGRESAR", use_container_width=True, key="login_btn")
+
+    if login_clicked:
         if auth_manager.login(username, password):
             st.success("✅ Acceso exitoso")
-            # Si el usuario es un jugador, enviarlo directo a su perfil
             if st.session_state.user.get('rol') == "Jugador":
                 st.session_state.current_page = "perfil"
             else:
@@ -559,6 +563,7 @@ def login_page():
             st.rerun()
         else:
             st.error("❌ Usuario o contraseña incorrectos")
+
     
     st.markdown("""
     <div class="forgot-password">
