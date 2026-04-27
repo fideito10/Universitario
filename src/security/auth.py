@@ -26,7 +26,7 @@ class AuthManager:
     def __init__(self):
         self.gs_manager = GoogleSheetsManager()
         # Intentar obtener sheet_id de secrets o usar el ID por defecto
-        self.sheet_id = "10Gixz7_8AvtYqBMS6RWz-wlW_MSpPVbjoCdz1GRM1lU"
+        self.sheet_id = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
         
         # Sincronizar con el manager si detectó uno en secrets
         if self.gs_manager.credentials_loaded and self.gs_manager.sheet_config.get("sheet_id"):

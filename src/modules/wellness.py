@@ -35,7 +35,7 @@ def wellness_module():
     
     gsm = GoogleSheetsManager()
     if not gsm.sheet_config.get("sheet_id"):
-        gsm.sheet_config["sheet_id"] = "10Gixz7_8AvtYqBMS6RWz-wlW_MSpPVbjoCdz1GRM1lU"
+        gsm.sheet_config["sheet_id"] = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
         
     user = st.session_state.user
     is_staff = user.get('rol') in ['Administrador', 'Entrenador', 'Preparador Físico']

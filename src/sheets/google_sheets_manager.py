@@ -140,7 +140,7 @@ class GoogleSheetsManager:
                     self.sheet_config.update(config)
             else:
                 # Usar configuración de Universitario por defecto
-                self.sheet_config["sheet_id"] = "10Gixz7_8AvtYqBMS6RWz-wlW_MSpPVbjoCdz1GRM1lU"
+                self.sheet_config["sheet_id"] = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
             
             # Cargar y validar credenciales
             creds = Credentials.from_service_account_file(
