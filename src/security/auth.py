@@ -166,12 +166,13 @@ class AuthManager:
                             st.warning(f"⚠️ No se encontró columna 'DNI'. Columnas disponibles: {list(master_df.columns)}")
                             return False
 
-                        # Limpiar DNIs y buscar coincidencia
+                        # Limpiar DNIs y buscar coincidencia (ignorar absolutamente todo lo que no sea un número)
                         master_df['DNI_CLEAN'] = master_df[dni_col].astype(str).apply(
-                            lambda x: "".join(filter(str.isdigit, x.replace('.0', '')))
+                            lambda x: "".join(filter(str.isdigit, x.split('.')[0]))
                         )
 
                         for _, row in master_df.iterrows():
+                            # Comparar solo los dígitos
                             if row['DNI_CLEAN'] == clean_u:
                                 # Buscar columnas Nombre y Apellido con variantes
                                 nombre = ""
