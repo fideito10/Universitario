@@ -48,44 +48,55 @@ class FormulariosGoogleSheets:
     def _setup_connection(self):
         """Configurar conexión autenticada con Google Sheets"""
         try:
-            # Scopes necesarios
             SCOPES = [
                 'https://www.googleapis.com/auth/spreadsheets',
                 'https://www.googleapis.com/auth/drive'
             ]
             
-            # Intentar cargar credenciales desde st.secrets (Streamlit Cloud)
-            try:
+            # 1. Intentar desde st.secrets
+            if hasattr(st, 'secrets') and "google" in st.secrets:
                 service_account_info = st.secrets["google"]
-                credentials = Credentials.from_service_account_info(
-                    service_account_info,
-                    scopes=SCOPES
-                )
-            except Exception as e:
-                # Si falla st.secrets, intentar archivo local
+                credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+            
+            # 2. Intentar desde Variables de Entorno (Railway)
+            elif os.getenv("STREAMLIT_GOOGLE_TYPE") or os.getenv("GOOGLE_TYPE"):
+                prefix = "STREAMLIT_GOOGLE_" if os.getenv("STREAMLIT_GOOGLE_TYPE") else "GOOGLE_"
+                service_account_info = {
+                    "type": os.getenv(f"{prefix}TYPE"),
+                    "project_id": os.getenv(f"{prefix}PROJECT_ID"),
+                    "private_key_id": os.getenv(f"{prefix}PRIVATE_KEY_ID"),
+                    "private_key": os.getenv(f"{prefix}PRIVATE_KEY", "").replace('\\n', '\n'),
+                    "client_email": os.getenv(f"{prefix}CLIENT_EMAIL"),
+                    "client_id": os.getenv(f"{prefix}CLIENT_ID"),
+                    "auth_uri": os.getenv(f"{prefix}AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+                    "token_uri": os.getenv(f"{prefix}TOKEN_URI", "https://oauth2.googleapis.com/token")
+                }
+                credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+            
+            # 3. Intentar archivos locales
+            else:
                 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                credentials_path = os.path.join(project_root, 'credentials', 'service_account.json')
+                possible_paths = [
+                    os.path.join(project_root, 'credentials', 'service_account.json'),
+                    os.path.join(project_root, 'service_account.json'),
+                    'service_account.json'
+                ]
                 
-                if not os.path.exists(credentials_path):
-                    raise FileNotFoundError(
-                        f"No se encontró el archivo de credenciales: credentials/service_account.json\n"
-                        f"💡 Asegúrese de que el archivo service_account.json esté en la carpeta credentials/"
-                    )
+                credentials = None
+                for cred_path in possible_paths:
+                    if os.path.exists(cred_path):
+                        credentials = Credentials.from_service_account_file(cred_path, scopes=SCOPES)
+                        break
                 
-                credentials = Credentials.from_service_account_file(
-                    credentials_path,
-                    scopes=SCOPES
-                )
+                if not credentials:
+                    raise FileNotFoundError("No se encontró el archivo de credenciales de Google.")
             
             # Autorizar cliente
             self.gc = gspread.authorize(credentials)
-            self.client = self.gc  # Alias para compatibilidad
+            self.client = self.gc
             self.credentials_loaded = True
-            
             return True, "Conexión establecida exitosamente"
             
-        except FileNotFoundError as e:
-            return False, str(e)
         except Exception as e:
             return False, f"Error configurando conexión: {e}"
     def _ensure_worksheet_exists(self) -> bool:

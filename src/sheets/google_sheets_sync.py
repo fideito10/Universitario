@@ -24,28 +24,46 @@ class GoogleSheetsCAR:
         self.setup_credentials()
     
     def setup_credentials(self):
-        """Configurar credenciales de Google desde st.secrets o archivo local"""
+        """Configurar credenciales de Google desde st.secrets, Variables de Entorno (Railway) o archivo local"""
         try:
-            # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
+            # 1. Intentar desde st.secrets
             if hasattr(st, 'secrets') and "google" in st.secrets:
-                creds = Credentials.from_service_account_info(
-                    dict(st.secrets["google"]), 
-                    scopes=self.scope
-                )
+                creds_info = dict(st.secrets["google"])
+                creds = Credentials.from_service_account_info(creds_info, scopes=self.scope)
                 self.client = gspread.authorize(creds)
                 return True
             
-            # Si estamos local, intentar cargar desde archivo
-            creds_path = "data/car_google_credentials.json"
-            if os.path.exists(creds_path):
-                creds = Credentials.from_service_account_file(
-                    creds_path, 
-                    scopes=self.scope
-                )
+            # 2. Intentar desde Variables de Entorno (Railway)
+            import os
+            if os.getenv("STREAMLIT_GOOGLE_TYPE") or os.getenv("GOOGLE_TYPE"):
+                prefix = "STREAMLIT_GOOGLE_" if os.getenv("STREAMLIT_GOOGLE_TYPE") else "GOOGLE_"
+                creds_info = {
+                    "type": os.getenv(f"{prefix}TYPE"),
+                    "project_id": os.getenv(f"{prefix}PROJECT_ID"),
+                    "private_key_id": os.getenv(f"{prefix}PRIVATE_KEY_ID"),
+                    "private_key": os.getenv(f"{prefix}PRIVATE_KEY", "").replace('\\n', '\n'),
+                    "client_email": os.getenv(f"{prefix}CLIENT_EMAIL"),
+                    "client_id": os.getenv(f"{prefix}CLIENT_ID"),
+                    "auth_uri": os.getenv(f"{prefix}AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+                    "token_uri": os.getenv(f"{prefix}TOKEN_URI", "https://oauth2.googleapis.com/token")
+                }
+                creds = Credentials.from_service_account_info(creds_info, scopes=self.scope)
                 self.client = gspread.authorize(creds)
                 return True
-            else:
-                return False
+
+            # 3. Intentar archivos locales
+            possible_paths = [
+                "data/car_google_credentials.json",
+                "credentials/service_account.json",
+                "service_account.json"
+            ]
+            for cred_path in possible_paths:
+                if os.path.exists(cred_path):
+                    creds = Credentials.from_service_account_file(cred_path, scopes=self.scope)
+                    self.client = gspread.authorize(creds)
+                    return True
+                    
+            return False
         except Exception as e:
             st.error(f"❌ Error en credenciales: {e}")
             return False
