@@ -53,7 +53,8 @@ class GoogleSheetsManager:
             "worksheets": {
                 "medical_records": "Registros_Medicos",
                 "statistics": "Estadisticas",
-                "config": "Configuracion"
+                "config": "Configuracion",
+                "wellness": "Wellness_Jugador"
             }
         }
         
@@ -139,7 +140,7 @@ class GoogleSheetsManager:
                     self.sheet_config.update(config)
             else:
                 # Usar configuración de Universitario por defecto
-                self.sheet_config["sheet_id"] = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
+                self.sheet_config["sheet_id"] = "10Gixz7_8AvtYqBMS6RWz-wlW_MSpPVbjoCdz1GRM1lU"
             
             # Cargar y validar credenciales
             creds = Credentials.from_service_account_file(
@@ -202,28 +203,27 @@ class GoogleSheetsManager:
                 "Observaciones", "Proxima_Evaluacion", "Estado", "Fecha_Registro"
             ]
             
-            # Verificar/crear hoja de registros médicos
-            worksheet_name = self.sheet_config["worksheets"]["medical_records"]
+            
+            # Verificar/crear hoja de Wellness
+            wellness_headers = [
+                "ID", "Timestamp", "Email_Jugador", "Nombre_Jugador", 
+                "RPE", "Sueno", "DOMS", "Wellness_Score", "Fecha"
+            ]
+            wellness_name = self.sheet_config["worksheets"]["wellness"]
             
             try:
-                worksheet = spreadsheet.worksheet(worksheet_name)
-                
-                # Verificar si tiene headers
+                worksheet = spreadsheet.worksheet(wellness_name)
                 first_row = worksheet.row_values(1)
                 if not first_row or len(first_row) < 5:
-                    worksheet.insert_row(medical_headers, 1)
-                    st.success(f"✅ Headers agregados a '{worksheet_name}'")
-                    
+                    worksheet.insert_row(wellness_headers, 1)
             except gspread.WorksheetNotFound:
-                # Crear la hoja
                 worksheet = spreadsheet.add_worksheet(
-                    title=worksheet_name,
+                    title=wellness_name,
                     rows=1000,
-                    cols=len(medical_headers)
+                    cols=len(wellness_headers)
                 )
-                worksheet.insert_row(medical_headers, 1)
-                st.success(f"✅ Hoja '{worksheet_name}' creada con headers")
-            
+                worksheet.insert_row(wellness_headers, 1)
+                
             return True
             
         except Exception as e:

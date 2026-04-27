@@ -26,7 +26,7 @@ class AuthManager:
     def __init__(self):
         self.gs_manager = GoogleSheetsManager()
         # Intentar obtener sheet_id de secrets o usar el ID por defecto
-        self.sheet_id = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
+        self.sheet_id = "10Gixz7_8AvtYqBMS6RWz-wlW_MSpPVbjoCdz1GRM1lU"
         
         # Sincronizar con el manager si detectó uno en secrets
         if self.gs_manager.credentials_loaded and self.gs_manager.sheet_config.get("sheet_id"):
@@ -37,21 +37,21 @@ class AuthManager:
         # Estructura de permisos según requerimientos del usuario
         self.permissions = {
             "Administrador": [
-                "dashboard", "perfil", "medica", "nutricion", "fisica", 
+                "dashboard", "perfil", "medica", "nutricion", "fisica", "wellness",
                 "dashboard_360", "reporte_medico", "bot", 
                 "administracion", "lista"
             ],
             "Entrenador": [
-                "dashboard", "fisica", "nutricion", "dashboard_360"
+                "dashboard", "fisica", "nutricion", "wellness", "dashboard_360"
             ],
             "Preparador Físico": [
-                "dashboard", "perfil", "fisica", "dashboard_360", "bot", "lista"
+                "dashboard", "perfil", "fisica", "wellness", "dashboard_360", "bot", "lista"
             ],
             "Nutricionista": [
-                "dashboard", "perfil", "nutricion", "dashboard_360", "bot"
+                "dashboard", "perfil", "nutricion", "wellness", "dashboard_360", "bot"
             ],
             "Jugador": [
-                "dashboard", "perfil", "dashboard_360", "nutricion", "fisica"
+                "dashboard", "perfil", "wellness", "dashboard_360", "nutricion", "fisica"
             ]
         }
 

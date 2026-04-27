@@ -16,10 +16,46 @@ def get_base64_image(image_path):
     except:
         return None
 
+def inject_mobile_meta():
+    """Inyecta metadatos para que la app se vea bien en dispositivos móviles (icono PWA)"""
+    logo_b64 = get_base64_image("escudo uni.jpg")
+    if logo_b64:
+        st.markdown(f"""
+        <script>
+            function updateHeadTag(tagName, attributes) {{
+                var head = window.parent.document.head;
+                var selector = tagName;
+                if (attributes.rel) selector += "[rel='" + attributes.rel + "']";
+                if (attributes.name) selector += "[name='" + attributes.name + "']";
+                
+                var element = window.parent.document.querySelector(selector) || window.parent.document.createElement(tagName);
+                for (var key in attributes) {{
+                    element.setAttribute(key, attributes[key]);
+                }}
+                if (!element.parentNode) head.appendChild(element);
+            }}
+
+            updateHeadTag('link', {{
+                rel: 'apple-touch-icon',
+                href: 'data:image/jpeg;base64,{logo_b64}'
+            }});
+
+            updateHeadTag('link', {{
+                rel: 'shortcut icon',
+                href: 'data:image/jpeg;base64,{logo_b64}'
+            }});
+
+            updateHeadTag('meta', {{ name: 'apple-mobile-web-app-capable', content: 'yes' }});
+            updateHeadTag('meta', {{ name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }});
+            updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
+            updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
+        </script>
+        """, unsafe_allow_html=True)
+
 # Configuración de la página
 st.set_page_config(
     page_title="Club Universitario de La Plata - Sistema de Gestión",
-    page_icon="🏉",
+    page_icon="escudo uni.jpg",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -557,7 +593,7 @@ def login_page():
         if auth_manager.login(username, password):
             st.success("✅ Acceso exitoso")
             if st.session_state.user.get('rol') == "Jugador":
-                st.session_state.current_page = "perfil"
+                st.session_state.current_page = "wellness"
             else:
                 st.session_state.current_page = "dashboard"
             st.rerun()
@@ -612,6 +648,7 @@ def main_dashboard():
             ("🏥 Área Médica",    "medica"),
             ("🥗 Nutrición",      "nutricion"),
             ("🏋️ Área Física",   "fisica"),
+            ("📝 Wellness",      "wellness"),
             ("📊 Dashboard 360°", "dashboard_360"),
             ("📝 Reporte Médico", "reporte_medico"),
         ]
@@ -650,6 +687,8 @@ def main_dashboard():
         nav_items.append(("🏥", "Médica", "medica"))
     if auth_manager.has_permission("nutricion"):
         nav_items.append(("🥗", "Nutrición", "nutricion"))
+    if auth_manager.has_permission("wellness"):
+        nav_items.append(("📝", "Wellness", "wellness"))
 
     # Limit to 5 for bottom nav
     nav_items = nav_items[:5]
@@ -707,6 +746,9 @@ def main_dashboard():
     elif page == "perfil":
         from src.modules.perfil_jugador import main_perfil_jugador
         main_perfil_jugador()
+    elif page == "wellness":
+        from src.modules.wellness import wellness_module
+        wellness_module()
     elif page == "lista":
         from src.modules.Lista import main_lista
         main_lista()
@@ -720,14 +762,7 @@ def dashboard_main():
     logo_b64 = get_base64_image("escudo uni.jpg")
     img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:clamp(80px,15vw,130px); margin-bottom:0.75rem; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">' if logo_b64 else ""
 
-    st.markdown(f"""
-    <div class="main-header">
-        {img_html}
-        <h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1>
-        <h3>Sistema de Gestión Deportiva</h3>
-        <p>Bienvenido, <strong>{st.session_state.user['nombre']}</strong> · {st.session_state.user['rol']}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div class="main-header">{img_html}<h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1><h3>Sistema de Gestión Deportiva</h3><p>Bienvenido, <strong>{st.session_state.user["nombre"]}</strong> · {st.session_state.user["rol"]}</p></div>', unsafe_allow_html=True)
 
     # All modules info
     all_modules_info = [
@@ -737,6 +772,8 @@ def dashboard_main():
          "desc": "Antropometría, planes nutricionales y composición corporal."},
         {"id": "fisica",       "icon": "🏋️", "label": "Área Física",   "color": "#fd7e14",
          "desc": "Evaluaciones físicas, tests y métricas de rendimiento."},
+        {"id": "wellness",     "icon": "📝", "label": "Wellness",       "color": "#000000",
+         "desc": "Monitoreo diario de sueño, fatiga y esfuerzo percibido."},
         {"id": "dashboard_360","icon": "📊", "label": "Dashboard 360°", "color": "#0d6efd",
          "desc": "Vista integral del jugador: médico, físico y nutricional."},
         {"id": "reporte_medico","icon":"📝", "label": "Reporte Médico", "color": "#6f42c1",
@@ -756,49 +793,9 @@ def dashboard_main():
         return
 
     # Responsive CSS grid (1 col mobile, 2 tablet, 3 desktop)
-    cards_html = ""
-    for mod in allowed:
-        cards_html += f"""
-        <div class="mod-card" onclick="void(0)">
-            <div class="mod-icon" style="background:{mod['color']}20; color:{mod['color']};">
-                {mod['icon']}
-            </div>
-            <div class="mod-label">{mod['label']}</div>
-            <div class="mod-desc">{mod['desc']}</div>
-        </div>"""
+    cards_html = "".join([f'<div class="mod-card"><div class="mod-icon" style="background:{m["color"]}20; color:{m["color"]};">{m["icon"]}</div><div class="mod-label">{m["label"]}</div><div class="mod-desc">{m["desc"]}</div></div>' for m in allowed])
 
-    st.markdown(f"""
-    <style>
-    .mod-grid {{
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-        gap: 1rem;
-        margin: 1.5rem 0;
-    }}
-    .mod-card {{
-        background: white;
-        border-radius: 14px;
-        padding: 1.5rem 1.25rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.09);
-        border: 1px solid #f0f0f0;
-        cursor: pointer;
-        transition: box-shadow 0.2s ease, transform 0.15s ease;
-        -webkit-tap-highlight-color: transparent;
-    }}
-    .mod-card:hover {{ box-shadow: 0 6px 20px rgba(0,0,0,0.14); transform: translateY(-2px); }}
-    .mod-card:active {{ transform: scale(0.97); }}
-    .mod-icon {{
-        width: 54px; height: 54px; border-radius: 14px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.8rem; margin-bottom: 0.9rem;
-    }}
-    .mod-label {{ font-weight: 700; font-size: 1.05rem; color: #111; margin-bottom: 0.4rem; }}
-    .mod-desc  {{ font-size: 0.88rem; color: #666; line-height: 1.5; }}
-    </style>
-    <div class="mod-grid">
-        {cards_html}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<style>.mod-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 1rem; margin: 1.5rem 0; }} .mod-card {{ background: white; border-radius: 14px; padding: 1.5rem 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,0.09); border: 1px solid #f0f0f0; transition: all 0.2s ease; }} .mod-card:hover {{ box-shadow: 0 6px 20px rgba(0,0,0,0.14); transform: translateY(-2px); }} .mod-icon {{ width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 0.9rem; }} .mod-label {{ font-weight: 700; font-size: 1.05rem; color: #111; margin-bottom: 0.4rem; }} .mod-desc {{ font-size: 0.88rem; color: #666; line-height: 1.5; }}</style><div class="mod-grid">{cards_html}</div>', unsafe_allow_html=True)
 
     # Streamlit buttons below grid (they handle the actual navigation)
     st.markdown("#### 👇 Tocá el botón del módulo al que querés entrar:")
@@ -822,6 +819,7 @@ def dashboard_main():
 
 
 def main():
+    inject_mobile_meta()
     # Inicializar session state
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
