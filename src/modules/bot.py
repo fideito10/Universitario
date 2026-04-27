@@ -7,6 +7,7 @@ import gspread
 import google.generativeai as genai
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+from src.utils.credentials import get_credentials_dict, get_service_account_credentials
 
 # Configuración de página si se ejecuta directo
 def check_standalone():
@@ -20,56 +21,30 @@ def check_standalone():
 # GESTIÓN DE CREDENCIALES
 # ==========================================
 def get_credentials():
-    """Obtiene credenciales de GCP para Google Sheets"""
-    try:
-        # 1. Intentar desde st.secrets
-        if hasattr(st, 'secrets') and "google" in st.secrets:
-            return dict(st.secrets["google"])
-            
-        # 2. Intentar desde Variables de Entorno (Railway)
-        import os
-        if os.getenv("STREAMLIT_GOOGLE_TYPE") or os.getenv("GOOGLE_TYPE"):
-            prefix = "STREAMLIT_GOOGLE_" if os.getenv("STREAMLIT_GOOGLE_TYPE") else "GOOGLE_"
-            creds = {
-                "type": os.getenv(f"{prefix}TYPE"),
-                "project_id": os.getenv(f"{prefix}PROJECT_ID"),
-                "private_key_id": os.getenv(f"{prefix}PRIVATE_KEY_ID"),
-                "private_key": os.getenv(f"{prefix}PRIVATE_KEY", "").replace('\\n', '\n'),
-                "client_email": os.getenv(f"{prefix}CLIENT_EMAIL"),
-                "client_id": os.getenv(f"{prefix}CLIENT_ID"),
-                "auth_uri": os.getenv(f"{prefix}AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-                "token_uri": os.getenv(f"{prefix}TOKEN_URI", "https://oauth2.googleapis.com/token")
-            }
-            return creds
-
-        # 3. Intentar desde archivos locales
-        possible_paths = [
-            "credentials/service_account.json",
-            "../credentials/service_account.json",
-            "service_account.json"
-        ]
-        
-        for path in possible_paths:
-            if os.path.exists(path):
-                with open(path) as f:
-                    return json.load(f)
-                    
-        return None
-    except Exception as e:
-        return None
+    """Obtiene credenciales de GCP usando el módulo centralizado."""
+    return get_credentials_dict()
 
 def get_gspread_client():
     """Autentica y devuelve cliente gspread"""
-    creds_dict = get_credentials()
-    if not creds_dict:
+    creds = get_service_account_credentials()
+    if not creds:
         return None
-        
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(creds)
+
+def get_gemini_api_key():
+    """Obtiene la Gemini API Key desde secrets o variables de entorno."""
+    # 1. st.secrets (local / Streamlit Cloud)
+    try:
+        secrets = st.secrets
+        if "gemini_api_key" in secrets:
+            return secrets["gemini_api_key"]
+        if "google" in secrets and secrets["google"].get("gemini_api_key"):
+            return secrets["google"]["gemini_api_key"]
+    except Exception:
+        pass
+    # 2. Variables de entorno (Railway)
+    return os.getenv("GEMINI_API_KEY", "")
+
 
 # ==========================================
 # CARGA DE DATOS (Optimizada)
@@ -159,15 +134,8 @@ def main_bot():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Configuración de IA (Limpia) ---
-    gemini_api_key = ""
-    
-    # 1. Intentar obtener de st.secrets (Prioridad)
-    if hasattr(st, 'secrets'):
-        if "gemini_api_key" in st.secrets:
-            gemini_api_key = st.secrets["gemini_api_key"]
-        elif "google" in st.secrets:
-            gemini_api_key = st.secrets["google"].get("gemini_api_key", "")
+    # --- Configuración de IA ---
+    gemini_api_key = get_gemini_api_key()
 
     # --- Sidebar ---
     with st.sidebar:

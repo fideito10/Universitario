@@ -315,8 +315,7 @@ def mostrar_foto_jugador(nombre_jugador, dni_jugador):
     # Definir rutas posibles
     base_dirs = [
         os.path.join(os.getcwd(), 'src', 'assets', 'fotos_jugadores'),
-        os.path.join(os.getcwd(), 'assets', 'fotos_jugadores'), # Fallback por si corre desde src
-        r"C:\Users\dell\Desktop\Universitario\src\assets\fotos_jugadores" # Ruta absoluta hardcoded por seguridad
+        os.path.join(os.getcwd(), 'assets', 'fotos_jugadores'),
     ]
     
     # Extensiones soportadas

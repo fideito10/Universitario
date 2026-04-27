@@ -19,141 +19,252 @@ def get_base64_image(image_path):
 # Configuración de la página
 st.set_page_config(
     page_title="Club Universitario de La Plata - Sistema de Gestión",
-    page_icon="escudo uni.jpg",
+    page_icon="🏉",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # CSS personalizado para el Universitario (Negro y Blanco)
 def load_universitario_styles():
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    /* ===== VARIABLES ===== */
     :root {
         --uni-black: #000000;
         --uni-white: #FFFFFF;
         --uni-gray-light: #F5F5F5;
         --uni-gray-dark: #2C2C2C;
-        --uni-accent: #1A1A1A;
+        --uni-gray-mid: #6c757d;
+        --touch-min: 48px;
     }
+
+    /* ===== BASE ===== */
+    * { box-sizing: border-box; }
     .stApp {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', sans-serif !important;
         background: #FFFFFF;
     }
+
+    /* ===== OCULTAR ELEMENTOS DE STREAMLIT ===== */
+    .stDeployButton { display: none !important; }
+    footer { visibility: hidden !important; }
+    #MainMenu { visibility: hidden !important; }
+
+    /* ===== SIDEBAR MEJORADO ===== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%) !important;
+        min-width: 260px !important;
+    }
+    [data-testid="stSidebar"] * { color: white !important; }
+    [data-testid="stSidebar"] .stButton > button {
+        background: rgba(255,255,255,0.08) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 10px !important;
+        min-height: var(--touch-min) !important;
+        font-size: 1rem !important;
+        font-weight: 500 !important;
+        width: 100% !important;
+        margin-bottom: 4px !important;
+        transition: background 0.2s ease !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover,
+    [data-testid="stSidebar"] .stButton > button:active {
+        background: rgba(255,255,255,0.18) !important;
+        transform: none !important;
+    }
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] h4 {
+        color: rgba(255,255,255,0.6) !important;
+        font-size: 0.75rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        margin: 1rem 0 0.4rem 0 !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255,255,255,0.1) !important;
+        margin: 0.5rem 0 !important;
+    }
+    [data-testid="stSidebarNav"] { display: none !important; }
+
+    /* ===== BOTONES GENERALES ===== */
+    .stButton > button {
+        background: linear-gradient(135deg, #000000, #2C2C2C) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 10px !important;
+        min-height: var(--touch-min) !important;
+        padding: 0.75rem 1.5rem !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        width: 100% !important;
+        cursor: pointer !important;
+        transition: opacity 0.2s ease, transform 0.1s ease !important;
+        -webkit-tap-highlight-color: transparent !important;
+    }
+    .stButton > button:hover { opacity: 0.88 !important; }
+    .stButton > button:active { transform: scale(0.97) !important; }
+
+    /* ===== INPUTS TOUCH-FRIENDLY ===== */
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div,
+    .stTextArea > div > div > textarea,
+    .stNumberInput > div > div > input {
+        min-height: var(--touch-min) !important;
+        border-radius: 10px !important;
+        border: 2px solid #E9ECEF !important;
+        font-size: 1rem !important;
+        padding: 0.6rem 0.9rem !important;
+    }
+    .stTextInput > div > div > input:focus,
+    .stTextArea > div > div > textarea:focus {
+        border-color: #000000 !important;
+        box-shadow: 0 0 0 3px rgba(0,0,0,0.08) !important;
+    }
+
+    /* ===== CARDS ===== */
     .main-header {
-        background: linear-gradient(135deg, var(--uni-black) 0%, var(--uni-gray-dark) 100%);
-        padding: 2.5rem;
+        background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
+        padding: 2rem 1.5rem;
         border-radius: 15px;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         text-align: center;
-        color: var(--uni-white);
-        font-family: 'Inter', sans-serif;
-        border: 3px solid var(--uni-black);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        color: white;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.25);
     }
-    .main-header h1 {
-        color: var(--uni-white);
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        margin: 0;
-    }
-    .main-header h3 {
-        color: var(--uni-white);
-        opacity: 0.9;
-        margin: 0.5rem 0 0 0;
-    }
-    .main-header p {
-        color: var(--uni-white);
-        opacity: 0.8;
-        margin: 0.5rem 0 0 0;
-    }
+    .main-header h1 { color: white; font-size: clamp(1.4rem, 4vw, 2.2rem); margin: 0; }
+    .main-header h3 { color: rgba(255,255,255,0.85); font-size: clamp(1rem, 2.5vw, 1.3rem); margin: 0.4rem 0 0 0; }
+    .main-header p  { color: rgba(255,255,255,0.7); font-size: clamp(0.85rem, 2vw, 1rem); margin: 0.3rem 0 0 0; }
+
     .area-card {
-        background: var(--uni-white);
-        padding: 1.5rem;
+        background: white;
+        padding: 1.25rem;
         border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        margin: 1rem 0;
-        border: 2px solid var(--uni-black);
-        border-left: 5px solid var(--uni-black);
+        box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+        margin: 0.75rem 0;
+        border-left: 5px solid #000000;
     }
+
     .metric-card {
-        background: linear-gradient(135deg, var(--uni-black) 0%, var(--uni-gray-dark) 100%);
-        padding: 1.5rem;
+        background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
+        padding: 1.25rem;
         border-radius: 12px;
-        color: var(--uni-white);
+        color: white;
         text-align: center;
         margin: 0.5rem 0;
-        border: 2px solid var(--uni-white);
-        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-        transition: transform 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
-    .metric-card:hover {
-        transform: translateY(-5px);
+    .metric-card h3 { margin: 0; font-size: 2rem; font-weight: 700; color: white; }
+    .metric-card p  { margin: 0.3rem 0 0 0; font-size: 0.9rem; opacity: 0.85; color: white; }
+
+    /* ===== TABS MOBILE ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px !important;
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        padding-bottom: 4px !important;
     }
-    .metric-card h3 {
-        margin: 0;
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--uni-white);
+    .stTabs [data-baseweb="tab"] {
+        min-height: 44px !important;
+        border-radius: 8px !important;
+        white-space: nowrap !important;
+        font-size: 0.9rem !important;
+        padding: 0 1rem !important;
     }
-    .metric-card p {
-        margin: 0.5rem 0 0 0;
-        font-size: 1rem;
-        opacity: 0.9;
-        color: var(--uni-white);
+
+    /* ===== DATAFRAMES MOBILE ===== */
+    [data-testid="stDataFrame"] {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
     }
-    .login-container {
-        background: rgba(255, 255, 255, 0.98);
-        border-radius: 20px;
-        padding: 2.5rem;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-        backdrop-filter: blur(10px);
-        border: 3px solid var(--uni-black);
+
+    /* ===== CHARTS MOBILE ===== */
+    .js-plotly-plot { max-width: 100% !important; }
+
+    /* ===== EXPANDERS ===== */
+    .streamlit-expanderHeader {
+        min-height: var(--touch-min) !important;
+        font-size: 1rem !important;
     }
-    .stButton > button {
-        background: linear-gradient(45deg, var(--uni-black), var(--uni-gray-dark));
-        color: var(--uni-white);
-        border: 2px solid var(--uni-white);
-        border-radius: 10px;
-        padding: 0.75rem 2rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
-        background: linear-gradient(45deg, var(--uni-gray-dark), var(--uni-black));
-    }
-    .stSelectbox > div > div > select,
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        border-radius: 10px;
-        border: 2px solid #E9ECEF;
-    }
-    .stDeployButton {display: none;}
-    footer {visibility: hidden;}
-    
-    /* Responsive Design para Dashboard */
-    @media (max-width: 768px) {
-        .main-header {
-            padding: 1.5rem;
-            margin-bottom: 1rem;
+
+    /* ===== SELECTBOX ===== */
+    .stSelectbox [data-testid="stWidgetLabel"] { font-size: 0.9rem !important; }
+
+    /* ===== RESPONSIVE: TABLET ===== */
+    @media (max-width: 900px) {
+        .main .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
         }
-        .main-header h1 {
-            font-size: 1.8rem;
+    }
+
+    /* ===== RESPONSIVE: MOBILE ===== */
+    @media (max-width: 640px) {
+        .main .block-container {
+            padding: 0.75rem !important;
+            padding-bottom: 5rem !important; /* space for bottom nav */
         }
-        .main-header h3 {
-            font-size: 1.2rem;
+        .main-header { padding: 1.25rem 1rem; border-radius: 10px; }
+        .area-card   { padding: 1rem; }
+
+        /* Stack columns on mobile */
+        [data-testid="column"] { min-width: 100% !important; }
+
+        /* Bigger touch targets */
+        .stButton > button { min-height: 52px !important; font-size: 1.05rem !important; }
+        .stTextInput > div > div > input { min-height: 52px !important; font-size: 1.05rem !important; }
+
+        /* Metrics smaller */
+        .metric-card h3 { font-size: 1.6rem; }
+
+        /* Hide sidebar toggle and rely on bottom nav */
+        [data-testid="collapsedControl"] { display: block !important; }
+
+        /* Plotly charts full width */
+        .js-plotly-plot, .plot-container { width: 100% !important; }
+    }
+
+    /* ===== BOTTOM NAVIGATION BAR (MOBILE ONLY) ===== */
+    @media (max-width: 640px) {
+        .mobile-bottom-nav {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 9999 !important;
+            background: #000000 !important;
+            display: flex !important;
+            justify-content: space-around !important;
+            align-items: center !important;
+            padding: 0.5rem 0.25rem !important;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.3) !important;
+            border-top: 1px solid rgba(255,255,255,0.1) !important;
         }
-        .main-header img {
-            width: 100px !important;
+        .mobile-bottom-nav a {
+            color: rgba(255,255,255,0.7) !important;
+            text-decoration: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            font-size: 0.65rem !important;
+            font-weight: 500 !important;
+            min-width: 50px !important;
+            padding: 0.25rem !important;
+            -webkit-tap-highlight-color: transparent !important;
         }
-        .area-card {
-            padding: 1rem;
-            margin: 0.5rem 0;
-        }
+        .mobile-bottom-nav a span.icon { font-size: 1.4rem !important; }
+    }
+    @media (min-width: 641px) {
+        .mobile-bottom-nav { display: none !important; }
     }
     </style>
     """, unsafe_allow_html=True)
+
 
 def login_page():
     bg_image = get_base64_image("Fondo.JPG")
@@ -464,83 +575,95 @@ def main_dashboard():
     load_universitario_styles()
     auth_manager = AuthManager()
     user = st.session_state.user
-    
-    # Sidebar
-    st.sidebar.markdown(f"""
-    <div style="text-align: center; padding: 1rem; background: linear-gradient(135deg, #000000, #2C2C2C); 
-                color: white; border-radius: 10px; margin-bottom: 1rem; border: 2px solid white;">
-        <h3>👋 Bienvenido</h3>
-        <p><strong>{user['nombre']}</strong></p>
-        <p>🏷️ {user['rol']}</p>
-        <p>🏉 Universitario - Sistema Digital</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.sidebar.markdown("### 🧭 Menú Principal")
-    
-    if st.sidebar.button("🏠 Portada", use_container_width=True):
-        st.session_state.current_page = "dashboard"
-        st.rerun()
-    
-    if auth_manager.has_permission("perfil"):
-        label_perfil = "👤 Mi Perfil" if st.session_state.user.get('rol') == "Jugador" else "👤 Perfil de Usuario"
-        if st.sidebar.button(label_perfil, use_container_width=True):
-            st.session_state.current_page = "perfil"
+
+    # ===== SIDEBAR =====
+    with st.sidebar:
+        st.markdown(f"""
+        <div style="text-align:center; padding:1rem 0.5rem 0.75rem; margin-bottom:0.5rem;">
+            <div style="font-size:2.5rem;">🏉</div>
+            <div style="font-weight:700; font-size:1.05rem; color:white; margin-top:0.25rem;">
+                {user['nombre']}
+            </div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.55); margin-top:0.15rem;">
+                {user['rol']}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("#### 🧭 Navegación")
+        if st.button("🏠 Inicio", use_container_width=True):
+            st.session_state.current_page = "dashboard"
             st.rerun()
-    
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📋 Módulos")
-    
-    # Mapeo de botones a sus IDs de página
-    modules = [
-        ("🏥 Área Médica", "medica"),
-        ("🥗 Área Nutrición", "nutricion"),
-        ("🏋️ Área Física", "fisica"),
-        ("📊 Dashboard 360°", "dashboard_360"),
-        ("📝 Reporte Médico", "reporte_medico")
-    ]
-    
-    for label, page_id in modules:
-        if auth_manager.has_permission(page_id):
-            if st.sidebar.button(label, use_container_width=True):
-                st.session_state.current_page = page_id
+        if auth_manager.has_permission("perfil"):
+            label_perfil = "👤 Mi Perfil" if user.get('rol') == "Jugador" else "👤 Perfil"
+            if st.button(label_perfil, use_container_width=True):
+                st.session_state.current_page = "perfil"
                 st.rerun()
 
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🤖 Asistente")
+        st.markdown("#### 📋 Módulos")
+        modules = [
+            ("🏥 Área Médica",    "medica"),
+            ("🥗 Nutrición",      "nutricion"),
+            ("🏋️ Área Física",   "fisica"),
+            ("📊 Dashboard 360°", "dashboard_360"),
+            ("📝 Reporte Médico", "reporte_medico"),
+        ]
+        for label, page_id in modules:
+            if auth_manager.has_permission(page_id):
+                if st.button(label, use_container_width=True):
+                    st.session_state.current_page = page_id
+                    st.rerun()
 
-    if auth_manager.has_permission("bot"):
-        if st.sidebar.button("🧠 Asistente IA", use_container_width=True):
-            st.session_state.current_page = "bot"
-            st.rerun()
-    
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### ⚙️ Administración")
-    
-    if auth_manager.has_permission("administracion"):
-        if st.sidebar.button("👥 Gestión Jugadores", use_container_width=True):
-            st.session_state.current_page = "administracion"
-            st.rerun()
-    
-    if auth_manager.has_permission("lista"):
-        if st.sidebar.button("📋 Pasar Lista", use_container_width=True):
-            st.session_state.current_page = "lista"
-            st.rerun()
-    
-    st.sidebar.markdown("---")
-    
-    if st.sidebar.button("⬅️ Volver a Portada", use_container_width=True):
-        st.session_state.current_page = "dashboard"
-        st.rerun()
-        
-    st.sidebar.markdown("---")
-    if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
-        auth_manager.logout()
-    
-    # Contenido principal - Enrutamiento
+        st.markdown("#### ⚙️ Admin")
+        if auth_manager.has_permission("bot"):
+            if st.button("🧠 Asistente IA", use_container_width=True):
+                st.session_state.current_page = "bot"
+                st.rerun()
+        if auth_manager.has_permission("administracion"):
+            if st.button("👥 Gestión Jugadores", use_container_width=True):
+                st.session_state.current_page = "administracion"
+                st.rerun()
+        if auth_manager.has_permission("lista"):
+            if st.button("📋 Pasar Lista", use_container_width=True):
+                st.session_state.current_page = "lista"
+                st.rerun()
+
+        st.markdown("---")
+        if st.button("🚪 Cerrar Sesión", use_container_width=True):
+            auth_manager.logout()
+
+    # ===== MOBILE BOTTOM NAV =====
+    # Build nav items from permitted pages
+    nav_items = [("🏠", "Inicio", "dashboard")]
+    if auth_manager.has_permission("perfil"):
+        nav_items.append(("👤", "Perfil", "perfil"))
+    if auth_manager.has_permission("fisica"):
+        nav_items.append(("🏋️", "Física", "fisica"))
+    if auth_manager.has_permission("medica"):
+        nav_items.append(("🏥", "Médica", "medica"))
+    if auth_manager.has_permission("nutricion"):
+        nav_items.append(("🥗", "Nutrición", "nutricion"))
+
+    # Limit to 5 for bottom nav
+    nav_items = nav_items[:5]
+    nav_links_html = ""
+    for icon, label, page_id in nav_items:
+        active_style = "color: white !important;" if st.session_state.get("current_page") == page_id else ""
+        nav_links_html += f"""
+        <a href="#" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'{page_id}'}}, '*')"
+           style="{active_style}">
+            <span class="icon">{icon}</span>
+            <span>{label}</span>
+        </a>"""
+
+    st.markdown(f"""
+    <div class="mobile-bottom-nav">
+        {nav_links_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ===== ROUTING =====
     page = st.session_state.get('current_page', 'dashboard')
-    
-    # Verificación de seguridad adicional
     if not auth_manager.has_permission(page):
         st.error("🚫 No tienes permiso para acceder a este módulo.")
         st.session_state.current_page = "dashboard"
@@ -558,8 +681,7 @@ def main_dashboard():
         if hasattr(mod_nutricion, 'main_nutricion'):
             mod_nutricion.main_nutricion()
         else:
-            st.error(f"Error: No se encuentra 'main_nutricion' en {mod_nutricion.__file__}")
-            st.write("Funciones disponibles:", [f for f in dir(mod_nutricion) if not f.startswith('__')])
+            st.error(f"Error: No se encuentra 'main_nutricion'")
     elif page == "fisica":
         from src.modules.areafisica import physical_area
         physical_area()
@@ -582,81 +704,115 @@ def main_dashboard():
         from src.modules.Lista import main_lista
         main_lista()
 
+
 def dashboard_main():
     """Dashboard principal del Club Universitario"""
     auth_manager = AuthManager()
-    
-    # Cargar logo
+
+    # Header
     logo_b64 = get_base64_image("escudo uni.jpg")
-    if logo_b64:
-        img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width: 150px; margin-bottom: 1rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">'
-    else:
-        img_html = ""
+    img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:clamp(80px,15vw,130px); margin-bottom:0.75rem; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">' if logo_b64 else ""
 
     st.markdown(f"""
     <div class="main-header">
         {img_html}
         <h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1>
         <h3>Sistema de Gestión Deportiva</h3>
-        <p>Centralización de datos médicos, físicos y nutricionales</p>
-        <div style="margin-top: 2rem; padding: 2rem; background: rgba(255,255,255,0.05); border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
-            <p style="font-size: 1.15rem; line-height: 1.8; max-width: 900px; margin: 0 auto; color: #E0E0E0; font-weight: 300;">
-                Bienvenido al sistema integral del Club Universitario. 
-                Tu rol como <strong>{st.session_state.user['rol']}</strong> te permite acceder a los módulos de gestión habilitados para tu perfil.
-            </p>
-        </div>
+        <p>Bienvenido, <strong>{st.session_state.user['nombre']}</strong> · {st.session_state.user['rol']}</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Secciones informativas dinámicas según permisos
-    st.markdown("---")
-    st.markdown("""
-    <h2 style='color: #000000; text-align: center; margin: 2rem 0 1rem 0;'>
-        🎯 Módulos Habilitados
-    </h2>
-    """, unsafe_allow_html=True)
-    
-    # Módulos informativos para el dashboard
+
+    # All modules info
     all_modules_info = [
-        {
-            "id": "medica",
-            "label": "🏥 Área Médica",
-            "desc": ["Registro de lesiones", "Historial médico", "Seguimiento de recuperación"]
-        },
-        {
-            "id": "nutricion",
-            "label": "🥗 Área Nutrición",
-            "desc": ["Planes nutricionales", "Seguimiento de dietas", "Análisis de composición"]
-        },
-        {
-            "id": "fisica",
-            "label": "🏋️ Área Física",
-            "desc": ["Planes de entrenamiento", "Evaluaciones físicas", "Métricas de rendimiento"]
-        }
+        {"id": "medica",       "icon": "🏥", "label": "Área Médica",    "color": "#dc3545",
+         "desc": "Registro de lesiones, historial clínico y seguimiento de recuperación."},
+        {"id": "nutricion",    "icon": "🥗", "label": "Nutrición",      "color": "#28a745",
+         "desc": "Antropometría, planes nutricionales y composición corporal."},
+        {"id": "fisica",       "icon": "🏋️", "label": "Área Física",   "color": "#fd7e14",
+         "desc": "Evaluaciones físicas, tests y métricas de rendimiento."},
+        {"id": "dashboard_360","icon": "📊", "label": "Dashboard 360°", "color": "#0d6efd",
+         "desc": "Vista integral del jugador: médico, físico y nutricional."},
+        {"id": "reporte_medico","icon":"📝", "label": "Reporte Médico", "color": "#6f42c1",
+         "desc": "Consulta y emisión de reportes médicos detallados."},
+        {"id": "bot",          "icon": "🧠", "label": "Asistente IA",   "color": "#20c997",
+         "desc": "Consultor inteligente con acceso en tiempo real a los datos del club."},
+        {"id": "administracion","icon":"👥", "label": "Gestión Jugadores","color": "#6c757d",
+         "desc": "Alta, baja y modificación de jugadores en la base de datos."},
+        {"id": "lista",        "icon": "📋", "label": "Pasar Lista",    "color": "#e83e8c",
+         "desc": "Control de asistencia a entrenamientos y partidos."},
     ]
-    
-    allowed_info = [m for m in all_modules_info if auth_manager.has_permission(m["id"])]
-    
-    if allowed_info:
-        cols = st.columns(len(allowed_info))
-        for i, mod in enumerate(allowed_info):
-            with cols[i]:
-                st.markdown('<div class="area-card">', unsafe_allow_html=True)
-                if st.button(mod["label"], use_container_width=True, key=f"dash_{mod['id']}_btn"):
+
+    allowed = [m for m in all_modules_info if auth_manager.has_permission(m["id"])]
+
+    if not allowed:
+        st.info("No tenés módulos habilitados para tu rol.")
+        return
+
+    # Responsive CSS grid (1 col mobile, 2 tablet, 3 desktop)
+    cards_html = ""
+    for mod in allowed:
+        cards_html += f"""
+        <div class="mod-card" onclick="void(0)">
+            <div class="mod-icon" style="background:{mod['color']}20; color:{mod['color']};">
+                {mod['icon']}
+            </div>
+            <div class="mod-label">{mod['label']}</div>
+            <div class="mod-desc">{mod['desc']}</div>
+        </div>"""
+
+    st.markdown(f"""
+    <style>
+    .mod-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }}
+    .mod-card {{
+        background: white;
+        border-radius: 14px;
+        padding: 1.5rem 1.25rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.09);
+        border: 1px solid #f0f0f0;
+        cursor: pointer;
+        transition: box-shadow 0.2s ease, transform 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+    }}
+    .mod-card:hover {{ box-shadow: 0 6px 20px rgba(0,0,0,0.14); transform: translateY(-2px); }}
+    .mod-card:active {{ transform: scale(0.97); }}
+    .mod-icon {{
+        width: 54px; height: 54px; border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.8rem; margin-bottom: 0.9rem;
+    }}
+    .mod-label {{ font-weight: 700; font-size: 1.05rem; color: #111; margin-bottom: 0.4rem; }}
+    .mod-desc  {{ font-size: 0.88rem; color: #666; line-height: 1.5; }}
+    </style>
+    <div class="mod-grid">
+        {cards_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Streamlit buttons below grid (they handle the actual navigation)
+    st.markdown("#### 👇 Tocá el botón del módulo al que querés entrar:")
+    cols_per_row = 3
+    rows = [allowed[i:i+cols_per_row] for i in range(0, len(allowed), cols_per_row)]
+    for row in rows:
+        cols = st.columns(len(row))
+        for col, mod in zip(cols, row):
+            with col:
+                if st.button(f"{mod['icon']} {mod['label']}", use_container_width=True, key=f"dash_go_{mod['id']}"):
                     st.session_state.current_page = mod["id"]
                     st.rerun()
-                for d in mod["desc"]:
-                    st.write(f"- {d}")
-                st.markdown('</div>', unsafe_allow_html=True)
-    
+
     # Footer
     st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; padding: 2rem; color: #2C2C2C;">
-        <p><strong>Club Universitario de La Plata</strong></p>
-        <p>Sistema de Gestión Deportiva • © 2025</p>
+    <div style="text-align:center; padding:1.5rem; color:#888; font-size:0.85rem;">
+        <strong>Club Universitario de La Plata</strong> · Sistema de Gestión Deportiva · © 2026
     </div>
     """, unsafe_allow_html=True)
+
 
 def main():
     # Inicializar session state
