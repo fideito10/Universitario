@@ -36,96 +36,95 @@ def load_universitario_styles():
         --uni-white: #FFFFFF;
         --uni-gray-light: #F5F5F5;
         --uni-gray-dark: #2C2C2C;
-        --uni-gray-mid: #6c757d;
-        --touch-min: 48px;
     }
 
     /* ===== BASE ===== */
     * { box-sizing: border-box; }
-    .stApp {
-        font-family: 'Inter', sans-serif !important;
-        background: #FFFFFF;
-    }
+    .stApp { font-family: 'Inter', sans-serif !important; background: #FFFFFF; }
 
     /* ===== OCULTAR ELEMENTOS DE STREAMLIT ===== */
     .stDeployButton { display: none !important; }
     footer { visibility: hidden !important; }
     #MainMenu { visibility: hidden !important; }
 
-    /* ===== SIDEBAR MEJORADO ===== */
+    /* ===== SIDEBAR — DESKTOP ===== */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%) !important;
-        min-width: 260px !important;
     }
     [data-testid="stSidebar"] * { color: white !important; }
+
+    /* Sidebar buttons — compact on desktop */
     [data-testid="stSidebar"] .stButton > button {
-        background: rgba(255,255,255,0.08) !important;
+        background: rgba(255,255,255,0.07) !important;
         color: white !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
-        border-radius: 10px !important;
-        min-height: var(--touch-min) !important;
-        font-size: 1rem !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+        border-radius: 8px !important;
+        height: 38px !important;
+        min-height: unset !important;
+        font-size: 0.88rem !important;
         font-weight: 500 !important;
         width: 100% !important;
-        margin-bottom: 4px !important;
-        transition: background 0.2s ease !important;
+        margin-bottom: 3px !important;
+        padding: 0 0.75rem !important;
+        transition: background 0.15s ease !important;
+        text-align: left !important;
     }
-    [data-testid="stSidebar"] .stButton > button:hover,
-    [data-testid="stSidebar"] .stButton > button:active {
-        background: rgba(255,255,255,0.18) !important;
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(255,255,255,0.15) !important;
         transform: none !important;
     }
     [data-testid="stSidebar"] h3,
     [data-testid="stSidebar"] h4 {
-        color: rgba(255,255,255,0.6) !important;
-        font-size: 0.75rem !important;
+        color: rgba(255,255,255,0.45) !important;
+        font-size: 0.68rem !important;
         text-transform: uppercase !important;
-        letter-spacing: 1px !important;
-        margin: 1rem 0 0.4rem 0 !important;
-        font-weight: 600 !important;
+        letter-spacing: 1.2px !important;
+        margin: 0.9rem 0 0.35rem 0 !important;
+        font-weight: 700 !important;
     }
     [data-testid="stSidebar"] hr {
         border-color: rgba(255,255,255,0.1) !important;
-        margin: 0.5rem 0 !important;
+        margin: 0.4rem 0 !important;
     }
     [data-testid="stSidebarNav"] { display: none !important; }
 
-    /* ===== BOTONES GENERALES ===== */
+    /* ===== BOTONES GENERALES — DESKTOP ===== */
     .stButton > button {
         background: linear-gradient(135deg, #000000, #2C2C2C) !important;
         color: #FFFFFF !important;
         border: none !important;
-        border-radius: 10px !important;
-        min-height: var(--touch-min) !important;
-        padding: 0.75rem 1.5rem !important;
-        font-size: 1rem !important;
+        border-radius: 8px !important;
+        height: 38px !important;
+        min-height: unset !important;
+        padding: 0 1.25rem !important;
+        font-size: 0.9rem !important;
         font-weight: 600 !important;
-        width: 100% !important;
         cursor: pointer !important;
         transition: opacity 0.2s ease, transform 0.1s ease !important;
         -webkit-tap-highlight-color: transparent !important;
     }
-    .stButton > button:hover { opacity: 0.88 !important; }
-    .stButton > button:active { transform: scale(0.97) !important; }
+    .stButton > button:hover { opacity: 0.85 !important; }
+    .stButton > button:active { transform: scale(0.98) !important; }
 
-    /* ===== INPUTS TOUCH-FRIENDLY ===== */
+    /* ===== INPUTS — DESKTOP ===== */
     .stTextInput > div > div > input,
-    .stSelectbox > div > div,
     .stTextArea > div > div > textarea,
     .stNumberInput > div > div > input {
-        min-height: var(--touch-min) !important;
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         border: 2px solid #E9ECEF !important;
-        font-size: 1rem !important;
-        padding: 0.6rem 0.9rem !important;
+        font-size: 0.9rem !important;
     }
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
         border-color: #000000 !important;
-        box-shadow: 0 0 0 3px rgba(0,0,0,0.08) !important;
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.07) !important;
+    }
+    .stSelectbox > div > div {
+        border-radius: 8px !important;
+        border: 2px solid #E9ECEF !important;
     }
 
-    /* ===== CARDS ===== */
+    /* ===== HEADER ===== */
     .main-header {
         background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
         padding: 2rem 1.5rem;
@@ -133,21 +132,21 @@ def load_universitario_styles():
         margin-bottom: 1.5rem;
         text-align: center;
         color: white;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
     }
-    .main-header h1 { color: white; font-size: clamp(1.4rem, 4vw, 2.2rem); margin: 0; }
-    .main-header h3 { color: rgba(255,255,255,0.85); font-size: clamp(1rem, 2.5vw, 1.3rem); margin: 0.4rem 0 0 0; }
-    .main-header p  { color: rgba(255,255,255,0.7); font-size: clamp(0.85rem, 2vw, 1rem); margin: 0.3rem 0 0 0; }
+    .main-header h1 { color: white; font-size: clamp(1.3rem, 3.5vw, 2rem); margin: 0; }
+    .main-header h3 { color: rgba(255,255,255,0.85); font-size: clamp(0.95rem, 2vw, 1.2rem); margin: 0.35rem 0 0; }
+    .main-header p  { color: rgba(255,255,255,0.65); font-size: 0.9rem; margin: 0.25rem 0 0; }
 
+    /* ===== CARDS ===== */
     .area-card {
         background: white;
         padding: 1.25rem;
         border-radius: 12px;
-        box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+        box-shadow: 0 3px 12px rgba(0,0,0,0.09);
         margin: 0.75rem 0;
         border-left: 5px solid #000000;
     }
-
     .metric-card {
         background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
         padding: 1.25rem;
@@ -155,112 +154,115 @@ def load_universitario_styles():
         color: white;
         text-align: center;
         margin: 0.5rem 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        transition: transform 0.2s ease;
     }
+    .metric-card:hover { transform: translateY(-3px); }
     .metric-card h3 { margin: 0; font-size: 2rem; font-weight: 700; color: white; }
-    .metric-card p  { margin: 0.3rem 0 0 0; font-size: 0.9rem; opacity: 0.85; color: white; }
+    .metric-card p  { margin: 0.3rem 0 0; font-size: 0.88rem; opacity: 0.85; color: white; }
 
-    /* ===== TABS MOBILE ===== */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px !important;
-        overflow-x: auto !important;
-        flex-wrap: nowrap !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important;
-        padding-bottom: 4px !important;
-    }
+    /* ===== TABS ===== */
+    .stTabs [data-baseweb="tab-list"] { gap: 6px !important; }
     .stTabs [data-baseweb="tab"] {
-        min-height: 44px !important;
         border-radius: 8px !important;
-        white-space: nowrap !important;
-        font-size: 0.9rem !important;
-        padding: 0 1rem !important;
+        font-size: 0.88rem !important;
+        height: 38px !important;
     }
 
-    /* ===== DATAFRAMES MOBILE ===== */
+    /* ===== DATAFRAMES — scroll horizontal siempre ===== */
     [data-testid="stDataFrame"] {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
     }
 
-    /* ===== CHARTS MOBILE ===== */
+    /* ===== PLOTLY — responsive ===== */
     .js-plotly-plot { max-width: 100% !important; }
 
-    /* ===== EXPANDERS ===== */
-    .streamlit-expanderHeader {
-        min-height: var(--touch-min) !important;
-        font-size: 1rem !important;
-    }
+    /* ===== BOTTOM NAV — hidden by default ===== */
+    .mobile-bottom-nav { display: none !important; }
 
-    /* ===== SELECTBOX ===== */
-    .stSelectbox [data-testid="stWidgetLabel"] { font-size: 0.9rem !important; }
-
-    /* ===== RESPONSIVE: TABLET ===== */
+    /* ==================================================
+       RESPONSIVE — TABLET (≤ 900px)
+    ================================================== */
     @media (max-width: 900px) {
         .main .block-container {
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
         }
     }
 
-    /* ===== RESPONSIVE: MOBILE ===== */
+    /* ==================================================
+       RESPONSIVE — MOBILE (≤ 640px)
+    ================================================== */
     @media (max-width: 640px) {
+        /* Espacio para bottom nav */
         .main .block-container {
-            padding: 0.75rem !important;
-            padding-bottom: 5rem !important; /* space for bottom nav */
+            padding: 0.5rem 0.5rem 5rem !important;
         }
-        .main-header { padding: 1.25rem 1rem; border-radius: 10px; }
-        .area-card   { padding: 1rem; }
 
-        /* Stack columns on mobile */
-        [data-testid="column"] { min-width: 100% !important; }
+        .main-header { padding: 1.1rem 0.9rem; border-radius: 10px; }
+        .area-card   { padding: 0.9rem; }
 
-        /* Bigger touch targets */
-        .stButton > button { min-height: 52px !important; font-size: 1.05rem !important; }
-        .stTextInput > div > div > input { min-height: 52px !important; font-size: 1.05rem !important; }
+        /* Touch targets grandes en móvil */
+        .stButton > button {
+            height: 50px !important;
+            font-size: 1rem !important;
+            border-radius: 10px !important;
+        }
+        [data-testid="stSidebar"] .stButton > button {
+            height: 48px !important;
+            font-size: 0.95rem !important;
+        }
+        .stTextInput > div > div > input,
+        .stTextArea > div > div > textarea,
+        .stNumberInput > div > div > input {
+            min-height: 48px !important;
+            font-size: 1rem !important;
+        }
 
-        /* Metrics smaller */
-        .metric-card h3 { font-size: 1.6rem; }
+        /* Tabs scrollables */
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto !important;
+            flex-wrap: nowrap !important;
+            -webkit-overflow-scrolling: touch !important;
+            scrollbar-width: none !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            white-space: nowrap !important;
+            height: 44px !important;
+        }
 
-        /* Hide sidebar toggle and rely on bottom nav */
-        [data-testid="collapsedControl"] { display: block !important; }
-
-        /* Plotly charts full width */
+        /* Charts full width */
         .js-plotly-plot, .plot-container { width: 100% !important; }
-    }
 
-    /* ===== BOTTOM NAVIGATION BAR (MOBILE ONLY) ===== */
-    @media (max-width: 640px) {
+        /* BOTTOM NAV — visible en móvil */
         .mobile-bottom-nav {
+            display: flex !important;
             position: fixed !important;
             bottom: 0 !important;
             left: 0 !important;
             right: 0 !important;
             z-index: 9999 !important;
             background: #000000 !important;
-            display: flex !important;
             justify-content: space-around !important;
             align-items: center !important;
-            padding: 0.5rem 0.25rem !important;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.3) !important;
-            border-top: 1px solid rgba(255,255,255,0.1) !important;
+            padding: 0.45rem 0.2rem !important;
+            box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important;
+            border-top: 1px solid rgba(255,255,255,0.08) !important;
         }
         .mobile-bottom-nav a {
-            color: rgba(255,255,255,0.7) !important;
+            color: rgba(255,255,255,0.65) !important;
             text-decoration: none !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
-            font-size: 0.65rem !important;
+            font-size: 0.62rem !important;
             font-weight: 500 !important;
-            min-width: 50px !important;
-            padding: 0.25rem !important;
+            min-width: 48px !important;
+            padding: 0.2rem !important;
             -webkit-tap-highlight-color: transparent !important;
         }
-        .mobile-bottom-nav a span.icon { font-size: 1.4rem !important; }
-    }
-    @media (min-width: 641px) {
-        .mobile-bottom-nav { display: none !important; }
+        .mobile-bottom-nav a span.icon { font-size: 1.35rem !important; }
     }
     </style>
     """, unsafe_allow_html=True)
