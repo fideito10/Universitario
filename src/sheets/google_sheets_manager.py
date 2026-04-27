@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 import os
 import json
+from src.utils.credentials import get_credentials_dict, get_service_account_credentials
+
 
 
 class GoogleSheetsManager:
@@ -83,89 +85,24 @@ class GoogleSheetsManager:
     
     def _setup_from_secrets(self) -> bool:
         """
-        Configurar credenciales usando st.secrets.
-        Acepta sección [google] con o sin sheet_id.
-        Si sheet_id no está en secrets, usa el ID hardcodeado por defecto.
-        
+        Configurar credenciales usando el módulo centralizado de credenciales.
+        Soporta st.secrets, variables de entorno (Railway) y archivos locales.
+
         Returns:
             bool: True si se configuró correctamente
         """
         try:
-            # 1. Intentar primero con st.secrets (Streamlit Cloud / Local)
-            if hasattr(st, "secrets"):
-                for section in ["google", "google_sheets", "gcp_service_account"]:
-                    if section in st.secrets:
-                        temp_data = st.secrets[section]
-                        has_creds = (
-                            (hasattr(temp_data, "type") or "type" in temp_data) and
-                            (hasattr(temp_data, "private_key") or "private_key" in temp_data) and
-                            (hasattr(temp_data, "client_email") or "client_email" in temp_data)
-                        )
-                        if has_creds:
-                            secrets_data = temp_data
-                            break
-
-            # 2. Si st.secrets falló, intentar directamente con Variables de Entorno (Railway/Docker)
-            if not secrets_data:
-                import os
-                # Buscamos prefijos comunes como STREAMLIT_GOOGLE_TYPE o GOOGLE_TYPE
-                if os.getenv("STREAMLIT_GOOGLE_TYPE") or os.getenv("GOOGLE_TYPE"):
-                    prefix = "STREAMLIT_GOOGLE_" if os.getenv("STREAMLIT_GOOGLE_TYPE") else "GOOGLE_"
-                    secrets_data = {
-                        "type": os.getenv(f"{prefix}TYPE"),
-                        "project_id": os.getenv(f"{prefix}PROJECT_ID"),
-                        "private_key_id": os.getenv(f"{prefix}PRIVATE_KEY_ID"),
-                        "private_key": os.getenv(f"{prefix}PRIVATE_KEY"),
-                        "client_email": os.getenv(f"{prefix}CLIENT_EMAIL"),
-                        "client_id": os.getenv(f"{prefix}CLIENT_ID"),
-                        "auth_uri": os.getenv(f"{prefix}AUTH_URI"),
-                        "token_uri": os.getenv(f"{prefix}TOKEN_URI")
-                    }
-                    # Limpieza básica para la clave privada (manejo de saltos de línea)
-                    if secrets_data["private_key"]:
-                        secrets_data["private_key"] = secrets_data["private_key"].replace('\\n', '\n')
-                
-            if not secrets_data:
+            creds = get_service_account_credentials(scopes=self.scope)
+            if creds is None:
                 return False
-
-            # Verificar campos mínimos requeridos (sin sheet_id, es opcional)
-            required = ["type", "project_id", "private_key", "client_email"]
-            for field in required:
-                if not (hasattr(secrets_data, field) or field in secrets_data):
-                    return False
-
-            # Crear credenciales y autorizar cliente
-            creds_info = {}
-            for field in required:
-                if isinstance(secrets_data, dict):
-                    creds_info[field] = secrets_data.get(field)
-                else:
-                    creds_info[field] = getattr(secrets_data, field, None)
-            
-            # Agregar campos opcionales
-            optional_fields = ["private_key_id", "client_id", "auth_uri", "token_uri"]
-            for field in optional_fields:
-                if isinstance(secrets_data, dict):
-                    creds_info[field] = secrets_data.get(field, "")
-                else:
-                    creds_info[field] = getattr(secrets_data, field, "")
-
-            # Asegurar formato de la clave privada
-            if creds_info.get("private_key"):
-                creds_info["private_key"] = creds_info["private_key"].replace('\\n', '\n')
-
-            creds = Credentials.from_service_account_info(
-                creds_info,
-                scopes=self.scope
-            )
 
             self.client = gspread.authorize(creds)
             self.credentials_loaded = True
-
             return True
 
-        except Exception as e:
+        except Exception:
             return False
+
     
     def _setup_from_file(self) -> bool:
         """

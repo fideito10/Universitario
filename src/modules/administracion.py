@@ -5,47 +5,11 @@ import json
 import os
 from datetime import datetime, date
 from google.oauth2 import service_account
+from src.utils.credentials import get_service_account_credentials
 
 def get_gcp_credentials():
-    """Obtener credenciales desde st.secrets (Streamlit Cloud), Variables de Entorno (Railway) o archivo local"""
-    try:
-        # 1. Primero intentar obtener desde st.secrets (para Streamlit Cloud)
-        if hasattr(st, 'secrets') and "google" in st.secrets:
-            credentials_info = dict(st.secrets["google"])
-            return service_account.Credentials.from_service_account_info(
-                credentials_info,
-                scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-            )
-        
-        # 2. Intentar desde Variables de Entorno (Railway/Docker)
-        if os.getenv("STREAMLIT_GOOGLE_TYPE") or os.getenv("GOOGLE_TYPE"):
-            prefix = "STREAMLIT_GOOGLE_" if os.getenv("STREAMLIT_GOOGLE_TYPE") else "GOOGLE_"
-            creds_info = {
-                "type": os.getenv(f"{prefix}TYPE"),
-                "project_id": os.getenv(f"{prefix}PROJECT_ID"),
-                "private_key_id": os.getenv(f"{prefix}PRIVATE_KEY_ID"),
-                "private_key": os.getenv(f"{prefix}PRIVATE_KEY", "").replace('\\n', '\n'),
-                "client_email": os.getenv(f"{prefix}CLIENT_EMAIL"),
-                "client_id": os.getenv(f"{prefix}CLIENT_ID"),
-                "auth_uri": os.getenv(f"{prefix}AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-                "token_uri": os.getenv(f"{prefix}TOKEN_URI", "https://oauth2.googleapis.com/token")
-            }
-            return service_account.Credentials.from_service_account_info(
-                creds_info,
-                scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-            )
-
-        # 3. Si no hay st.secrets ni env vars, intentar archivo local
-        credentials_path = 'credentials/service_account.json'
-        if os.path.exists(credentials_path):
-            return service_account.Credentials.from_service_account_file(
-                credentials_path,
-                scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-            )
-            
-        return None
-    except Exception as e:
-        return None
+    """Obtener credenciales usando el módulo centralizado de credenciales."""
+    return get_service_account_credentials()
 
 class JugadoresMaestroManager:
     def __init__(self):
