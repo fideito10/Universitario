@@ -12,47 +12,13 @@ from typing import Dict, List, Optional
 import json
 import sys
 import os
+from src.utils.credentials import get_credentials_dict
+
 def get_google_credentials():
     """
-    Obtiene las credenciales de Google de forma segura desde st.secrets, Variables de Entorno (Railway) o archivo local
+    Obtiene las credenciales de Google usando el módulo centralizado.
     """
-    try:
-        # 1. Intentar desde st.secrets
-        if hasattr(st, 'secrets') and "google" in st.secrets:
-            return dict(st.secrets["google"])
-            
-        # 2. Intentar desde Variables de Entorno (Railway)
-        import os
-        if os.getenv("STREAMLIT_GOOGLE_TYPE") or os.getenv("GOOGLE_TYPE"):
-            prefix = "STREAMLIT_GOOGLE_" if os.getenv("STREAMLIT_GOOGLE_TYPE") else "GOOGLE_"
-            creds = {
-                "type": os.getenv(f"{prefix}TYPE"),
-                "project_id": os.getenv(f"{prefix}PROJECT_ID"),
-                "private_key_id": os.getenv(f"{prefix}PRIVATE_KEY_ID"),
-                "private_key": os.getenv(f"{prefix}PRIVATE_KEY", "").replace('\\n', '\n'),
-                "client_email": os.getenv(f"{prefix}CLIENT_EMAIL"),
-                "client_id": os.getenv(f"{prefix}CLIENT_ID"),
-                "auth_uri": os.getenv(f"{prefix}AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-                "token_uri": os.getenv(f"{prefix}TOKEN_URI", "https://oauth2.googleapis.com/token")
-            }
-            return creds
-
-        # 3. Intentar desde archivos locales
-        possible_paths = [
-            "credentials/service_account.json",
-            "../credentials/service_account.json",
-            "service_account.json"
-        ]
-        
-        for cred_path in possible_paths:
-            if os.path.exists(cred_path):
-                with open(cred_path) as f:
-                    import json
-                    return json.load(f)
-                    
-        return None
-    except Exception:
-        return None
+    return get_credentials_dict()
 
 # Importaciones opcionales
 try:
