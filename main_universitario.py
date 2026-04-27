@@ -695,18 +695,9 @@ def main_dashboard():
     nav_links_html = ""
     for icon, label, page_id in nav_items:
         active_style = "color: white !important;" if st.session_state.get("current_page") == page_id else ""
-        nav_links_html += f"""
-        <a href="#" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'{page_id}'}}, '*')"
-           style="{active_style}">
-            <span class="icon">{icon}</span>
-            <span>{label}</span>
-        </a>"""
+        nav_links_html += f"""<a href="#" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'{page_id}'}}, '*')" style="{active_style}"><span class="icon">{icon}</span><span>{label}</span></a>"""
 
-    st.markdown(f"""
-    <div class="mobile-bottom-nav">
-        {nav_links_html}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div class="mobile-bottom-nav">{nav_links_html}</div>', unsafe_allow_html=True)
 
     # ===== ROUTING =====
     page = st.session_state.get('current_page', 'dashboard')
