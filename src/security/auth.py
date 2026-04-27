@@ -113,7 +113,7 @@ class AuthManager:
             # Aceptar DNI en ambos campos O solo en el campo usuario (usando DNI como contraseña también)
             dni_login = clean_u != "" and (clean_u == clean_p or password_raw.strip() == "")
 
-            if clean_u != "" and clean_u == clean_p:
+            if dni_login:
                 # A. Buscar en la tabla Usuarios por DNI
                 if not users_df.empty and 'DNI' in users_df.columns:
                     for idx, row in users_df.iterrows():
