@@ -22,33 +22,37 @@ def inject_mobile_meta():
     if logo_b64:
         st.markdown(f"""
         <script>
-            function updateHeadTag(tagName, attributes) {{
-                var head = window.parent.document.head;
-                var selector = tagName;
-                if (attributes.rel) selector += "[rel='" + attributes.rel + "']";
-                if (attributes.name) selector += "[name='" + attributes.name + "']";
-                
-                var element = window.parent.document.querySelector(selector) || window.parent.document.createElement(tagName);
-                for (var key in attributes) {{
-                    element.setAttribute(key, attributes[key]);
+            try {{
+                function updateHeadTag(tagName, attributes) {{
+                    var head = window.parent.document.head;
+                    var selector = tagName;
+                    if (attributes.rel) selector += "[rel='" + attributes.rel + "']";
+                    if (attributes.name) selector += "[name='" + attributes.name + "']";
+                    
+                    var element = window.parent.document.querySelector(selector) || window.parent.document.createElement(tagName);
+                    for (var key in attributes) {{
+                        element.setAttribute(key, attributes[key]);
+                    }}
+                    if (!element.parentNode) head.appendChild(element);
                 }}
-                if (!element.parentNode) head.appendChild(element);
+
+                updateHeadTag('link', {{
+                    rel: 'apple-touch-icon',
+                    href: 'data:image/jpeg;base64,{logo_b64}'
+                }});
+
+                updateHeadTag('link', {{
+                    rel: 'shortcut icon',
+                    href: 'data:image/jpeg;base64,{logo_b64}'
+                }});
+
+                updateHeadTag('meta', {{ name: 'apple-mobile-web-app-capable', content: 'yes' }});
+                updateHeadTag('meta', {{ name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }});
+                updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
+                updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
+            }} catch (e) {{
+                console.warn("Mobile meta injection blocked or failed:", e);
             }}
-
-            updateHeadTag('link', {{
-                rel: 'apple-touch-icon',
-                href: 'data:image/jpeg;base64,{logo_b64}'
-            }});
-
-            updateHeadTag('link', {{
-                rel: 'shortcut icon',
-                href: 'data:image/jpeg;base64,{logo_b64}'
-            }});
-
-            updateHeadTag('meta', {{ name: 'apple-mobile-web-app-capable', content: 'yes' }});
-            updateHeadTag('meta', {{ name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }});
-            updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
-            updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
         </script>
         """, unsafe_allow_html=True)
 
@@ -810,10 +814,11 @@ def dashboard_main():
 
 
 def main():
-    inject_mobile_meta()
     # Inicializar session state
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
+    
+    inject_mobile_meta()
     
     if 'current_page' not in st.session_state:
         st.session_state.current_page = "dashboard"
