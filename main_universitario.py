@@ -714,95 +714,96 @@ def main_dashboard():
     # ===== NUEVO MOBILE BOTTOM NAV (JS + CSS + BTONES NATIVOS) =====
     nav_container = st.container()
     with nav_container:
-        st.markdown("""
-            <div id="mobile-nav-marker" style="display:none;"></div>
-            <img src="dummy" onerror="
-                setTimeout(() => {
-                    let marker = document.getElementById('mobile-nav-marker');
-                    if (marker) {
-                        let block = marker.closest('div[data-testid=\\'stVerticalBlock\\']');
-                        if (block) {
-                            block.classList.add('nav-block-wrapper');
-                            let cols = block.querySelector('div[data-testid=\\'stColumns\\']') || 
-                                       block.querySelector('div[data-testid=\\'stHorizontalBlock\\']');
-                            if (cols) {
-                                cols.classList.add('nav-columns-row');
-                                let colDivs = cols.querySelectorAll('div[data-testid=\\'column\\']');
-                                colDivs.forEach(c => c.classList.add('nav-col-item'));
-                            }
-                        }
-                    }
-                }, 100);
-            " style="display:none;">
-            <style>
-            /* Ocultar en desktop */
-            @media (min-width: 769px) {
-                .nav-block-wrapper { display: none !important; }
-            }
-            
-            /* Estilos móviles */
-            @media (max-width: 768px) {
-                .nav-columns-row {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    position: fixed !important;
-                    bottom: 0 !important;
-                    left: 0 !important;
-                    right: 0 !important;
-                    z-index: 99999 !important;
-                    background: #000000 !important;
-                    padding: 0.45rem 0.2rem !important;
-                    box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important;
-                    border-top: 1px solid rgba(255,255,255,0.08) !important;
-                    margin: 0 !important;
-                    justify-content: space-around !important;
-                    gap: 0 !important;
-                }
-                .nav-col-item {
-                    width: auto !important;
-                    flex: 1 1 0% !important;
-                    padding: 0 !important;
-                    min-width: 0 !important;
-                }
-                .nav-columns-row button {
-                    background: transparent !important;
-                    border: none !important;
-                    box-shadow: none !important;
-                    color: rgba(255,255,255,0.55) !important;
-                    height: auto !important;
-                    padding: 0.2rem 0 !important;
-                    display: flex !important;
-                    flex-direction: column !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    border-radius: 0 !important;
-                    width: 100% !important;
-                    min-height: 48px !important;
-                }
-                .nav-columns-row button:hover,
-                .nav-columns-row button:active {
-                    color: white !important;
-                    background: rgba(255,255,255,0.05) !important;
-                }
-                .nav-columns-row button p {
-                    font-size: 0.65rem !important;
-                    font-weight: 500 !important;
-                    line-height: 1.3 !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    display: flex !important;
-                    flex-direction: column !important;
-                    align-items: center !important;
-                    gap: 2px !important;
-                }
-                
-                /* Hack para evitar que el contenido final quede tapado por la barra */
-                .main .block-container {
-                    padding-bottom: 80px !important;
+        html_code = """
+<div id="mobile-nav-marker" style="display:none;"></div>
+<img src="dummy" onerror="
+    setTimeout(() => {
+        let marker = document.getElementById('mobile-nav-marker');
+        if (marker) {
+            let block = marker.closest('div[data-testid=\\'stVerticalBlock\\']');
+            if (block) {
+                block.classList.add('nav-block-wrapper');
+                let cols = block.querySelector('div[data-testid=\\'stColumns\\']') || 
+                           block.querySelector('div[data-testid=\\'stHorizontalBlock\\']');
+                if (cols) {
+                    cols.classList.add('nav-columns-row');
+                    let colDivs = cols.querySelectorAll('div[data-testid=\\'column\\']');
+                    colDivs.forEach(c => c.classList.add('nav-col-item'));
                 }
             }
-            </style>
-        """, unsafe_allow_html=True)
+        }
+    }, 100);
+" style="display:none;">
+<style>
+/* Ocultar en desktop */
+@media (min-width: 769px) {
+    .nav-block-wrapper { display: none !important; }
+}
+
+/* Estilos móviles */
+@media (max-width: 768px) {
+    .nav-columns-row {
+        display: flex !important;
+        flex-direction: row !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 99999 !important;
+        background: #000000 !important;
+        padding: 0.45rem 0.2rem !important;
+        box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important;
+        border-top: 1px solid rgba(255,255,255,0.08) !important;
+        margin: 0 !important;
+        justify-content: space-around !important;
+        gap: 0 !important;
+    }
+    .nav-col-item {
+        width: auto !important;
+        flex: 1 1 0% !important;
+        padding: 0 !important;
+        min-width: 0 !important;
+    }
+    .nav-columns-row button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: rgba(255,255,255,0.55) !important;
+        height: auto !important;
+        padding: 0.2rem 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 0 !important;
+        width: 100% !important;
+        min-height: 48px !important;
+    }
+    .nav-columns-row button:hover,
+    .nav-columns-row button:active {
+        color: white !important;
+        background: rgba(255,255,255,0.05) !important;
+    }
+    .nav-columns-row button p {
+        font-size: 0.65rem !important;
+        font-weight: 500 !important;
+        line-height: 1.3 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 2px !important;
+    }
+    
+    /* Hack para evitar que el contenido final quede tapado por la barra */
+    .main .block-container {
+        padding-bottom: 80px !important;
+    }
+}
+</style>
+"""
+        st.markdown(html_code, unsafe_allow_html=True)
         
         cols = st.columns(len(nav_items))
         active_css = ""
