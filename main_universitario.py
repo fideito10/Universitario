@@ -710,91 +710,112 @@ def main_dashboard():
 
     # Limit to 5 for bottom nav
     nav_items = nav_items[:5]
-    
-    # ===== NUEVO MOBILE BOTTOM NAV (PURE HTML + HIDDEN BUTTONS) =====
-    
-    # 1. Creamos botones reales de Streamlit, pero los escondemos. 
-    #    Estos botones se encargan del ruteo cuando son 'clickeados' por JS.
-    hidden_container = st.container()
-    with hidden_container:
-        st.markdown('<div id="hidden-btn-container" style="display:none;"></div>', unsafe_allow_html=True)
-        # Ocultar todo este bloque para que los botones invisibles no ocupen espacio
-        st.markdown('<style>div[data-testid="stVerticalBlock"]:has(#hidden-btn-container) { display: none !important; }</style>', unsafe_allow_html=True)
-        for icon, label, page_id in nav_items:
-            # Los botones tienen texto super especifico para poder encontrarlos con JS
-            if st.button(f"__NAV_TO_{page_id}__", key=f"hidden_btn_{page_id}"):
+
+    # ===== MOBILE BOTTOM NAV: botones ocultos para ruteo =====
+    # Los botones nativos de Streamlit se renderizan fuera del flujo visible
+    # usando CSS que los hace de 0x0 sin afectar el layout del contenido
+    st.markdown("""
+        <style>
+        /* Solo ocultar visualmente los botones de navegacion, no el contenido */
+        [data-testid="stBaseButton-secondary"][kind="secondary"]:has(p:first-child) {
+            /* Se aplica solo via clase especifica a continuacion */
+        }
+        .nav-hidden-btn-row {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+            clip: rect(0,0,0,0) !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        .nav-hidden-btn-row button {
+            pointer-events: all !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Botones reales de Streamlit en una fila oculta
+    st.markdown('<div class="nav-hidden-btn-row">', unsafe_allow_html=True)
+    nav_btn_cols = st.columns(len(nav_items))
+    for i, (icon, label, page_id) in enumerate(nav_items):
+        with nav_btn_cols[i]:
+            if st.button(label, key=f"mob_nav_{page_id}", use_container_width=True):
                 st.session_state.current_page = page_id
                 st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # 2. Renderizamos la barra de navegacion en HTML puro (exactamente como era antes)
+    # ===== HTML BOTTOM NAV BAR (pure HTML, fijo al fondo) =====
+    current_page = st.session_state.get("current_page", "dashboard")
     nav_links_html = ""
     for icon, label, page_id in nav_items:
-        is_active = (st.session_state.get("current_page") == page_id)
-        active_class = "active" if is_active else ""
-        
-        # JS para buscar el boton oculto correspondiente y darle click
-        js_click = f"event.preventDefault(); Array.from(document.querySelectorAll('button')).forEach(b => {{ if(b.innerText.includes('__NAV_TO_{page_id}__')) b.click(); }});"
-        
-        nav_links_html += f"""
-        <a href="#" onclick="{js_click}" class="nav-item {active_class}">
-            <span class="icon">{icon}</span>
-            <span class="label">{label}</span>
-        </a>
-        """
+        active_class = "active" if current_page == page_id else ""
+        # JS: encuentra el boton de Streamlit por su texto y le hace click
+        js_click = f"event.preventDefault(); (function(){{ var btns=document.querySelectorAll('div.nav-hidden-btn-row button'); for(var i=0;i<btns.length;i++){{ if(btns[i].innerText.trim()==='{label}') {{ btns[i].click(); break; }} }} }})();"
+        nav_links_html += f'<a href="#" onclick="{js_click}" class="mbn-item {active_class}"><span class="mbn-icon">{icon}</span><span class="mbn-label">{label}</span></a>'
 
-    # 3. CSS para la barra HTML
     st.markdown(f"""
         <style>
-        .mobile-bottom-nav {{
-            display: none;
-        }}
+        /* Desktop: ocultar la barra */
+        .mobile-bottom-nav {{ display: none !important; }}
+
+        /* Mobile: mostrar fija al fondo */
         @media (max-width: 768px) {{
             .mobile-bottom-nav {{
                 display: flex !important;
+                flex-direction: row !important;
                 position: fixed !important;
                 bottom: 0 !important;
                 left: 0 !important;
                 right: 0 !important;
-                z-index: 99999 !important;
-                background: #000000 !important;
+                width: 100% !important;
+                z-index: 999999 !important;
+                background: #0d0d0d !important;
+                border-top: 1px solid rgba(255,255,255,0.1) !important;
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.5) !important;
+                padding: 6px 0 8px !important;
+                margin: 0 !important;
                 justify-content: space-around !important;
                 align-items: center !important;
-                padding: 0.45rem 0.2rem !important;
-                box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important;
-                border-top: 1px solid rgba(255,255,255,0.08) !important;
             }}
-            .mobile-bottom-nav a {{
-                color: rgba(255,255,255,0.55) !important;
-                text-decoration: none !important;
+            .mbn-item {{
+                flex: 1 !important;
                 display: flex !important;
                 flex-direction: column !important;
                 align-items: center !important;
-                width: 100% !important;
-                padding: 0.2rem 0 !important;
-                border-radius: 8px !important;
-                transition: all 0.2s ease !important;
+                justify-content: center !important;
+                gap: 3px !important;
+                padding: 4px 2px !important;
+                color: rgba(255,255,255,0.45) !important;
+                text-decoration: none !important;
+                font-family: inherit !important;
+                transition: color 0.15s ease !important;
+                -webkit-tap-highlight-color: transparent !important;
             }}
-            .mobile-bottom-nav a:hover, 
-            .mobile-bottom-nav a:active,
-            .mobile-bottom-nav a.active {{
-                color: white !important;
-                background: rgba(255,255,255,0.05) !important;
+            .mbn-item.active,
+            .mbn-item:active {{
+                color: #ffffff !important;
             }}
-            .mobile-bottom-nav a span.icon {{
-                font-size: 1.2rem !important;
-                margin-bottom: 2px !important;
+            .mbn-icon {{
+                font-size: 1.3rem !important;
+                line-height: 1 !important;
             }}
-            .mobile-bottom-nav a span.label {{
-                font-size: 0.65rem !important;
+            .mbn-label {{
+                font-size: 0.6rem !important;
                 font-weight: 500 !important;
-                line-height: 1.3 !important;
+                letter-spacing: 0.02em !important;
+                text-transform: uppercase !important;
             }}
-            .mobile-bottom-nav a.active span.label {{
+            .mbn-item.active .mbn-label {{
                 font-weight: 700 !important;
+                color: #4fc3f7 !important;
             }}
-            /* Hack para evitar que el contenido final quede tapado por la barra */
-            .main .block-container {{
-                padding-bottom: 85px !important;
+            .mbn-item.active .mbn-icon {{
+                color: #4fc3f7 !important;
+            }}
+            /* Espacio al final para que el contenido no quede tapado */
+            section.main > div.block-container {{
+                padding-bottom: 90px !important;
             }}
         }}
         </style>
