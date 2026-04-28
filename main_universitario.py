@@ -712,38 +712,42 @@ def main_dashboard():
     nav_items = nav_items[:5]
 
     # ===== MOBILE BOTTOM NAV: botones ocultos para ruteo =====
-    # Los botones nativos de Streamlit se renderizan fuera del flujo visible
-    # usando CSS que los hace de 0x0 sin afectar el layout del contenido
+    # Técnica: ponemos un span marcador, luego los botones en columnas.
+    # CSS usa el selector de hermano (+) para ocultar el bloque de columnas
+    # sin afectar el resto del contenido.
+    st.markdown('<span id="nav-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
     st.markdown("""
         <style>
-        /* Solo ocultar visualmente los botones de navegacion, no el contenido */
-        [data-testid="stBaseButton-secondary"][kind="secondary"]:has(p:first-child) {
-            /* Se aplica solo via clase especifica a continuacion */
-        }
-        .nav-hidden-btn-row {
+        /* Ocultar la fila de columnas que viene inmediatamente después del marcador */
+        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div[data-testid="stHorizontalBlock"],
+        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div[data-testid="stColumns"],
+        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div {
             position: absolute !important;
-            width: 1px !important;
-            height: 1px !important;
-            overflow: hidden !important;
-            clip: rect(0,0,0,0) !important;
+            top: -9999px !important;
+            left: -9999px !important;
             opacity: 0 !important;
             pointer-events: none !important;
+            height: 0 !important;
+            overflow: hidden !important;
         }
-        .nav-hidden-btn-row button {
+        /* Permitir clicks en los botones aunque estén fuera de pantalla */
+        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div button {
             pointer-events: all !important;
+        }
+        /* Tambien ocultar el propio marcador */
+        div[data-testid="stElementContainer"]:has(#nav-row-marker) {
+            display: none !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Botones reales de Streamlit en una fila oculta
-    st.markdown('<div class="nav-hidden-btn-row">', unsafe_allow_html=True)
+    # Fila de botones nativos de Streamlit (se oculta via CSS pero siguen siendo clickeables)
     nav_btn_cols = st.columns(len(nav_items))
     for i, (icon, label, page_id) in enumerate(nav_items):
         with nav_btn_cols[i]:
             if st.button(label, key=f"mob_nav_{page_id}", use_container_width=True):
                 st.session_state.current_page = page_id
                 st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # ===== HTML BOTTOM NAV BAR (pure HTML, fijo al fondo) =====
     current_page = st.session_state.get("current_page", "dashboard")
