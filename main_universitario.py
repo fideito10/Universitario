@@ -727,7 +727,7 @@ def main_dashboard():
     for icon, label, page_id in nav_items:
         active_class = "active" if current_page == page_id else ""
         nav_links_html += (
-            f'<a href="?nav={page_id}" class="mbn-item {active_class}">'
+            f'<a href="#" onclick="window.location.href=\'?nav={page_id}\'; return false;" class="mbn-item {active_class}">'
             f'<span class="mbn-icon">{icon}</span>'
             f'<span class="mbn-label">{label}</span>'
             f'</a>'
