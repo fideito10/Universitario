@@ -710,12 +710,7 @@ def main_dashboard():
                 st.session_state.current_page = "lista"
                 st.rerun()
 
-        st.markdown("---")
-        if st.button("🚪 Cerrar Sesión", use_container_width=True):
-            auth_manager.logout()
-
     # ===== MOBILE BOTTOM NAV =====
-    # Build nav items from permitted pages
     nav_items = [("🏠", "Inicio", "dashboard")]
     if auth_manager.has_permission("perfil"):
         nav_items.append(("👤", "Perfil", "perfil"))
@@ -727,27 +722,59 @@ def main_dashboard():
         nav_items.append(("🥗", "Nutrición", "nutricion"))
     if auth_manager.has_permission("wellness"):
         nav_items.append(("📝", "Wellness", "wellness"))
-
-    # Limit to 5
     nav_items = nav_items[:5]
 
-    # Leer query param de navegacion (lo setean los links HTML de abajo)
-    qp = st.query_params.to_dict()
-    if "nav" in qp:
-        nav_target = qp["nav"]
-        if auth_manager.has_permission(nav_target) or nav_target == "dashboard":
-            st.session_state.current_page = nav_target
-        st.query_params.clear()
-        st.rerun()
+    # 1. Botones nativos de Streamlit (son los que realmente navegan con st.rerun)
+    #    Se renderizan primero, luego JS los oculta y los mapea al bottom bar
+    nav_cols = st.columns(len(nav_items))
+    nav_labels = []
+    for i, (icon, label, page_id) in enumerate(nav_items):
+        nav_labels.append(label)
+        with nav_cols[i]:
+            if st.button(label, key=f"mob_nav_{page_id}", use_container_width=True):
+                st.session_state.current_page = page_id
+                st.rerun()
 
-    # ===== HTML BOTTOM NAV BAR =====
-    # Links puros que cambian el query param ?nav=X para que Streamlit lo procese
+    # 2. JS via img onerror (unica forma de ejecutar JS en st.markdown):
+    #    - Oculta el bloque de columnas nativas
+    #    - Guarda referencias en window.__mnBtns para que el bottom bar pueda clickearlos
+    labels_js = str(nav_labels).replace("'", '"')
+    st.markdown(f"""
+        <img src="x" onerror="(function(){{
+            var labels = {labels_js};
+            function setup() {{
+                var btns = document.querySelectorAll('button');
+                var found = {{}};
+                btns.forEach(function(b) {{
+                    if (labels.indexOf(b.innerText.trim()) !== -1) {{
+                        found[b.innerText.trim()] = b;
+                        var hblock = b.closest('[data-testid=\\'stHorizontalBlock\\']')
+                                   || b.closest('[data-testid=\\'stColumns\\']');
+                        if (hblock && !hblock.dataset.navHidden) {{
+                            hblock.style.cssText = 'position:absolute!important;top:-9999px!important;left:-9999px!important;width:1px!important;height:1px!important;overflow:hidden!important;';
+                            hblock.dataset.navHidden = '1';
+                        }}
+                    }}
+                }});
+                if (Object.keys(found).length === labels.length) {{
+                    window.__mnBtns = found;
+                }} else {{
+                    setTimeout(setup, 200);
+                }}
+            }}
+            setTimeout(setup, 400);
+        }})();" style="display:none">
+    """, unsafe_allow_html=True)
+
+    # 3. HTML bottom bar — onclick llama .click() en el boton nativo correspondiente
     current_page = st.session_state.get("current_page", "dashboard")
     nav_links_html = ""
     for icon, label, page_id in nav_items:
         active_class = "active" if current_page == page_id else ""
+        # JS: busca el botón guardado en window.__mnBtns y le hace click
+        js = f"event.preventDefault();event.stopPropagation();if(window.__mnBtns&&window.__mnBtns['{label}']){{window.__mnBtns['{label}'].click();}}else{{var b=Array.from(document.querySelectorAll('button')).find(function(x){{return x.innerText.trim()==='{label}';}});if(b)b.click();}}"
         nav_links_html += (
-            f'<a href="#" onclick="window.location.href=\'?nav={page_id}\'; return false;" class="mbn-item {active_class}">'
+            f'<a href="#" onclick="{js}" class="mbn-item {active_class}">'
             f'<span class="mbn-icon">{icon}</span>'
             f'<span class="mbn-label">{label}</span>'
             f'</a>'
@@ -755,17 +782,13 @@ def main_dashboard():
 
     st.markdown(f"""
         <style>
-        /* Desktop: ocultar barra */
         .mobile-bottom-nav {{ display: none !important; }}
-
         @media (max-width: 768px) {{
             .mobile-bottom-nav {{
                 display: flex !important;
                 flex-direction: row !important;
                 position: fixed !important;
-                bottom: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
+                bottom: 0 !important; left: 0 !important; right: 0 !important;
                 width: 100% !important;
                 z-index: 999999 !important;
                 background: #0d0d0d !important;
@@ -786,34 +809,23 @@ def main_dashboard():
                 padding: 4px 2px !important;
                 color: rgba(255,255,255,0.45) !important;
                 text-decoration: none !important;
-                font-family: inherit !important;
                 -webkit-tap-highlight-color: transparent !important;
                 cursor: pointer !important;
             }}
             .mbn-item.active {{ color: #4fc3f7 !important; }}
             .mbn-item:active   {{ color: #ffffff !important; }}
-            .mbn-icon {{
-                font-size: 1.35rem !important;
-                line-height: 1 !important;
-            }}
+            .mbn-icon {{ font-size: 1.35rem !important; line-height: 1 !important; }}
             .mbn-label {{
                 font-size: 0.58rem !important;
                 font-weight: 500 !important;
                 letter-spacing: 0.04em !important;
                 text-transform: uppercase !important;
             }}
-            .mbn-item.active .mbn-label {{
-                font-weight: 700 !important;
-            }}
-            /* Que el contenido no quede tapado por la barra */
-            section.main > div.block-container {{
-                padding-bottom: 90px !important;
-            }}
+            .mbn-item.active .mbn-label {{ font-weight: 700 !important; }}
+            section.main > div.block-container {{ padding-bottom: 90px !important; }}
         }}
         </style>
-        <div class="mobile-bottom-nav">
-            {nav_links_html}
-        </div>
+        <div class="mobile-bottom-nav">{nav_links_html}</div>
     """, unsafe_allow_html=True)
 
     # ===== ROUTING =====
