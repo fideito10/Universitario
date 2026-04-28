@@ -723,14 +723,14 @@ def main_dashboard():
         }
         
         /* Ocultar la barra entera en desktop */
-        @media (min-width: 641px) {
+        @media (min-width: 769px) {
             div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div {
                 display: none !important;
             }
         }
         
         /* Convertir el contenedor de columnas en bottom nav en mobile */
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
             div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div {
                 display: flex !important;
                 flex-direction: row !important;
@@ -801,7 +801,7 @@ def main_dashboard():
         with cols[idx]:
             if st.session_state.get("current_page") == page_id:
                 active_css += f"""
-                @media (max-width: 640px) {{
+                @media (max-width: 768px) {{
                     div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div > div:nth-child({idx+1}) button p {{
                         color: white !important;
                         font-weight: 700 !important;
