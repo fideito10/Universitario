@@ -711,67 +711,97 @@ def main_dashboard():
     # Limit to 5 for bottom nav
     nav_items = nav_items[:5]
     
-    # ===== NUEVO MOBILE BOTTOM NAV (JS + CSS + BTONES NATIVOS) =====
-    nav_container = st.container()
-    with nav_container:
-        html_code = """
-<div id="mobile-nav-marker" style="display:none;"></div>
-<img src="dummy" onerror="
-    setTimeout(() => {
-        let marker = document.getElementById('mobile-nav-marker');
-        if (marker) {
-            let block = marker.closest('div[data-testid=\\'stVerticalBlock\\']');
-            if (block) {
-                block.classList.add('nav-block-wrapper');
-                let cols = block.querySelector('div[data-testid=\\'stColumns\\']') || block.querySelector('div[data-testid=\\'stHorizontalBlock\\']');
-                if (cols) {
-                    cols.classList.add('nav-columns-row');
-                    let colDivs = cols.querySelectorAll('div[data-testid=\\'column\\']');
-                    colDivs.forEach(c => c.classList.add('nav-col-item'));
-                }
-            }
-        }
-    }, 100);
-" style="display:none;">
-<style>
-/* Ocultar en desktop */
-@media (min-width: 769px) { .nav-block-wrapper { display: none !important; } }
-/* Estilos móviles */
-@media (max-width: 768px) {
-    .nav-columns-row { display: flex !important; flex-direction: row !important; position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 99999 !important; background: #000000 !important; padding: 0.45rem 0.2rem !important; box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important; border-top: 1px solid rgba(255,255,255,0.08) !important; margin: 0 !important; justify-content: space-around !important; gap: 0 !important; }
-    .nav-col-item { width: auto !important; flex: 1 1 0% !important; padding: 0 !important; min-width: 0 !important; }
-    .nav-columns-row button { background: transparent !important; border: none !important; box-shadow: none !important; color: rgba(255,255,255,0.55) !important; height: auto !important; padding: 0.2rem 0 !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; border-radius: 0 !important; width: 100% !important; min-height: 48px !important; }
-    .nav-columns-row button:hover, .nav-columns-row button:active { color: white !important; background: rgba(255,255,255,0.05) !important; }
-    .nav-columns-row button p { font-size: 0.65rem !important; font-weight: 500 !important; line-height: 1.3 !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: column !important; align-items: center !important; gap: 2px !important; }
-    /* Hack para evitar que el contenido final quede tapado por la barra */
-    .main .block-container { padding-bottom: 80px !important; }
-}
-</style>
-""".replace('\n', ' ')
-        st.markdown(html_code, unsafe_allow_html=True)
+    # ===== NUEVO MOBILE BOTTOM NAV (PURE HTML + HIDDEN BUTTONS) =====
+    
+    # 1. Creamos botones reales de Streamlit, pero los escondemos. 
+    #    Estos botones se encargan del ruteo cuando son 'clickeados' por JS.
+    hidden_container = st.container()
+    with hidden_container:
+        st.markdown('<div id="hidden-btn-container" style="display:none;"></div>', unsafe_allow_html=True)
+        # Ocultar todo este bloque para que los botones invisibles no ocupen espacio
+        st.markdown('<style>div[data-testid="stVerticalBlock"]:has(#hidden-btn-container) { display: none !important; }</style>', unsafe_allow_html=True)
+        for icon, label, page_id in nav_items:
+            # Los botones tienen texto super especifico para poder encontrarlos con JS
+            if st.button(f"__NAV_TO_{page_id}__", key=f"hidden_btn_{page_id}"):
+                st.session_state.current_page = page_id
+                st.rerun()
+
+    # 2. Renderizamos la barra de navegacion en HTML puro (exactamente como era antes)
+    nav_links_html = ""
+    for icon, label, page_id in nav_items:
+        is_active = (st.session_state.get("current_page") == page_id)
+        active_class = "active" if is_active else ""
         
-        cols = st.columns(len(nav_items))
-        active_css = ""
-        for idx, (icon, label, page_id) in enumerate(nav_items):
-            with cols[idx]:
-                if st.session_state.get("current_page") == page_id:
-                    active_css += f"""
-                    @media (max-width: 768px) {{
-                        .nav-columns-row > div:nth-child({idx+1}) button p {{
-                            color: white !important;
-                            font-weight: 700 !important;
-                        }}
-                        .nav-columns-row > div:nth-child({idx+1}) button {{
-                            color: white !important;
-                        }}
-                    }}
-                    """
-                if st.button(f"{icon} {label}", key=f"mob_nav_{page_id}", use_container_width=True):
-                    st.session_state.current_page = page_id
-                    st.rerun()
-                    
-        if active_css:
-            st.markdown(f"<style>{active_css}</style>", unsafe_allow_html=True)
+        # JS para buscar el boton oculto correspondiente y darle click
+        js_click = f"event.preventDefault(); Array.from(document.querySelectorAll('button')).forEach(b => {{ if(b.innerText.includes('__NAV_TO_{page_id}__')) b.click(); }});"
+        
+        nav_links_html += f"""
+        <a href="#" onclick="{js_click}" class="nav-item {active_class}">
+            <span class="icon">{icon}</span>
+            <span class="label">{label}</span>
+        </a>
+        """
+
+    # 3. CSS para la barra HTML
+    st.markdown(f"""
+        <style>
+        .mobile-bottom-nav {{
+            display: none;
+        }}
+        @media (max-width: 768px) {{
+            .mobile-bottom-nav {{
+                display: flex !important;
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 99999 !important;
+                background: #000000 !important;
+                justify-content: space-around !important;
+                align-items: center !important;
+                padding: 0.45rem 0.2rem !important;
+                box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important;
+                border-top: 1px solid rgba(255,255,255,0.08) !important;
+            }}
+            .mobile-bottom-nav a {{
+                color: rgba(255,255,255,0.55) !important;
+                text-decoration: none !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                width: 100% !important;
+                padding: 0.2rem 0 !important;
+                border-radius: 8px !important;
+                transition: all 0.2s ease !important;
+            }}
+            .mobile-bottom-nav a:hover, 
+            .mobile-bottom-nav a:active,
+            .mobile-bottom-nav a.active {{
+                color: white !important;
+                background: rgba(255,255,255,0.05) !important;
+            }}
+            .mobile-bottom-nav a span.icon {{
+                font-size: 1.2rem !important;
+                margin-bottom: 2px !important;
+            }}
+            .mobile-bottom-nav a span.label {{
+                font-size: 0.65rem !important;
+                font-weight: 500 !important;
+                line-height: 1.3 !important;
+            }}
+            .mobile-bottom-nav a.active span.label {{
+                font-weight: 700 !important;
+            }}
+            /* Hack para evitar que el contenido final quede tapado por la barra */
+            .main .block-container {{
+                padding-bottom: 85px !important;
+            }}
+        }}
+        </style>
+        <div class="mobile-bottom-nav">
+            {nav_links_html}
+        </div>
+    """, unsafe_allow_html=True)
 
     # ===== ROUTING =====
     page = st.session_state.get('current_page', 'dashboard')
