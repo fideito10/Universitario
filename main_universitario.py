@@ -724,15 +724,16 @@ def main_dashboard():
         
         /* Ocultar la barra entera en desktop */
         @media (min-width: 641px) {
-            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div {
                 display: none !important;
             }
         }
         
-        /* Convertir el stHorizontalBlock de los botones en bottom nav en mobile */
+        /* Convertir el contenedor de columnas en bottom nav en mobile */
         @media (max-width: 640px) {
-            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div {
                 display: flex !important;
+                flex-direction: row !important;
                 position: fixed !important;
                 bottom: 0 !important;
                 left: 0 !important;
@@ -748,7 +749,7 @@ def main_dashboard():
             }
             
             /* Columnas internas */
-            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div > div {
                 width: auto !important;
                 flex: 1 1 0% !important;
                 padding: 0 !important;
@@ -756,7 +757,7 @@ def main_dashboard():
             }
             
             /* Botones Streamlit dentro de la barra */
-            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div button {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -772,20 +773,23 @@ def main_dashboard():
                 min-height: 48px !important;
             }
             
-            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button:hover,
-            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button:active {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div button:hover,
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div button:active {
                 color: white !important;
                 background: rgba(255,255,255,0.05) !important;
             }
             
             /* Texto e Icono del botón */
-            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button p {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div button p {
                 font-size: 0.65rem !important;
                 font-weight: 500 !important;
                 line-height: 1.3 !important;
-                white-space: pre-line !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 2px !important;
             }
         }
         </style>
@@ -798,16 +802,16 @@ def main_dashboard():
             if st.session_state.get("current_page") == page_id:
                 active_css += f"""
                 @media (max-width: 640px) {{
-                    div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child({idx+1}) button p {{
+                    div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div > div:nth-child({idx+1}) button p {{
                         color: white !important;
                         font-weight: 700 !important;
                     }}
-                    div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child({idx+1}) button {{
+                    div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div > div:nth-child({idx+1}) button {{
                         color: white !important;
                     }}
                 }}
                 """
-            if st.button(f"{icon}\\n{label}", key=f"mob_nav_{page_id}", use_container_width=True):
+            if st.button(f"{icon} {label}", key=f"mob_nav_{page_id}", use_container_width=True):
                 st.session_state.current_page = page_id
                 st.rerun()
                 
