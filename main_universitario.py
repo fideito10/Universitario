@@ -708,62 +708,36 @@ def main_dashboard():
     if auth_manager.has_permission("wellness"):
         nav_items.append(("📝", "Wellness", "wellness"))
 
-    # Limit to 5 for bottom nav
+    # Limit to 5
     nav_items = nav_items[:5]
 
-    # ===== MOBILE BOTTOM NAV: botones ocultos para ruteo =====
-    # Técnica: ponemos un span marcador, luego los botones en columnas.
-    # CSS usa el selector de hermano (+) para ocultar el bloque de columnas
-    # sin afectar el resto del contenido.
-    st.markdown('<span id="nav-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
-    st.markdown("""
-        <style>
-        /* Ocultar la fila de columnas que viene inmediatamente después del marcador */
-        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div[data-testid="stHorizontalBlock"],
-        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div[data-testid="stColumns"],
-        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div {
-            position: absolute !important;
-            top: -9999px !important;
-            left: -9999px !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-            height: 0 !important;
-            overflow: hidden !important;
-        }
-        /* Permitir clicks en los botones aunque estén fuera de pantalla */
-        div[data-testid="stElementContainer"]:has(#nav-row-marker) + div button {
-            pointer-events: all !important;
-        }
-        /* Tambien ocultar el propio marcador */
-        div[data-testid="stElementContainer"]:has(#nav-row-marker) {
-            display: none !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    # Leer query param de navegacion (lo setean los links HTML de abajo)
+    qp = st.query_params.to_dict()
+    if "nav" in qp:
+        nav_target = qp["nav"]
+        if auth_manager.has_permission(nav_target) or nav_target == "dashboard":
+            st.session_state.current_page = nav_target
+        st.query_params.clear()
+        st.rerun()
 
-    # Fila de botones nativos de Streamlit (se oculta via CSS pero siguen siendo clickeables)
-    nav_btn_cols = st.columns(len(nav_items))
-    for i, (icon, label, page_id) in enumerate(nav_items):
-        with nav_btn_cols[i]:
-            if st.button(label, key=f"mob_nav_{page_id}", use_container_width=True):
-                st.session_state.current_page = page_id
-                st.rerun()
-
-    # ===== HTML BOTTOM NAV BAR (pure HTML, fijo al fondo) =====
+    # ===== HTML BOTTOM NAV BAR =====
+    # Links puros que cambian el query param ?nav=X para que Streamlit lo procese
     current_page = st.session_state.get("current_page", "dashboard")
     nav_links_html = ""
     for icon, label, page_id in nav_items:
         active_class = "active" if current_page == page_id else ""
-        # JS: encuentra el boton de Streamlit por su texto y le hace click
-        js_click = f"event.preventDefault(); (function(){{ var btns=document.querySelectorAll('div.nav-hidden-btn-row button'); for(var i=0;i<btns.length;i++){{ if(btns[i].innerText.trim()==='{label}') {{ btns[i].click(); break; }} }} }})();"
-        nav_links_html += f'<a href="#" onclick="{js_click}" class="mbn-item {active_class}"><span class="mbn-icon">{icon}</span><span class="mbn-label">{label}</span></a>'
+        nav_links_html += (
+            f'<a href="?nav={page_id}" class="mbn-item {active_class}">'
+            f'<span class="mbn-icon">{icon}</span>'
+            f'<span class="mbn-label">{label}</span>'
+            f'</a>'
+        )
 
     st.markdown(f"""
         <style>
-        /* Desktop: ocultar la barra */
+        /* Desktop: ocultar barra */
         .mobile-bottom-nav {{ display: none !important; }}
 
-        /* Mobile: mostrar fija al fondo */
         @media (max-width: 768px) {{
             .mobile-bottom-nav {{
                 display: flex !important;
@@ -775,9 +749,9 @@ def main_dashboard():
                 width: 100% !important;
                 z-index: 999999 !important;
                 background: #0d0d0d !important;
-                border-top: 1px solid rgba(255,255,255,0.1) !important;
+                border-top: 1px solid rgba(255,255,255,0.12) !important;
                 box-shadow: 0 -4px 20px rgba(0,0,0,0.5) !important;
-                padding: 6px 0 8px !important;
+                padding: 6px 0 10px !important;
                 margin: 0 !important;
                 justify-content: space-around !important;
                 align-items: center !important;
@@ -793,31 +767,25 @@ def main_dashboard():
                 color: rgba(255,255,255,0.45) !important;
                 text-decoration: none !important;
                 font-family: inherit !important;
-                transition: color 0.15s ease !important;
                 -webkit-tap-highlight-color: transparent !important;
+                cursor: pointer !important;
             }}
-            .mbn-item.active,
-            .mbn-item:active {{
-                color: #ffffff !important;
-            }}
+            .mbn-item.active {{ color: #4fc3f7 !important; }}
+            .mbn-item:active   {{ color: #ffffff !important; }}
             .mbn-icon {{
-                font-size: 1.3rem !important;
+                font-size: 1.35rem !important;
                 line-height: 1 !important;
             }}
             .mbn-label {{
-                font-size: 0.6rem !important;
+                font-size: 0.58rem !important;
                 font-weight: 500 !important;
-                letter-spacing: 0.02em !important;
+                letter-spacing: 0.04em !important;
                 text-transform: uppercase !important;
             }}
             .mbn-item.active .mbn-label {{
                 font-weight: 700 !important;
-                color: #4fc3f7 !important;
             }}
-            .mbn-item.active .mbn-icon {{
-                color: #4fc3f7 !important;
-            }}
-            /* Espacio al final para que el contenido no quede tapado */
+            /* Que el contenido no quede tapado por la barra */
             section.main > div.block-container {{
                 padding-bottom: 90px !important;
             }}
