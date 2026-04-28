@@ -710,12 +710,109 @@ def main_dashboard():
 
     # Limit to 5 for bottom nav
     nav_items = nav_items[:5]
-    nav_links_html = ""
-    for icon, label, page_id in nav_items:
-        active_style = "color: white !important;" if st.session_state.get("current_page") == page_id else ""
-        nav_links_html += f"""<a href="#" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'{page_id}'}}, '*')" style="{active_style}"><span class="icon">{icon}</span><span>{label}</span></a>"""
-
-    st.markdown(f'<div class="mobile-bottom-nav">{nav_links_html}</div>', unsafe_allow_html=True)
+    
+    # Marcador oculto para inyectar CSS a la fila de botones nativos
+    st.markdown('<div id="mobile-nav-marker" style="display:none;"></div>', unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+        /* Ocultar el marcador vacío de Streamlit */
+        div[data-testid="stElementContainer"]:has(#mobile-nav-marker) {
+            display: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        /* Ocultar la barra entera en desktop */
+        @media (min-width: 641px) {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] {
+                display: none !important;
+            }
+        }
+        
+        /* Convertir el stHorizontalBlock de los botones en bottom nav en mobile */
+        @media (max-width: 640px) {
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 99999 !important;
+                background: #000000 !important;
+                padding: 0.45rem 0.2rem !important;
+                box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important;
+                border-top: 1px solid rgba(255,255,255,0.08) !important;
+                margin: 0 !important;
+                justify-content: space-around !important;
+                gap: 0 !important;
+            }
+            
+            /* Columnas internas */
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+                width: auto !important;
+                flex: 1 1 0% !important;
+                padding: 0 !important;
+                min-width: 0 !important;
+            }
+            
+            /* Botones Streamlit dentro de la barra */
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                color: rgba(255,255,255,0.55) !important;
+                height: auto !important;
+                padding: 0.2rem 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 0 !important;
+                width: 100% !important;
+                min-height: 48px !important;
+            }
+            
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button:hover,
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button:active {
+                color: white !important;
+                background: rgba(255,255,255,0.05) !important;
+            }
+            
+            /* Texto e Icono del botón */
+            div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] button p {
+                font-size: 0.65rem !important;
+                font-weight: 500 !important;
+                line-height: 1.3 !important;
+                white-space: pre-line !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    active_css = ""
+    cols = st.columns(len(nav_items))
+    for idx, (icon, label, page_id) in enumerate(nav_items):
+        with cols[idx]:
+            if st.session_state.get("current_page") == page_id:
+                active_css += f"""
+                @media (max-width: 640px) {{
+                    div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child({idx+1}) button p {{
+                        color: white !important;
+                        font-weight: 700 !important;
+                    }}
+                    div[data-testid="stElementContainer"]:has(#mobile-nav-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child({idx+1}) button {{
+                        color: white !important;
+                    }}
+                }}
+                """
+            if st.button(f"{icon}\\n{label}", key=f"mob_nav_{page_id}", use_container_width=True):
+                st.session_state.current_page = page_id
+                st.rerun()
+                
+    if active_css:
+        st.markdown(f"<style>{active_css}</style>", unsafe_allow_html=True)
 
     # ===== ROUTING =====
     page = st.session_state.get('current_page', 'dashboard')
