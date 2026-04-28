@@ -724,55 +724,51 @@ def main_dashboard():
         nav_items.append(("📝", "Wellness", "wellness"))
     nav_items = nav_items[:5]
 
-    # 1. Botones nativos de Streamlit (son los que realmente navegan con st.rerun)
-    #    Se renderizan primero, luego JS los oculta y los mapea al bottom bar
+    # Marcador invisible justo antes de los botones nativos
+    st.markdown('<span id="__nav_start__"></span>', unsafe_allow_html=True)
+
+    # CSS: oculta el bloque de columnas que sigue al marcador
+    st.markdown("""
+        <style>
+        /* Ocultar el marcador y el bloque de botones nativos */
+        div:has(> span#__nav_start__) {
+            display: none !important;
+        }
+        div:has(span#__nav_start__) ~ div[data-testid="stHorizontalBlock"],
+        div:has(span#__nav_start__) ~ div[data-testid="stColumns"] {
+            position: absolute !important;
+            top: -9999px !important;
+            left: -9999px !important;
+            width: 0 !important;
+            height: 0 !important;
+            overflow: hidden !important;
+            pointer-events: none !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Botones nativos de Streamlit — el CSS los oculta, el JS del bottom bar los clickea
     nav_cols = st.columns(len(nav_items))
-    nav_labels = []
     for i, (icon, label, page_id) in enumerate(nav_items):
-        nav_labels.append(label)
         with nav_cols[i]:
             if st.button(label, key=f"mob_nav_{page_id}", use_container_width=True):
                 st.session_state.current_page = page_id
                 st.rerun()
 
-    # 2. JS via img onerror (unica forma de ejecutar JS en st.markdown):
-    #    - Oculta el bloque de columnas nativas
-    #    - Guarda referencias en window.__mnBtns para que el bottom bar pueda clickearlos
-    labels_js = str(nav_labels).replace("'", '"')
-    st.markdown(f"""
-        <img src="x" onerror="(function(){{
-            var labels = {labels_js};
-            function setup() {{
-                var btns = document.querySelectorAll('button');
-                var found = {{}};
-                btns.forEach(function(b) {{
-                    if (labels.indexOf(b.innerText.trim()) !== -1) {{
-                        found[b.innerText.trim()] = b;
-                        var hblock = b.closest('[data-testid=\\'stHorizontalBlock\\']')
-                                   || b.closest('[data-testid=\\'stColumns\\']');
-                        if (hblock && !hblock.dataset.navHidden) {{
-                            hblock.style.cssText = 'position:absolute!important;top:-9999px!important;left:-9999px!important;width:1px!important;height:1px!important;overflow:hidden!important;';
-                            hblock.dataset.navHidden = '1';
-                        }}
-                    }}
-                }});
-                if (Object.keys(found).length === labels.length) {{
-                    window.__mnBtns = found;
-                }} else {{
-                    setTimeout(setup, 200);
-                }}
-            }}
-            setTimeout(setup, 400);
-        }})();" style="display:none">
-    """, unsafe_allow_html=True)
-
-    # 3. HTML bottom bar — onclick llama .click() en el boton nativo correspondiente
+    # Bottom bar HTML — los onclick buscan el botón nativo por texto y lo clickean
     current_page = st.session_state.get("current_page", "dashboard")
     nav_links_html = ""
     for icon, label, page_id in nav_items:
         active_class = "active" if current_page == page_id else ""
-        # JS: busca el botón guardado en window.__mnBtns y le hace click
-        js = f"event.preventDefault();event.stopPropagation();if(window.__mnBtns&&window.__mnBtns['{label}']){{window.__mnBtns['{label}'].click();}}else{{var b=Array.from(document.querySelectorAll('button')).find(function(x){{return x.innerText.trim()==='{label}';}});if(b)b.click();}}"
+        safe_label = label.replace("'", "\\'")
+        js = (
+            f"event.preventDefault();"
+            f"(function(){{"
+            f"var b=Array.from(document.querySelectorAll('button'))"
+            f".find(function(x){{return x.innerText.trim()==='{safe_label}';}});"
+            f"if(b){{b.style.pointerEvents='all';b.click();}}"
+            f"}})();"
+        )
         nav_links_html += (
             f'<a href="#" onclick="{js}" class="mbn-item {active_class}">'
             f'<span class="mbn-icon">{icon}</span>'
