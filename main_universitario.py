@@ -582,7 +582,27 @@ def login_page():
     
     # Formulario de login (sin contenedor blanco)
     auth_manager = AuthManager()
-    
+
+    # Inyectar atributos autocomplete para que Safari/Chrome ofrezca Face ID / Touch ID
+    st.markdown("""
+        <script>
+        setTimeout(function() {
+            var inputs = window.parent.document.querySelectorAll('input');
+            inputs.forEach(function(inp) {
+                if (inp.type === 'password') {
+                    inp.setAttribute('autocomplete', 'current-password');
+                    inp.setAttribute('name', 'password');
+                } else if (inp.type === 'text' || inp.type === 'email') {
+                    if (!inp.getAttribute('autocomplete')) {
+                        inp.setAttribute('autocomplete', 'username');
+                        inp.setAttribute('name', 'username');
+                    }
+                }
+            });
+        }, 300);
+        </script>
+    """, unsafe_allow_html=True)
+
     username = st.text_input("USUARIO", placeholder="Ingresa tu usuario", label_visibility="collapsed", key="username_input")
     st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
     password = st.text_input("CONTRASEÑA", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed", key="password_input")
