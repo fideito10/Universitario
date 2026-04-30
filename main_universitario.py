@@ -4,6 +4,7 @@ Centralización de Módulos: Área Médica, Nutrición y Física
 Desarrollado con Streamlit
 """
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 from datetime import datetime
 import base64
@@ -724,10 +725,10 @@ def main_dashboard():
         nav_items.append(("📝", "Wellness", "wellness"))
     nav_items = nav_items[:5]
 
-    # ── Botones nativos (Streamlit los necesita para hacer rerun) ──
-    # Se ocultan via JS+MutationObserver buscando el stHorizontalBlock padre
+    # ── JS via components.html (único lugar donde los scripts se ejecutan en Streamlit) ──
+    # Usa window.parent.document para acceder al DOM principal desde el iframe
     nav_labels_js = "[" + ", ".join(f'"{lbl}"' for _, lbl, _ in nav_items) + "]"
-    st.markdown(f"""
+    components.html(f"""
         <script>
         (function() {{
             var labels = {nav_labels_js};
@@ -738,7 +739,7 @@ def main_dashboard():
                     if (!el || !el.parentElement) break;
                     el = el.parentElement;
                     if (el.getAttribute && el.getAttribute('data-testid') === 'stHorizontalBlock') {{
-                        el.style.cssText = 'display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;pointer-events:none!important;';
+                        el.style.cssText = 'display:none!important;height:0!important;overflow:hidden!important;pointer-events:none!important;';
                         return true;
                     }}
                 }}
@@ -746,35 +747,30 @@ def main_dashboard():
             }}
 
             function hideAll() {{
-                var btns = document.querySelectorAll('button');
+                var btns = window.parent.document.querySelectorAll('button');
                 var count = 0;
                 btns.forEach(function(b) {{
                     if (labels.indexOf(b.innerText.trim()) !== -1) {{
-                        hideBlock(b);
-                        count++;
+                        hideBlock(b); count++;
                     }}
                 }});
                 return count;
             }}
 
-            // Correr inmediatamente y con delays por si aún no renderizó
             function run() {{
-                if (hideAll() === 0) {{
-                    setTimeout(run, 400);
-                }}
+                if (hideAll() === 0) {{ setTimeout(run, 400); }}
             }}
             run();
-            setTimeout(run, 600);
-            setTimeout(run, 1500);
+            setTimeout(hideAll, 800);
+            setTimeout(hideAll, 2000);
 
-            // MutationObserver para cubrir reruns de Streamlit
+            // MutationObserver para reruns de Streamlit
             var obs = new MutationObserver(function() {{ hideAll(); }});
-            obs.observe(document.body, {{ childList: true, subtree: true }});
+            obs.observe(window.parent.document.body, {{ childList: true, subtree: true }});
         }})();
         </script>
-    """, unsafe_allow_html=True)
+    """, height=0)
 
-    # Renderizar botones nativos (ocultos por el JS de arriba)
     nav_cols = st.columns(len(nav_items))
     for i, (icon, label, page_id) in enumerate(nav_items):
         with nav_cols[i]:
