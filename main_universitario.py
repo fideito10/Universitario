@@ -51,15 +51,18 @@ def inject_mobile_meta():
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }});
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
                 updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
+                
+                // Forzar el título del navegador si Streamlit lo ignora
+                window.parent.document.title = "Universitario - Sistema de Gestión";
             }} catch (e) {{
                 console.warn("Mobile meta injection blocked or failed:", e);
             }}
         </script>
         """, unsafe_allow_html=True)
 
-# Configuración de la página
+# Configuración de la página - DEBE SER EL PRIMER COMANDO DE ST
 st.set_page_config(
-    page_title="Club Universitario de La Plata - Sistema de Gestión",
+    page_title="Universitario - Sistema de Gestión",
     page_icon="escudo uni.jpg",
     layout="wide",
     initial_sidebar_state="collapsed"
