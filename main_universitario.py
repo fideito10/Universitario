@@ -276,34 +276,6 @@ def load_universitario_styles():
         /* Charts full width */
         .js-plotly-plot, .plot-container { width: 100% !important; }
 
-        /* BOTTOM NAV — visible en móvil */
-        .mobile-bottom-nav {
-            display: flex !important;
-            position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            z-index: 9999 !important;
-            background: #000000 !important;
-            justify-content: space-around !important;
-            align-items: center !important;
-            padding: 0.45rem 0.2rem !important;
-            box-shadow: 0 -3px 16px rgba(0,0,0,0.35) !important;
-            border-top: 1px solid rgba(255,255,255,0.08) !important;
-        }
-        .mobile-bottom-nav a {
-            color: rgba(255,255,255,0.65) !important;
-            text-decoration: none !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            font-size: 0.62rem !important;
-            font-weight: 500 !important;
-            min-width: 48px !important;
-            padding: 0.2rem !important;
-            -webkit-tap-highlight-color: transparent !important;
-        }
-        .mobile-bottom-nav a span.icon { font-size: 1.35rem !important; }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -618,7 +590,7 @@ def login_page():
         if auth_manager.login(username, password):
             st.success("✅ Acceso exitoso")
             if st.session_state.user.get('rol') == "Jugador":
-                st.session_state.current_page = "wellness"
+                st.session_state.current_page = "perfil"
             else:
                 st.session_state.current_page = "dashboard"
             st.rerun()
@@ -726,115 +698,6 @@ def main_dashboard():
         nav_items.append(("\U0001f4dd", "Wellness", "wellness"))
     nav_items = nav_items[:5]
 
-    # ── Input oculto como canal JS → Streamlit ──
-    # El JS del bottom nav setea este input, Streamlit lo detecta y navega
-    st.markdown("""
-        <style>
-        div[data-testid="stTextInput"]:has(input[placeholder="__NAVTRIGGER__"]) {
-            position: fixed !important;
-            top: -9999px !important;
-            left: -9999px !important;
-            width: 1px !important;
-            height: 1px !important;
-            overflow: hidden !important;
-            opacity: 0 !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    nav_trigger = st.text_input(
-        "nav",
-        value="",
-        key="__nav_trigger__",
-        placeholder="__NAVTRIGGER__",
-        label_visibility="collapsed"
-    )
-    if nav_trigger and auth_manager.has_permission(nav_trigger):
-        st.session_state.current_page = nav_trigger
-        st.session_state["__nav_trigger__"] = ""
-        st.rerun()
-
-    # ── Bottom bar HTML ── onclick setea el input via JS nativo de React
-    current_page = st.session_state.get("current_page", "dashboard")
-    nav_links_html = ""
-    for icon, label, page_id in nav_items:
-        active_class = "active" if current_page == page_id else ""
-        js = (
-            f"event.preventDefault();"
-            f"(function(){{"
-            f"  var inp=document.querySelector('input[placeholder=\"__NAVTRIGGER__\"]');"
-            f"  if(inp){{"
-            f"    var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;"
-            f"    setter.call(inp,'{page_id}');"
-            f"    inp.dispatchEvent(new Event('input',{{bubbles:true}}));"
-            f"    inp.dispatchEvent(new Event('change',{{bubbles:true}}));"
-            f"    inp.dispatchEvent(new KeyboardEvent('keydown',{{key:'Enter',keyCode:13,which:13,bubbles:true}}));"
-            f"    inp.dispatchEvent(new KeyboardEvent('keypress',{{key:'Enter',keyCode:13,which:13,bubbles:true}}));"
-            f"    inp.dispatchEvent(new KeyboardEvent('keyup',{{key:'Enter',keyCode:13,which:13,bubbles:true}}));"
-            f"    inp.blur();"
-            f"  }}"
-            f"}})();"
-        )
-        # Mostrar label con acento correcto para UI
-        display_labels = {
-            "Inicio": "Inicio", "Perfil": "Perfil", "Fisica": "F\u00edsica",
-            "Medica": "M\u00e9dica", "Nutricion": "Nutrici\u00f3n", "Wellness": "Wellness"
-        }
-        display = display_labels.get(label, label)
-        nav_links_html += (
-            f'<a href="#" onclick="{js}" class="mbn-item {active_class}">'
-            f'<span class="mbn-icon">{icon}</span>'
-            f'<span class="mbn-label">{display}</span>'
-            f'</a>'
-        )
-
-    st.markdown(f"""
-        <style>
-        .mobile-bottom-nav {{ display: none !important; }}
-        @media (max-width: 768px) {{
-            .mobile-bottom-nav {{
-                display: flex !important;
-                flex-direction: row !important;
-                position: fixed !important;
-                bottom: 0 !important; left: 0 !important; right: 0 !important;
-                width: 100% !important;
-                z-index: 999999 !important;
-                background: #0d0d0d !important;
-                border-top: 1px solid rgba(255,255,255,0.12) !important;
-                box-shadow: 0 -4px 20px rgba(0,0,0,0.5) !important;
-                padding: 6px 0 10px !important;
-                margin: 0 !important;
-                justify-content: space-around !important;
-                align-items: center !important;
-            }}
-            .mbn-item {{
-                flex: 1 !important;
-                display: flex !important;
-                flex-direction: column !important;
-                align-items: center !important;
-                justify-content: center !important;
-                gap: 3px !important;
-                padding: 4px 2px !important;
-                color: rgba(255,255,255,0.45) !important;
-                text-decoration: none !important;
-                -webkit-tap-highlight-color: transparent !important;
-                cursor: pointer !important;
-            }}
-            .mbn-item.active {{ color: #4fc3f7 !important; }}
-            .mbn-item:active   {{ color: #ffffff !important; }}
-            .mbn-icon {{ font-size: 1.35rem !important; line-height: 1 !important; }}
-            .mbn-label {{
-                font-size: 0.58rem !important;
-                font-weight: 500 !important;
-                letter-spacing: 0.04em !important;
-                text-transform: uppercase !important;
-            }}
-            .mbn-item.active .mbn-label {{ font-weight: 700 !important; }}
-            section.main > div.block-container {{ padding-bottom: 90px !important; }}
-        }}
-        </style>
-        <div class="mobile-bottom-nav">{nav_links_html}</div>
-    """, unsafe_allow_html=True)
 
         # ===== ROUTING =====
     page = st.session_state.get('current_page', 'dashboard')
@@ -921,21 +784,66 @@ def dashboard_main():
         return
 
     # Responsive CSS grid (1 col mobile, 2 tablet, 3 desktop)
-    cards_html = "".join([f'<div class="mod-card"><div class="mod-icon" style="background:{m["color"]}20; color:{m["color"]};">{m["icon"]}</div><div class="mod-label">{m["label"]}</div><div class="mod-desc">{m["desc"]}</div></div>' for m in allowed])
+    # Convertimos cada tarjeta en un enlace que cambia la página
+    cards_html = "".join([
+        f'<a href="/?nav={m["id"]}" target="_self" style="text-decoration:none; color:inherit;">'
+        f'<div class="mod-card">'
+        f'<div class="mod-icon" style="background:{m["color"]}20; color:{m["color"]};">{m["icon"]}</div>'
+        f'<div class="mod-label">{m["label"]}</div>'
+        f'<div class="mod-desc">{m["desc"]}</div>'
+        f'</div>'
+        f'</a>' 
+        for m in allowed
+    ])
 
-    st.markdown(f'<style>.mod-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 1rem; margin: 1.5rem 0; }} .mod-card {{ background: white; border-radius: 14px; padding: 1.5rem 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,0.09); border: 1px solid #f0f0f0; transition: all 0.2s ease; }} .mod-card:hover {{ box-shadow: 0 6px 20px rgba(0,0,0,0.14); transform: translateY(-2px); }} .mod-icon {{ width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 0.9rem; }} .mod-label {{ font-weight: 700; font-size: 1.05rem; color: #111; margin-bottom: 0.4rem; }} .mod-desc {{ font-size: 0.88rem; color: #666; line-height: 1.5; }}</style><div class="mod-grid">{cards_html}</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <style>
+    .mod-grid {{ 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); 
+        gap: 1rem; 
+        margin: 1.5rem 0; 
+    }} 
+    .mod-card {{ 
+        background: white; 
+        border-radius: 14px; 
+        padding: 1.5rem 1.25rem; 
+        box-shadow: 0 2px 12px rgba(0,0,0,0.09); 
+        border: 1px solid #f0f0f0; 
+        transition: all 0.2s ease; 
+        height: 100%;
+        cursor: pointer;
+    }} 
+    .mod-card:hover {{ 
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
+        transform: translateY(-4px); 
+        border-color: #000;
+    }} 
+    .mod-icon {{ 
+        width: 54px; 
+        height: 54px; 
+        border-radius: 14px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        font-size: 1.8rem; 
+        margin-bottom: 0.9rem; 
+    }} 
+    .mod-label {{ 
+        font-weight: 700; 
+        font-size: 1.05rem; 
+        color: #111; 
+        margin-bottom: 0.4rem; 
+    }} 
+    .mod-desc {{ 
+        font-size: 0.88rem; 
+        color: #666; 
+        line-height: 1.5; 
+    }}
+    </style>
+    <div class="mod-grid">{cards_html}</div>
+    """, unsafe_allow_html=True)
 
-    # Streamlit buttons below grid (they handle the actual navigation)
-    st.markdown("#### 👇 Tocá el botón del módulo al que querés entrar:")
-    cols_per_row = 3
-    rows = [allowed[i:i+cols_per_row] for i in range(0, len(allowed), cols_per_row)]
-    for row in rows:
-        cols = st.columns(len(row))
-        for col, mod in zip(cols, row):
-            with col:
-                if st.button(f"{mod['icon']} {mod['label']}", use_container_width=True, key=f"dash_go_{mod['id']}"):
-                    st.session_state.current_page = mod["id"]
-                    st.rerun()
 
     # Footer
     st.markdown("---")
@@ -951,6 +859,19 @@ def main():
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
     
+    # Manejo de navegación por parámetros de URL (para las tarjetas-botón)
+    if "nav" in st.query_params:
+        new_page = st.query_params["nav"]
+        # Solo navegar si el usuario está autenticado y tiene permiso
+        if st.session_state.authenticated:
+            auth = AuthManager()
+            if auth.has_permission(new_page):
+                st.session_state.current_page = new_page
+        
+        # Limpiar parámetros para evitar bucles y que la URL quede limpia
+        st.query_params.clear()
+        st.rerun()
+
     inject_mobile_meta()
     
     if 'current_page' not in st.session_state:
