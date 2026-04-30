@@ -659,9 +659,9 @@ def main_dashboard():
             ("🏥 Área Médica",    "medica"),
             ("🥗 Nutrición",      "nutricion"),
             ("🏋️ Área Física",   "fisica"),
-            ("📝 Wellness",      "wellness"),
-            ("📊 Dashboard 360°", "dashboard_360"),
-            ("📝 Reporte Médico", "reporte_medico"),
+            ("📝 Bienestar",      "wellness"),
+            ("📊 Panel de control 360°", "dashboard_360"),
+            ("📝 Informe Médico", "reporte_medico"),
         ]
         for label, page_id in modules:
             if auth_manager.has_permission(page_id):
@@ -757,17 +757,19 @@ def dashboard_main():
 
     # All modules info
     all_modules_info = [
+        {"id": "perfil",       "icon": "👤", "label": "Mi Perfil" if st.session_state.user.get('rol') == "Jugador" else "Perfil", "color": "#000000",
+         "desc": "Información personal, datos de contacto y ficha técnica."},
         {"id": "medica",       "icon": "🏥", "label": "Área Médica",    "color": "#dc3545",
          "desc": "Registro de lesiones, historial clínico y seguimiento de recuperación."},
         {"id": "nutricion",    "icon": "🥗", "label": "Nutrición",      "color": "#28a745",
          "desc": "Antropometría, planes nutricionales y composición corporal."},
         {"id": "fisica",       "icon": "🏋️", "label": "Área Física",   "color": "#fd7e14",
          "desc": "Evaluaciones físicas, tests y métricas de rendimiento."},
-        {"id": "wellness",     "icon": "📝", "label": "Wellness",       "color": "#000000",
+        {"id": "wellness",     "icon": "📝", "label": "Bienestar",       "color": "#000000",
          "desc": "Monitoreo diario de sueño, fatiga y esfuerzo percibido."},
-        {"id": "dashboard_360","icon": "📊", "label": "Dashboard 360°", "color": "#0d6efd",
+        {"id": "dashboard_360","icon": "📊", "label": "Panel de control 360°", "color": "#0d6efd",
          "desc": "Vista integral del jugador: médico, físico y nutricional."},
-        {"id": "reporte_medico","icon":"📝", "label": "Reporte Médico", "color": "#6f42c1",
+        {"id": "reporte_medico","icon":"📝", "label": "Informe Médico", "color": "#6f42c1",
          "desc": "Consulta y emisión de reportes médicos detallados."},
         {"id": "bot",          "icon": "🧠", "label": "Asistente IA",   "color": "#20c997",
          "desc": "Consultor inteligente con acceso en tiempo real a los datos del club."},
@@ -784,7 +786,7 @@ def dashboard_main():
         return
 
     # Responsive CSS grid (1 col mobile, 2 tablet, 3 desktop)
-    # Convertimos cada tarjeta en un enlace que cambia la página
+    # Usamos etiquetas <a> con parámetros de URL para navegar sin botones visibles extra
     cards_html = "".join([
         f'<a href="/?nav={m["id"]}" target="_self" style="text-decoration:none; color:inherit;">'
         f'<div class="mod-card">'
@@ -792,7 +794,7 @@ def dashboard_main():
         f'<div class="mod-label">{m["label"]}</div>'
         f'<div class="mod-desc">{m["desc"]}</div>'
         f'</div>'
-        f'</a>' 
+        f'</a>'
         for m in allowed
     ])
 
