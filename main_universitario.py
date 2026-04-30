@@ -821,6 +821,8 @@ def dashboard_main():
          "desc": "Consultor inteligente con acceso en tiempo real a los datos del club."},
         {"id": "administracion","icon":"👥", "label": "Gestión Jugadores","color": "#6c757d",
          "desc": "Alta, baja y modificación de jugadores en la base de datos."},
+        {"id": "analisis_partido","icon": "📊", "label": "Análisis de Partido", "color": "#17a2b8",
+         "desc": "Estadísticas detalladas de acciones, intensidad y eficiencia por partido."},
         {"id": "lista",        "icon": "📋", "label": "Pasar Lista",    "color": "#e83e8c",
          "desc": "Control de asistencia a entrenamientos y partidos."},
     ]
