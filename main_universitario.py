@@ -712,97 +712,74 @@ def main_dashboard():
                 st.rerun()
 
     # ===== MOBILE BOTTOM NAV =====
-    nav_items = [("🏠", "Inicio", "dashboard")]
+    # Construir items segun permisos
+    nav_items = [("\U0001f3e0", "Inicio", "dashboard")]
     if auth_manager.has_permission("perfil"):
-        nav_items.append(("👤", "Perfil", "perfil"))
+        nav_items.append(("\U0001f464", "Perfil", "perfil"))
     if auth_manager.has_permission("fisica"):
-        nav_items.append(("🏋️", "Física", "fisica"))
+        nav_items.append(("\U0001f3cb", "Fisica", "fisica"))
     if auth_manager.has_permission("medica"):
-        nav_items.append(("🏥", "Médica", "medica"))
+        nav_items.append(("\U0001f3e5", "Medica", "medica"))
     if auth_manager.has_permission("nutricion"):
-        nav_items.append(("🥗", "Nutrición", "nutricion"))
+        nav_items.append(("\U0001f957", "Nutricion", "nutricion"))
     if auth_manager.has_permission("wellness"):
-        nav_items.append(("📝", "Wellness", "wellness"))
+        nav_items.append(("\U0001f4dd", "Wellness", "wellness"))
     nav_items = nav_items[:5]
 
-    # ── JS via components.html (único lugar donde los scripts se ejecutan en Streamlit) ──
-    # Usa window.parent.document para acceder al DOM principal desde el iframe
-    nav_labels_js = "[" + ", ".join(f'"{lbl}"' for _, lbl, _ in nav_items) + "]"
-    components.html(f"""
-        <script>
-        (function() {{
-            var labels = {nav_labels_js};
+    # ── Input oculto como canal JS → Streamlit ──
+    # El JS del bottom nav setea este input, Streamlit lo detecta y navega
+    st.markdown("""
+        <style>
+        div[data-testid="stTextInput"]:has(input[placeholder="__NAVTRIGGER__"]) {
+            position: fixed !important;
+            top: -9999px !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+            opacity: 0 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-            function hideBlock(btn) {{
-                var el = btn;
-                for (var i = 0; i < 12; i++) {{
-                    if (!el || !el.parentElement) break;
-                    el = el.parentElement;
-                    if (el.getAttribute && el.getAttribute('data-testid') === 'stHorizontalBlock') {{
-                        // Mover fuera de pantalla (NO display:none) para que React pueda clickear
-                        el.style.cssText = 'position:fixed!important;top:-9999px!important;left:-9999px!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;';
-                        return true;
-                    }}
-                }}
-                return false;
-            }}
+    nav_trigger = st.text_input(
+        "nav",
+        value="",
+        key="__nav_trigger__",
+        placeholder="__NAVTRIGGER__",
+        label_visibility="collapsed"
+    )
+    if nav_trigger and auth_manager.has_permission(nav_trigger):
+        st.session_state.current_page = nav_trigger
+        st.session_state["__nav_trigger__"] = ""
+        st.rerun()
 
-            function hideAll() {{
-                var btns = window.parent.document.querySelectorAll('button');
-                var count = 0;
-                btns.forEach(function(b) {{
-                    // textContent funciona aunque el padre esté oculto (innerText no)
-                    if (labels.indexOf((b.textContent || '').trim()) !== -1) {{
-                        hideBlock(b); count++;
-                    }}
-                }});
-                return count;
-            }}
-
-            function run() {{
-                if (hideAll() === 0) {{ setTimeout(run, 400); }}
-            }}
-            run();
-            setTimeout(hideAll, 800);
-            setTimeout(hideAll, 2000);
-
-            // MutationObserver para reruns de Streamlit
-            var obs = new MutationObserver(function() {{ hideAll(); }});
-            obs.observe(window.parent.document.body, {{ childList: true, subtree: true }});
-        }})();
-        </script>
-    """, height=0)
-
-    nav_cols = st.columns(len(nav_items))
-    for i, (icon, label, page_id) in enumerate(nav_items):
-        with nav_cols[i]:
-            if st.button(label, key=f"mob_nav_{page_id}", use_container_width=True):
-                st.session_state.current_page = page_id
-                st.rerun()
-
-    # ── Bottom bar HTML ── los onclick muestran el botón momentáneamente y lo clickean
+    # ── Bottom bar HTML ── onclick setea el input via JS nativo de React
     current_page = st.session_state.get("current_page", "dashboard")
     nav_links_html = ""
     for icon, label, page_id in nav_items:
         active_class = "active" if current_page == page_id else ""
-        safe_label = label.replace('"', '\\"')
         js = (
-            f'event.preventDefault();'
-            f'(function(){{'
-            f'  var b=Array.from(document.querySelectorAll(\"button\"))'
-            f'    .find(function(x){{return (x.textContent||\"\"  ).trim()===\"{safe_label}\";}});'
-            f'  if(b){{'
-            f'    b.style.pointerEvents=\"all\";'
-            f'    b.style.visibility=\"visible\";'
-            f'    b.style.opacity=\"1\";'
-            f'    b.dispatchEvent(new MouseEvent(\"click\",{{bubbles:true,cancelable:true,view:window}}));'
-            f'  }}'
-            f'}})();'
+            f"event.preventDefault();"
+            f"(function(){{"
+            f"  var inp=document.querySelector('input[placeholder=\"__NAVTRIGGER__\"]');"
+            f"  if(inp){{"
+            f"    var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;"
+            f"    setter.call(inp,'{page_id}');"
+            f"    inp.dispatchEvent(new Event('input',{{bubbles:true}}));"
+            f"  }}"
+            f"}})();"
         )
+        # Mostrar label con acento correcto para UI
+        display_labels = {
+            "Inicio": "Inicio", "Perfil": "Perfil", "Fisica": "F\u00edsica",
+            "Medica": "M\u00e9dica", "Nutricion": "Nutrici\u00f3n", "Wellness": "Wellness"
+        }
+        display = display_labels.get(label, label)
         nav_links_html += (
             f'<a href="#" onclick="{js}" class="mbn-item {active_class}">'
             f'<span class="mbn-icon">{icon}</span>'
-            f'<span class="mbn-label">{label}</span>'
+            f'<span class="mbn-label">{display}</span>'
             f'</a>'
         )
 
@@ -854,7 +831,7 @@ def main_dashboard():
         <div class="mobile-bottom-nav">{nav_links_html}</div>
     """, unsafe_allow_html=True)
 
-    # ===== ROUTING =====
+        # ===== ROUTING =====
     page = st.session_state.get('current_page', 'dashboard')
     if not auth_manager.has_permission(page):
         st.error("🚫 No tienes permiso para acceder a este módulo.")
