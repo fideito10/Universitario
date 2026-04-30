@@ -693,10 +693,20 @@ def main_dashboard():
             ("🥗 Nutrición",      "nutricion"),
             ("🏋️ Área Física",   "fisica"),
             ("📝 Bienestar",      "wellness"),
-            ("📊 Panel de control 360°", "dashboard_360"),
             ("📝 Informe Médico", "reporte_medico"),
         ]
         for label, page_id in modules:
+            if auth_manager.has_permission(page_id):
+                if st.button(label, use_container_width=True):
+                    st.session_state.current_page = page_id
+                    st.rerun()
+
+        st.markdown("#### 📋 Staff Técnico")
+        staff_modules = [
+            ("📊 Análisis de Partido", "analisis_partido"),
+            ("📊 Panel de control 360°", "dashboard_360"),
+        ]
+        for label, page_id in staff_modules:
             if auth_manager.has_permission(page_id):
                 if st.button(label, use_container_width=True):
                     st.session_state.current_page = page_id
@@ -773,6 +783,9 @@ def main_dashboard():
     elif page == "wellness":
         from src.modules.wellness import wellness_module
         wellness_module()
+    elif page == "analisis_partido":
+        from src.modules.analisis_partido import rugby_analysis_module
+        rugby_analysis_module()
     elif page == "lista":
         from src.modules.Lista import main_lista
         main_lista()

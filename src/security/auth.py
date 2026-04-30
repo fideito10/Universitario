@@ -39,13 +39,13 @@ class AuthManager:
             "Administrador": [
                 "dashboard", "perfil", "medica", "nutricion", "fisica", "wellness",
                 "dashboard_360", "reporte_medico", "bot", 
-                "administracion", "lista"
+                "administracion", "lista", "analisis_partido"
             ],
             "Entrenador": [
-                "dashboard", "fisica", "nutricion", "wellness", "dashboard_360"
+                "dashboard", "fisica", "nutricion", "wellness", "dashboard_360", "analisis_partido"
             ],
             "Preparador Físico": [
-                "dashboard", "perfil", "fisica", "wellness", "dashboard_360", "bot", "lista"
+                "dashboard", "perfil", "fisica", "wellness", "dashboard_360", "bot", "lista", "analisis_partido"
             ],
             "Nutricionista": [
                 "dashboard", "perfil", "nutricion", "wellness", "dashboard_360", "bot"
