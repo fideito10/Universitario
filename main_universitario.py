@@ -767,6 +767,11 @@ def main_dashboard():
             f"    var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;"
             f"    setter.call(inp,'{page_id}');"
             f"    inp.dispatchEvent(new Event('input',{{bubbles:true}}));"
+            f"    inp.dispatchEvent(new Event('change',{{bubbles:true}}));"
+            f"    inp.dispatchEvent(new KeyboardEvent('keydown',{{key:'Enter',keyCode:13,which:13,bubbles:true}}));"
+            f"    inp.dispatchEvent(new KeyboardEvent('keypress',{{key:'Enter',keyCode:13,which:13,bubbles:true}}));"
+            f"    inp.dispatchEvent(new KeyboardEvent('keyup',{{key:'Enter',keyCode:13,which:13,bubbles:true}}));"
+            f"    inp.blur();"
             f"  }}"
             f"}})();"
         )
