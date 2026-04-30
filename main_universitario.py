@@ -724,38 +724,57 @@ def main_dashboard():
         nav_items.append(("📝", "Wellness", "wellness"))
     nav_items = nav_items[:5]
 
-    # ── Botones nativos ocultos (Streamlit necesita estos para hacer rerun) ──
-    # Los ocultamos via JS buscando su aria-label y escondiendo el stHorizontalBlock padre
-    nav_labels_js = "[" + ", ".join(f"'{lbl}'" for _, lbl, _ in nav_items) + "]"
+    # ── Botones nativos (Streamlit los necesita para hacer rerun) ──
+    # Se ocultan via JS+MutationObserver buscando el stHorizontalBlock padre
+    nav_labels_js = "[" + ", ".join(f'"{lbl}"' for _, lbl, _ in nav_items) + "]"
     st.markdown(f"""
         <script>
-        (function hideNavButtons() {{
+        (function() {{
             var labels = {nav_labels_js};
-            function tryHide() {{
-                var allBtns = Array.from(window.parent.document.querySelectorAll('button'));
-                var found = 0;
-                allBtns.forEach(function(btn) {{
-                    if (labels.indexOf(btn.innerText.trim()) !== -1) {{
-                        // Subir hasta stHorizontalBlock y ocultarlo
-                        var el = btn;
-                        for (var i = 0; i < 8; i++) {{
-                            if (!el.parentElement) break;
-                            el = el.parentElement;
-                            if (el.getAttribute && el.getAttribute('data-testid') === 'stHorizontalBlock') {{
-                                el.style.cssText = 'position:fixed!important;top:-9999px!important;left:-9999px!important;width:0!important;height:0!important;overflow:hidden!important;pointer-events:none!important;opacity:0!important;';
-                                found++;
-                                break;
-                            }}
-                        }}
+
+            function hideBlock(btn) {{
+                var el = btn;
+                for (var i = 0; i < 12; i++) {{
+                    if (!el || !el.parentElement) break;
+                    el = el.parentElement;
+                    if (el.getAttribute && el.getAttribute('data-testid') === 'stHorizontalBlock') {{
+                        el.style.cssText = 'display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;pointer-events:none!important;';
+                        return true;
+                    }}
+                }}
+                return false;
+            }}
+
+            function hideAll() {{
+                var btns = document.querySelectorAll('button');
+                var count = 0;
+                btns.forEach(function(b) {{
+                    if (labels.indexOf(b.innerText.trim()) !== -1) {{
+                        hideBlock(b);
+                        count++;
                     }}
                 }});
-                if (found === 0) {{ setTimeout(tryHide, 300); }}
+                return count;
             }}
-            setTimeout(tryHide, 200);
+
+            // Correr inmediatamente y con delays por si aún no renderizó
+            function run() {{
+                if (hideAll() === 0) {{
+                    setTimeout(run, 400);
+                }}
+            }}
+            run();
+            setTimeout(run, 600);
+            setTimeout(run, 1500);
+
+            // MutationObserver para cubrir reruns de Streamlit
+            var obs = new MutationObserver(function() {{ hideAll(); }});
+            obs.observe(document.body, {{ childList: true, subtree: true }});
         }})();
         </script>
     """, unsafe_allow_html=True)
 
+    # Renderizar botones nativos (ocultos por el JS de arriba)
     nav_cols = st.columns(len(nav_items))
     for i, (icon, label, page_id) in enumerate(nav_items):
         with nav_cols[i]:
@@ -763,19 +782,27 @@ def main_dashboard():
                 st.session_state.current_page = page_id
                 st.rerun()
 
-    # ── Bottom bar HTML ── los onclick clickean el botón nativo oculto
+    # ── Bottom bar HTML ── los onclick muestran el botón momentáneamente y lo clickean
     current_page = st.session_state.get("current_page", "dashboard")
     nav_links_html = ""
     for icon, label, page_id in nav_items:
         active_class = "active" if current_page == page_id else ""
-        safe_label = label.replace("'", "\\'")
+        safe_label = label.replace('"', '\\"')
         js = (
-            f"event.preventDefault();"
-            f"(function(){{"
-            f"var b=Array.from(window.parent.document.querySelectorAll('button'))"
-            f".find(function(x){{return x.innerText.trim()==='{safe_label}';}});"
-            f"if(b){{b.style.pointerEvents='all';b.style.opacity='1';b.click();}}"
-            f"}})();"
+            f'event.preventDefault();'
+            f'(function(){{'
+            f'  var b=Array.from(document.querySelectorAll("button"))'
+            f'    .find(function(x){{return x.innerText.trim()==="{safe_label}";}});'
+            f'  if(b){{'
+            f'    var el=b; var block=null;'
+            f'    for(var i=0;i<12;i++){{'
+            f'      if(!el.parentElement)break; el=el.parentElement;'
+            f'      if(el.getAttribute&&el.getAttribute("data-testid")==="stHorizontalBlock"){{block=el;break;}}'
+            f'    }}'
+            f'    if(block){{block.style.cssText="";}} '
+            f'    b.click();'
+            f'  }}'
+            f'}})();'
         )
         nav_links_html += (
             f'<a href="#" onclick="{js}" class="mbn-item {active_class}">'
