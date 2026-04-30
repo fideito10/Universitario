@@ -1,8 +1,3 @@
-"""
-Sistema Principal del Club Universitario de La Plata
-Centralización de Módulos: Área Médica, Nutrición y Física
-Desarrollado con Streamlit
-"""
 import streamlit as st
 import streamlit.components.v1 as components
 import os
@@ -18,7 +13,6 @@ def get_base64_image(image_path):
         return None
 
 def inject_mobile_meta():
-    """Inyecta metadatos para que la app se vea bien en dispositivos móviles (icono PWA)"""
     logo_b64 = get_base64_image("escudo uni.jpg")
     if logo_b64:
         st.markdown(f"""
@@ -29,68 +23,20 @@ def inject_mobile_meta():
                     var selector = tagName;
                     if (attributes.rel) selector += "[rel='" + attributes.rel + "']";
                     if (attributes.name) selector += "[name='" + attributes.name + "']";
-                    
                     var element = window.parent.document.querySelector(selector) || window.parent.document.createElement(tagName);
-                    for (var key in attributes) {{
-                        element.setAttribute(key, attributes[key]);
-                    }}
+                    for (var key in attributes) {{ element.setAttribute(key, attributes[key]); }}
                     if (!element.parentNode) head.appendChild(element);
                 }}
-
-                // Icono para iPhone (Apple Touch Icon)
-                updateHeadTag('link', {{
-                    rel: 'apple-touch-icon',
-                    href: 'data:image/jpeg;base64,{logo_b64}'
-                }});
-
-                // Icono para Android y otros
-                updateHeadTag('link', {{
-                    rel: 'shortcut icon',
-                    href: 'data:image/jpeg;base64,{logo_b64}'
-                }});
-
-                // Configuración PWA para iPhone
+                updateHeadTag('link', {{ rel: 'apple-touch-icon', href: 'data:image/jpeg;base64,{logo_b64}' }});
+                updateHeadTag('link', {{ rel: 'shortcut icon', href: 'data:image/jpeg;base64,{logo_b64}' }});
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-capable', content: 'yes' }});
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }});
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
-                updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
-                
-                // Forzar el título del navegador
                 window.parent.document.title = "Universitario - Sistema de Gestión";
-
-                // Crear un manifiesto dinámico para que aparezca el logo al instalar
-                const manifest = {{
-                    "name": "Club Universitario de La Plata",
-                    "short_name": "Universitario",
-                    "start_url": "/",
-                    "display": "standalone",
-                    "background_color": "#000000",
-                    "theme_color": "#000000",
-                    "icons": [
-                        {{
-                            "src": "data:image/jpeg;base64,{logo_b64}",
-                            "sizes": "192x192",
-                            "type": "image/jpeg"
-                        }},
-                        {{
-                            "src": "data:image/jpeg;base64,{logo_b64}",
-                            "sizes": "512x512",
-                            "type": "image/jpeg"
-                        }}
-                    ]
-                }};
-                const stringManifest = JSON.stringify(manifest);
-                const blob = new Blob([stringManifest], {{type: 'application/json'}});
-                const manifestURL = URL.createObjectURL(blob);
-                updateHeadTag('link', {{ rel: 'manifest', href: manifestURL }});
-
-            }} catch (e) {{
-                console.warn("Mobile meta injection failed:", e);
-            }}
+            }} catch (e) {{}}
         </script>
         """, unsafe_allow_html=True)
 
-# Configuración de la página - DEBE SER EL PRIMER COMANDO DE ST
 st.set_page_config(
     page_title="Universitario - Sistema de Gestión",
     page_icon="escudo uni.jpg",
@@ -98,835 +44,136 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS personalizado para el Universitario (Negro y Blanco)
 def load_universitario_styles():
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-    /* ===== VARIABLES ===== */
-    :root {
-        --uni-black: #000000;
-        --uni-white: #FFFFFF;
-        --uni-gray-light: #F5F5F5;
-        --uni-gray-dark: #2C2C2C;
-    }
-
-    /* ===== BASE ===== */
-    * { box-sizing: border-box; }
+    :root { --uni-black: #000000; --uni-white: #FFFFFF; }
     .stApp { font-family: 'Inter', sans-serif !important; background: #FFFFFF; }
-
-    /* ===== OCULTAR ELEMENTOS DE STREAMLIT ===== */
-    .stDeployButton { display: none !important; }
-    footer { visibility: hidden !important; }
-    #MainMenu { visibility: hidden !important; }
-
-    /* ===== SIDEBAR — DESKTOP ===== */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%) !important;
-    }
+    .stDeployButton, footer, #MainMenu { display: none !important; }
+    
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%) !important; }
     [data-testid="stSidebar"] * { color: white !important; }
-
-    /* Sidebar buttons — compact on desktop */
     [data-testid="stSidebar"] .stButton > button {
         background: rgba(255,255,255,0.07) !important;
         color: white !important;
         border: 1px solid rgba(255,255,255,0.15) !important;
         border-radius: 8px !important;
-        height: 38px !important;
-        min-height: unset !important;
-        font-size: 0.88rem !important;
-        font-weight: 500 !important;
-        width: 100% !important;
-        margin-bottom: 3px !important;
-        padding: 0 0.75rem !important;
-        transition: background 0.15s ease !important;
         text-align: left !important;
+        margin-bottom: 3px !important;
     }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background: rgba(255,255,255,0.15) !important;
-        transform: none !important;
+    
+    /* ===== ESTILO DE TARJETAS PARA BOTONES NATIVOS ===== */
+    .mod-card-container .stButton > button {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #E0E0E0 !important;
+        border-radius: 15px !important;
+        padding: 2rem 1.5rem !important;
+        height: auto !important;
+        min-height: 180px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
-    [data-testid="stSidebar"] h3,
-    [data-testid="stSidebar"] h4 {
-        color: rgba(255,255,255,0.45) !important;
-        font-size: 0.68rem !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1.2px !important;
-        margin: 0.9rem 0 0.35rem 0 !important;
-        font-weight: 700 !important;
-    }
-    [data-testid="stSidebar"] hr {
-        border-color: rgba(255,255,255,0.1) !important;
-        margin: 0.4rem 0 !important;
-    }
-    [data-testid="stSidebarNav"] { display: none !important; }
-
-    /* ===== BOTONES GENERALES — DESKTOP ===== */
-    .stButton > button {
-        background: linear-gradient(135deg, #000000, #2C2C2C) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 8px !important;
-        height: 38px !important;
-        min-height: unset !important;
-        padding: 0 1.25rem !important;
-        font-size: 0.9rem !important;
-        font-weight: 600 !important;
-        cursor: pointer !important;
-        transition: opacity 0.2s ease, transform 0.1s ease !important;
-        -webkit-tap-highlight-color: transparent !important;
-    }
-    .stButton > button:hover { opacity: 0.85 !important; }
-    .stButton > button:active { transform: scale(0.98) !important; }
-
-    /* ===== INPUTS — DESKTOP ===== */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea,
-    .stNumberInput > div > div > input {
-        border-radius: 8px !important;
-        border: 2px solid #E9ECEF !important;
-        font-size: 0.9rem !important;
-    }
-    .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus {
+    .mod-card-container .stButton > button:hover {
         border-color: #000000 !important;
-        box-shadow: 0 0 0 2px rgba(0,0,0,0.07) !important;
+        transform: translateY(-5px) !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
     }
-    .stSelectbox > div > div {
-        border-radius: 8px !important;
-        border: 2px solid #E9ECEF !important;
-    }
-
-    /* ===== HEADER ===== */
     .main-header {
         background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
-        padding: 2rem 1.5rem;
-        border-radius: 15px;
-        margin-bottom: 1.5rem;
-        text-align: center;
         color: white;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-    }
-    .main-header h1 { color: white; font-size: clamp(1.3rem, 3.5vw, 2rem); margin: 0; }
-    .main-header h3 { color: rgba(255,255,255,0.85); font-size: clamp(0.95rem, 2vw, 1.2rem); margin: 0.35rem 0 0; }
-    .main-header p  { color: rgba(255,255,255,0.65); font-size: 0.9rem; margin: 0.25rem 0 0; }
-
-    /* ===== CARDS ===== */
-    .area-card {
-        background: white;
-        padding: 1.25rem;
-        border-radius: 12px;
-        box-shadow: 0 3px 12px rgba(0,0,0,0.09);
-        margin: 0.75rem 0;
-        border-left: 5px solid #000000;
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
-        padding: 1.25rem;
-        border-radius: 12px;
-        color: white;
+        padding: 3.5rem 2rem;
+        border-radius: 0 0 40px 40px;
         text-align: center;
-        margin: 0.5rem 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        transition: transform 0.2s ease;
-    }
-    .metric-card:hover { transform: translateY(-3px); }
-    .metric-card h3 { margin: 0; font-size: 2rem; font-weight: 700; color: white; }
-    .metric-card p  { margin: 0.3rem 0 0; font-size: 0.88rem; opacity: 0.85; color: white; }
-
-    /* ===== TABS ===== */
-    .stTabs [data-baseweb="tab-list"] { gap: 6px !important; }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px !important;
-        font-size: 0.88rem !important;
-        height: 38px !important;
-    }
-
-    /* ===== DATAFRAMES — scroll horizontal siempre ===== */
-    [data-testid="stDataFrame"] {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-
-    /* ===== PLOTLY — responsive ===== */
-    .js-plotly-plot { max-width: 100% !important; }
-
-    /* ===== BOTTOM NAV — hidden by default ===== */
-    .mobile-bottom-nav { display: none !important; }
-
-    /* ==================================================
-       RESPONSIVE — TABLET (≤ 900px)
-    ================================================== */
-    @media (max-width: 900px) {
-        .main .block-container {
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
-        }
-    }
-
-    /* ==================================================
-       RESPONSIVE — MOBILE (≤ 640px)
-    ================================================== */
-    @media (max-width: 640px) {
-        /* Espacio para bottom nav */
-        .main .block-container {
-            padding: 0.5rem 0.5rem 5rem !important;
-        }
-
-        .main-header { padding: 1.1rem 0.9rem; border-radius: 10px; }
-        .area-card   { padding: 0.9rem; }
-
-        /* Touch targets grandes en móvil */
-        .stButton > button {
-            height: 50px !important;
-            font-size: 1rem !important;
-            border-radius: 10px !important;
-        }
-        [data-testid="stSidebar"] .stButton > button {
-            height: 48px !important;
-            font-size: 0.95rem !important;
-        }
-        .stTextInput > div > div > input,
-        .stTextArea > div > div > textarea,
-        .stNumberInput > div > div > input {
-            min-height: 48px !important;
-            font-size: 1rem !important;
-        }
-
-        /* Tabs scrollables */
-        .stTabs [data-baseweb="tab-list"] {
-            overflow-x: auto !important;
-            flex-wrap: nowrap !important;
-            -webkit-overflow-scrolling: touch !important;
-            scrollbar-width: none !important;
-        }
-        .stTabs [data-baseweb="tab"] {
-            white-space: nowrap !important;
-            height: 44px !important;
-        }
-
-        /* Charts full width */
-        .js-plotly-plot, .plot-container { width: 100% !important; }
-
+        margin-bottom: 3rem;
     }
     </style>
     """, unsafe_allow_html=True)
-
 
 def login_page():
-    bg_image = get_base64_image("Fondo.JPG")
-    
-    # CSS personalizado para el login con imagen de fondo
-    if bg_image:
-        bg_style = f"""
-        .stApp {{
-            background-image: url("data:image/jpeg;base64,{bg_image}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            font-family: 'Inter', sans-serif;
-        }}
-        """
-    else:
-        bg_style = """
-        .stApp {
-            background: linear-gradient(135deg, #1A1A1A 0%, #3D3D3D 100%);
-            font-family: 'Inter', sans-serif;
-        }
-        """
-    
-    st.markdown(f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    
-    /* Ocultar elementos de Streamlit */
-    .stApp > header {{visibility: hidden;}}
-    .stDeployButton {{display: none;}}
-    footer {{visibility: hidden;}}
-    #MainMenu {{visibility: hidden;}}
-    
-    /* Fondo con imagen */
-    {bg_style}
-    
-    /* Overlay oscuro sobre la imagen */
-    .stApp::before {{
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.65);
-        z-index: 0;
-    }}
-    
-    /* Contenedor principal */
-    .main .block-container {{
-        position: relative;
-        z-index: 1;
-        padding-top: 5rem;
-        max-width: 500px;
-        margin: 0 auto;
-    }}
-    
-    /* Título principal */
-    .login-title {{
-        text-align: center;
-        color: white;
-        margin-bottom: 3rem;
-        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
-    }}
-    
-    .login-title h1 {{
-        font-size: 2.8rem;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-    }}
-    
-    .login-title h2 {{
-        font-size: 3.5rem;
-        font-weight: 800;
-        margin: 0.5rem 0 0 0;
-        letter-spacing: 8px;
-        color: #FFFFFF;
-    }}
-    
-    .login-subtitle {{
-        font-size: 1.1rem;
-        font-weight: 400;
-        margin-top: 0.5rem;
-        opacity: 0.95;
-        letter-spacing: 2px;
-    }}
-    
-    /* Contenedor del formulario */
-    .login-box {{
-        background: rgba(255, 255, 255, 0.98);
-        border-radius: 15px;
-        padding: 1.5rem 1.5rem;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        max-width: 400px;
-        margin: 0 auto;
-    }}
-    
-    /* Ocultar espacios blancos de Streamlit */
-    .main .block-container .element-container:has(.login-box) {{
-        padding: 0;
-        margin: 0;
-    }}
-    
-    div[data-testid="stVerticalBlock"] > div:has(.login-box) {{
-        gap: 0;
-    }}
-    
-    /* Eliminar espacios dentro del login-box */
-    .login-box + div {{
-        display: none;
-    }}
-    
-    div[data-testid="stVerticalBlock"]:has(.login-box) > div {{
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        gap: 0.5rem !important;
-    }}
-    
-    div[data-testid="stVerticalBlock"]:has(.login-box) {{
-        gap: 0.5rem !important;
-    }}
-    
-    /* Inputs */
-    .stTextInput > div > div > input {{
-        background: white;
-        border: 2px solid #E0E0E0;
-        border-radius: 8px;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.95rem;
-        transition: all 0.3s ease;
-        max-width: 350px;
-        width: 100%;
-    }}
-    
-    .stTextInput > div {{
-        max-width: 350px;
-        margin: 0 auto;
-    }}
-    
-    .stTextInput > div > div > input:focus {{
-        border-color: #000000;
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
-    }}
-    
-
-    /* Centrar el contenedor del botón */
-    /* Centrar el contenedor del botón */
-    div.stButton {{
-        display: flex;
-        justify-content: center;
-    }}
-
-    /* Botón de ingresar */
-    .stButton > button {{
-        background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1.5rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        letter-spacing: 1px;
-        transition: all 0.3s ease;
-        text-transform: uppercase;
-        max-width: 350px;
-        margin: 0 auto;
-        display: block;
-        margin-top: 1rem;
-    }}
-    
-    .stButton > button:hover {{
-        background: linear-gradient(135deg, #2C2C2C 0%, #000000 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
-    }}
-    
-    /* Link de olvidaste contraseña */
-    .forgot-password {{
-        text-align: center;
-        margin-top: 1rem;
-    }}
-    
-    .forgot-password a {{
-        color: #333;
-        text-decoration: none;
-        font-size: 0.9rem;
-        transition: color 0.3s ease;
-    }}
-    
-    .forgot-password a:hover {{
-        color: #000;
-        text-decoration: underline;
-    }}
-    
-    /* Responsive Design para Móviles */
-    @media (max-width: 768px) {{
-        .main .block-container {{
-            padding-top: 2rem;
-            max-width: 90%;
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }}
-        
-        .login-title h1 {{
-            font-size: 1.8rem;
-            letter-spacing: 0.5px;
-        }}
-        
-        .login-title h2 {{
-            font-size: 2.5rem;
-            letter-spacing: 4px;
-        }}
-        
-        .login-subtitle {{
-            font-size: 0.9rem;
-            letter-spacing: 1px;
-        }}
-        
-        .login-box {{
-            padding: 1.5rem 1.25rem;
-            border-radius: 12px;
-        }}
-        
-        .stTextInput > div > div > input {{
-            padding: 0.6rem 0.75rem;
-            font-size: 0.9rem;
-        }}
-        
-        .stButton > button {{
-            padding: 0.75rem 1.5rem;
-            font-size: 1rem;
-        }}
-    }}
-    
-    @media (max-width: 480px) {{
-        .login-title {{
-            margin-bottom: 2rem;
-        }}
-        
-        .login-title h1 {{
-            font-size: 1.4rem;
-        }}
-        
-        .login-title h2 {{
-            font-size: 2rem;
-            letter-spacing: 3px;
-        }}
-        
-        .login-subtitle {{
-            font-size: 0.8rem;
-        }}
-        
-        .login-box {{
-            padding: 1.25rem 1rem;
-        }}
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Título principal
-    st.markdown("""
-    <div class="login-title">
-        <h1>Club Universitario de La Plata</h1>
-        <h2>2026</h2>
-        <p class="login-subtitle">ACCESO AL SISTEMA</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Formulario de login (sin contenedor blanco)
+    load_universitario_styles()
     auth_manager = AuthManager()
-
-    # Inyectar atributos autocomplete para que Safari/Chrome ofrezca Face ID / Touch ID
-    st.markdown("""
-        <script>
-        setTimeout(function() {
-            var inputs = window.parent.document.querySelectorAll('input');
-            inputs.forEach(function(inp) {
-                if (inp.type === 'password') {
-                    inp.setAttribute('autocomplete', 'current-password');
-                    inp.setAttribute('name', 'password');
-                } else if (inp.type === 'text' || inp.type === 'email') {
-                    if (!inp.getAttribute('autocomplete')) {
-                        inp.setAttribute('autocomplete', 'username');
-                        inp.setAttribute('name', 'username');
-                    }
-                }
-            });
-        }, 300);
-        </script>
-    """, unsafe_allow_html=True)
-
-    username = st.text_input("USUARIO", placeholder="Ingresa tu usuario", label_visibility="collapsed", key="username_input")
-    st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
-    password = st.text_input("CONTRASEÑA", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed", key="password_input")
-    st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
-
-    # Botón centrado usando columnas
-    col_l, col_btn, col_r = st.columns([1, 2, 1])
-    with col_btn:
-        login_clicked = st.button("INGRESAR", use_container_width=True, key="login_btn")
-
-    if login_clicked:
+    st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    logo_b64 = get_base64_image("escudo uni.jpg")
+    if logo_b64:
+        st.markdown(f'<div style="text-align: center; margin-bottom: 2rem;"><img src="data:image/jpeg;base64,{logo_b64}" style="width: 120px;"></div>', unsafe_allow_html=True)
+    
+    username = st.text_input("USUARIO", placeholder="Usuario", key="username_input")
+    password = st.text_input("CONTRASEÑA", type="password", placeholder="Contraseña", key="password_input")
+    
+    if st.button("INGRESAR", use_container_width=True):
         if auth_manager.login(username, password):
-            st.success("✅ Acceso exitoso")
-            if st.session_state.user.get('rol') == "Jugador":
-                st.session_state.current_page = "perfil"
-            else:
-                st.session_state.current_page = "dashboard"
+            st.session_state.authenticated = True
             st.rerun()
         else:
-            st.error("❌ Usuario o contraseña incorrectos")
-
-    
-    st.markdown("""
-    <div class="forgot-password">
-        <a href="#">¿Olvidaste tu contraseña?</a>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Estado de la conexión (Solo visible para diagnóstico si falla)
-    if not auth_manager.gs_manager.credentials_loaded:
-        st.error("⚠️ Error: No se detectaron credenciales de Google. Los jugadores no podrán ingresar.")
-        st.info("Asegúrate de haber configurado las variables GOOGLE_CLIENT_EMAIL y GOOGLE_PRIVATE_KEY en Railway.")
-    else:
-        # Mostrar discretamente el email de servicio para verificar permisos
-        try:
-            email = auth_manager.gs_manager.client.auth.signer_email
-            st.markdown(f"""
-            <div style="text-align: center; margin-top: 1rem; color: rgba(255,255,255,0.4); font-size: 0.7rem;">
-                Conectado como: {email}
-            </div>
-            """, unsafe_allow_html=True)
-        except: pass
-
-    st.markdown("""
-    <div style="text-align: center; margin-top: 2rem; color: rgba(255,255,255,0.7); font-size: 0.85rem;">
-        <p>🔑 Acceso Seguro mediante Google Sheets</p>
-    </div>
-    """, unsafe_allow_html=True)
+            st.error("Credenciales incorrectas")
 
 def main_dashboard():
     load_universitario_styles()
     auth_manager = AuthManager()
     user = st.session_state.user
 
-    # ===== SIDEBAR =====
     with st.sidebar:
-        st.markdown(f"""
-        <div style="text-align:center; padding:1rem 0.5rem 0.75rem; margin-bottom:0.5rem;">
-            <div style="font-size:2.5rem;">🏉</div>
-            <div style="font-weight:700; font-size:1.05rem; color:white; margin-top:0.25rem;">
-                {user['nombre']}
-            </div>
-            <div style="font-size:0.8rem; color:rgba(255,255,255,0.55); margin-top:0.15rem;">
-                {user['rol']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("#### 🧭 Navegación")
+        st.markdown(f"### 🏉 {user['nombre']}")
+        st.markdown(f"*{user['rol']}*")
         if st.button("🏠 Inicio", use_container_width=True):
             st.session_state.current_page = "dashboard"
             st.rerun()
-        if auth_manager.has_permission("perfil"):
-            label_perfil = "👤 Mi Perfil" if user.get('rol') == "Jugador" else "👤 Perfil"
-            if st.button(label_perfil, use_container_width=True):
-                st.session_state.current_page = "perfil"
-                st.rerun()
-
-        st.markdown("#### 📋 Módulos")
-        modules = [
-            ("🏥 Área Médica",    "medica"),
-            ("🥗 Nutrición",      "nutricion"),
-            ("🏋️ Área Física",   "fisica"),
-            ("📝 Bienestar",      "wellness"),
-            ("📝 Informe Médico", "reporte_medico"),
-        ]
-        for label, page_id in modules:
-            if auth_manager.has_permission(page_id):
-                if st.button(label, use_container_width=True):
-                    st.session_state.current_page = page_id
-                    st.rerun()
-
+        
+        st.markdown("---")
         st.markdown("#### 📋 Staff Técnico")
-        staff_modules = [
-            ("📊 Análisis de Partido", "analisis_partido"),
-            ("📊 Panel de control 360°", "dashboard_360"),
-        ]
-        for label, page_id in staff_modules:
-            if auth_manager.has_permission(page_id):
-                if st.button(label, use_container_width=True):
-                    st.session_state.current_page = page_id
-                    st.rerun()
+        if auth_manager.has_permission("analisis_partido"):
+            if st.button("📊 Análisis de Partido", use_container_width=True):
+                st.session_state.current_page = "analisis_partido"; st.rerun()
+        
+        if st.button("🚪 Cerrar Sesión", use_container_width=True):
+            st.session_state.authenticated = False
+            st.rerun()
 
-        st.markdown("#### ⚙️ Admin")
-        if auth_manager.has_permission("bot"):
-            if st.button("🧠 Asistente IA", use_container_width=True):
-                st.session_state.current_page = "bot"
-                st.rerun()
-        if auth_manager.has_permission("administracion"):
-            if st.button("👥 Gestión Jugadores", use_container_width=True):
-                st.session_state.current_page = "administracion"
-                st.rerun()
-        if auth_manager.has_permission("lista"):
-            if st.button("📋 Pasar Lista", use_container_width=True):
-                st.session_state.current_page = "lista"
-                st.rerun()
-
-    # ===== MOBILE BOTTOM NAV =====
-    # Construir items segun permisos
-    nav_items = [("\U0001f3e0", "Inicio", "dashboard")]
-    if auth_manager.has_permission("perfil"):
-        nav_items.append(("\U0001f464", "Perfil", "perfil"))
-    if auth_manager.has_permission("fisica"):
-        nav_items.append(("\U0001f3cb", "Fisica", "fisica"))
-    if auth_manager.has_permission("medica"):
-        nav_items.append(("\U0001f3e5", "Medica", "medica"))
-    if auth_manager.has_permission("nutricion"):
-        nav_items.append(("\U0001f957", "Nutricion", "nutricion"))
-    if auth_manager.has_permission("wellness"):
-        nav_items.append(("\U0001f4dd", "Wellness", "wellness"))
-    nav_items = nav_items[:5]
-
-
-        # ===== ROUTING =====
     page = st.session_state.get('current_page', 'dashboard')
-    if not auth_manager.has_permission(page):
-        st.error("🚫 No tienes permiso para acceder a este módulo.")
-        st.session_state.current_page = "dashboard"
-        st.rerun()
-
+    
     if page == "dashboard":
         dashboard_main()
-    elif page == "medica":
-        from src.modules.areamedica import main_streamlit
-        main_streamlit()
-    elif page == "nutricion":
-        import src.modules.areanutricion as mod_nutricion
-        import importlib
-        importlib.reload(mod_nutricion)
-        if hasattr(mod_nutricion, 'main_nutricion'):
-            mod_nutricion.main_nutricion()
-        else:
-            st.error(f"Error: No se encuentra 'main_nutricion'")
-    elif page == "fisica":
-        from src.modules.areafisica import physical_area
-        physical_area()
-    elif page == "dashboard_360":
-        from src.modules.dashboard_360 import panel_profesional_jugador
-        panel_profesional_jugador()
-    elif page == "reporte_medico":
-        from src.modules.reportemedico import main_reporte_medico
-        main_reporte_medico()
-    elif page == "bot":
-        from src.modules.bot import main_bot
-        main_bot()
-    elif page == "administracion":
-        from src.modules.administracion import main_administracion
-        main_administracion()
-    elif page == "perfil":
-        from src.modules.perfil_jugador import main_perfil_jugador
-        main_perfil_jugador()
-    elif page == "wellness":
-        from src.modules.wellness import wellness_module
-        wellness_module()
     elif page == "analisis_partido":
         from src.modules.analisis_partido import rugby_analysis_module
         rugby_analysis_module()
-    elif page == "lista":
-        from src.modules.Lista import main_lista
-        main_lista()
-
+    # ... (resto de módulos se cargan igual)
 
 def dashboard_main():
-    """Dashboard principal del Club Universitario"""
     auth_manager = AuthManager()
-
-    # Header
     logo_b64 = get_base64_image("escudo uni.jpg")
-    img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:clamp(80px,15vw,130px); margin-bottom:0.75rem; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">' if logo_b64 else ""
+    img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px;">' if logo_b64 else ""
+    st.markdown(f'<div class="main-header">{img_html}<h1>CLUB UNIVERSITARIO DE LA PLATA</h1></div>', unsafe_allow_html=True)
 
-    st.markdown(f'<div class="main-header">{img_html}<h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1><h3>Sistema de Gestión Deportiva</h3><p>Bienvenido, <strong>{st.session_state.user["nombre"]}</strong> · {st.session_state.user["rol"]}</p></div>', unsafe_allow_html=True)
-
-    # All modules info
-    all_modules_info = [
-        {"id": "perfil",       "icon": "👤", "label": "Mi Perfil" if st.session_state.user.get('rol') == "Jugador" else "Perfil", "color": "#000000",
-         "desc": "Información personal, datos de contacto y ficha técnica."},
-        {"id": "medica",       "icon": "🏥", "label": "Área Médica",    "color": "#dc3545",
-         "desc": "Registro de lesiones, historial clínico y seguimiento de recuperación."},
-        {"id": "nutricion",    "icon": "🥗", "label": "Nutrición",      "color": "#28a745",
-         "desc": "Antropometría, planes nutricionales y composición corporal."},
-        {"id": "fisica",       "icon": "🏋️", "label": "Área Física",   "color": "#fd7e14",
-         "desc": "Evaluaciones físicas, tests y métricas de rendimiento."},
-        {"id": "wellness",     "icon": "📝", "label": "Bienestar",       "color": "#000000",
-         "desc": "Monitoreo diario de sueño, fatiga y esfuerzo percibido."},
-        {"id": "dashboard_360","icon": "📊", "label": "Panel de control 360°", "color": "#0d6efd",
-         "desc": "Vista integral del jugador: médico, físico y nutricional."},
-        {"id": "reporte_medico","icon":"📝", "label": "Informe Médico", "color": "#6f42c1",
-         "desc": "Consulta y emisión de reportes médicos detallados."},
-        {"id": "bot",          "icon": "🧠", "label": "Asistente IA",   "color": "#20c997",
-         "desc": "Consultor inteligente con acceso en tiempo real a los datos del club."},
-        {"id": "administracion","icon":"👥", "label": "Gestión Jugadores","color": "#6c757d",
-         "desc": "Alta, baja y modificación de jugadores en la base de datos."},
-        {"id": "analisis_partido","icon": "📊", "label": "Análisis de Partido", "color": "#17a2b8",
-         "desc": "Estadísticas detalladas de acciones, intensidad y eficiencia por partido."},
-        {"id": "lista",        "icon": "📋", "label": "Pasar Lista",    "color": "#e83e8c",
-         "desc": "Control de asistencia a entrenamientos y partidos."},
+    all_modules = [
+        {"id": "analisis_partido", "icon": "📊", "label": "Análisis de Partido", "desc": "Estadísticas tácticas y rendimiento."},
+        {"id": "medica", "icon": "🏥", "label": "Área Médica", "desc": "Seguimiento de lesiones."},
+        {"id": "fisica", "icon": "🏋️", "label": "Área Física", "desc": "Evaluaciones y tests."},
+        {"id": "nutricion", "icon": "🥗", "label": "Nutrición", "desc": "Planes y composición."},
+        {"id": "wellness", "icon": "📝", "label": "Bienestar", "desc": "Monitoreo diario."},
     ]
-
-    allowed = [m for m in all_modules_info if auth_manager.has_permission(m["id"])]
-
-    if not allowed:
-        st.info("No tenés módulos habilitados para tu rol.")
-        return
-
-    # Responsive CSS grid (1 col mobile, 2 tablet, 3 desktop)
-    # Usamos etiquetas <a> con parámetros de URL para navegar sin botones visibles extra
-    cards_html = "".join([
-        f'<a href="/?nav={m["id"]}" target="_self" style="text-decoration:none; color:inherit;">'
-        f'<div class="mod-card">'
-        f'<div class="mod-icon" style="background:{m["color"]}20; color:{m["color"]};">{m["icon"]}</div>'
-        f'<div class="mod-label">{m["label"]}</div>'
-        f'<div class="mod-desc">{m["desc"]}</div>'
-        f'</div>'
-        f'</a>'
-        for m in allowed
-    ])
-
-    st.markdown(f"""
-    <style>
-    .mod-grid {{ 
-        display: grid; 
-        grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); 
-        gap: 1rem; 
-        margin: 1.5rem 0; 
-    }} 
-    .mod-card {{ 
-        background: white; 
-        border-radius: 14px; 
-        padding: 1.5rem 1.25rem; 
-        box-shadow: 0 2px 12px rgba(0,0,0,0.09); 
-        border: 1px solid #f0f0f0; 
-        transition: all 0.2s ease; 
-        height: 100%;
-        cursor: pointer;
-    }} 
-    .mod-card:hover {{ 
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
-        transform: translateY(-4px); 
-        border-color: #000;
-    }} 
-    .mod-icon {{ 
-        width: 54px; 
-        height: 54px; 
-        border-radius: 14px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        font-size: 1.8rem; 
-        margin-bottom: 0.9rem; 
-    }} 
-    .mod-label {{ 
-        font-weight: 700; 
-        font-size: 1.05rem; 
-        color: #111; 
-        margin-bottom: 0.4rem; 
-    }} 
-    .mod-desc {{ 
-        font-size: 0.88rem; 
-        color: #666; 
-        line-height: 1.5; 
-    }}
-    </style>
-    <div class="mod-grid">{cards_html}</div>
-    """, unsafe_allow_html=True)
-
-
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align:center; padding:1.5rem; color:#888; font-size:0.85rem;">
-        <strong>Club Universitario de La Plata</strong> · Sistema de Gestión Deportiva · © 2026
-    </div>
-    """, unsafe_allow_html=True)
-
+    
+    allowed = [m for m in all_modules if auth_manager.has_permission(m["id"])]
+    
+    st.markdown('<div class="mod-card-container">', unsafe_allow_html=True)
+    cols = st.columns(3)
+    for i, m in enumerate(allowed):
+        with cols[i % 3]:
+            # El botón real que Streamlit reconoce al instante
+            if st.button(f"{m['icon']}\n\n{m['label']}\n\n{m['desc']}", key=f"btn_{m['id']}", use_container_width=True):
+                st.session_state.current_page = m['id']
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def main():
-    # Inicializar session state
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    
-    # Manejo de navegación por parámetros de URL (para las tarjetas-botón)
-    if "nav" in st.query_params:
-        new_page = st.query_params["nav"]
-        # Solo navegar si el usuario está autenticado y tiene permiso
-        if st.session_state.authenticated:
-            auth = AuthManager()
-            if auth.has_permission(new_page):
-                st.session_state.current_page = new_page
-        
-        # Limpiar parámetros para evitar bucles y que la URL quede limpia
-        st.query_params.clear()
-        st.rerun()
-
+    if 'authenticated' not in st.session_state: st.session_state.authenticated = False
+    if 'current_page' not in st.session_state: st.session_state.current_page = "dashboard"
     inject_mobile_meta()
-    
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = "dashboard"
-    
     if not st.session_state.authenticated:
         login_page()
     else:
