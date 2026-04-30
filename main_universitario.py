@@ -37,25 +37,55 @@ def inject_mobile_meta():
                     if (!element.parentNode) head.appendChild(element);
                 }}
 
+                // Icono para iPhone (Apple Touch Icon)
                 updateHeadTag('link', {{
                     rel: 'apple-touch-icon',
                     href: 'data:image/jpeg;base64,{logo_b64}'
                 }});
 
+                // Icono para Android y otros
                 updateHeadTag('link', {{
                     rel: 'shortcut icon',
                     href: 'data:image/jpeg;base64,{logo_b64}'
                 }});
 
+                // Configuración PWA para iPhone
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-capable', content: 'yes' }});
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }});
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
                 updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
                 
-                // Forzar el título del navegador si Streamlit lo ignora
+                // Forzar el título del navegador
                 window.parent.document.title = "Universitario - Sistema de Gestión";
+
+                // Crear un manifiesto dinámico para que aparezca el logo al instalar
+                const manifest = {{
+                    "name": "Club Universitario de La Plata",
+                    "short_name": "Universitario",
+                    "start_url": "/",
+                    "display": "standalone",
+                    "background_color": "#000000",
+                    "theme_color": "#000000",
+                    "icons": [
+                        {{
+                            "src": "data:image/jpeg;base64,{logo_b64}",
+                            "sizes": "192x192",
+                            "type": "image/jpeg"
+                        }},
+                        {{
+                            "src": "data:image/jpeg;base64,{logo_b64}",
+                            "sizes": "512x512",
+                            "type": "image/jpeg"
+                        }}
+                    ]
+                }};
+                const stringManifest = JSON.stringify(manifest);
+                const blob = new Blob([stringManifest], {{type: 'application/json'}});
+                const manifestURL = URL.createObjectURL(blob);
+                updateHeadTag('link', {{ rel: 'manifest', href: manifestURL }});
+
             }} catch (e) {{
-                console.warn("Mobile meta injection blocked or failed:", e);
+                console.warn("Mobile meta injection failed:", e);
             }}
         </script>
         """, unsafe_allow_html=True)
