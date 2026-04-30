@@ -739,7 +739,8 @@ def main_dashboard():
                     if (!el || !el.parentElement) break;
                     el = el.parentElement;
                     if (el.getAttribute && el.getAttribute('data-testid') === 'stHorizontalBlock') {{
-                        el.style.cssText = 'display:none!important;height:0!important;overflow:hidden!important;pointer-events:none!important;';
+                        // Mover fuera de pantalla (NO display:none) para que React pueda clickear
+                        el.style.cssText = 'position:fixed!important;top:-9999px!important;left:-9999px!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;';
                         return true;
                     }}
                 }}
@@ -750,7 +751,8 @@ def main_dashboard():
                 var btns = window.parent.document.querySelectorAll('button');
                 var count = 0;
                 btns.forEach(function(b) {{
-                    if (labels.indexOf(b.innerText.trim()) !== -1) {{
+                    // textContent funciona aunque el padre esté oculto (innerText no)
+                    if (labels.indexOf((b.textContent || '').trim()) !== -1) {{
                         hideBlock(b); count++;
                     }}
                 }});
@@ -788,14 +790,16 @@ def main_dashboard():
             f'event.preventDefault();'
             f'(function(){{'
             f'  var b=Array.from(document.querySelectorAll("button"))'
-            f'    .find(function(x){{return x.innerText.trim()==="{safe_label}";}});'
+            f'    .find(function(x){{return (x.textContent||"").trim()==="{safe_label}";}});'
             f'  if(b){{'
             f'    var el=b; var block=null;'
             f'    for(var i=0;i<12;i++){{'
             f'      if(!el.parentElement)break; el=el.parentElement;'
             f'      if(el.getAttribute&&el.getAttribute("data-testid")==="stHorizontalBlock"){{block=el;break;}}'
             f'    }}'
-            f'    if(block){{block.style.cssText="";}} '
+            f'    if(block){{'
+            f'      block.style.cssText="position:fixed;top:-9999px;left:-9999px;pointer-events:all;";'
+            f'    }}'
             f'    b.click();'
             f'  }}'
             f'}})();'
