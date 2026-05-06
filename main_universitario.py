@@ -784,7 +784,7 @@ def main_dashboard():
         from src.modules.wellness import wellness_module
         wellness_module()
     elif page == "analisis_partido":
-        from src.modules.analisis_partido import rugby_analysis_module
+        from src.modules.panel_partido import rugby_analysis_module
         rugby_analysis_module()
     elif page == "lista":
         from src.modules.Lista import main_lista
@@ -833,49 +833,90 @@ def dashboard_main():
         st.info("No tenés módulos habilitados para tu rol.")
         return
 
-    st.markdown("""
+    # --- Grilla de tarjetas con components.html (HTML/CSS/JS puro, sin abrir nueva ventana) ---
+    rows = (len(allowed) + 2) // 3
+    grid_height = rows * 190 + 30
+
+    cards_items = ""
+    for m in allowed:
+        cards_items += f"""
+        <div class="home-card" style="--card-color:{m['color']};" onclick="navigate('{m['id']}')">
+            <span class="c-icon">{m['icon']}</span>
+            <span class="c-label">{m['label']}</span>
+            <span class="c-desc">{m['desc']}</span>
+        </div>"""
+
+    grid_html = f"""
+    <!DOCTYPE html><html><head>
+    <meta charset="utf-8">
     <style>
-    /* Estilizar botones de Streamlit como tarjetas del dashboard */
-    .stButton > button[key^="nav_"] {
-        background: white !important;
-        border-radius: 14px !important;
-        padding: 1.5rem !important;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.09) !important;
-        border: 1px solid #f0f0f0 !important;
-        transition: all 0.2s ease !important;
-        height: 180px !important;
-        width: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        justify-content: flex-start !important;
-        white-space: normal !important;
-        text-align: left !important;
-    }
-    .stButton > button[key^="nav_"]:hover {
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
-        transform: translateY(-4px) !important;
-        border-color: #000 !important;
-    }
-    /* Estilo para el contenido interno del botón simulado */
-    .btn-icon { font-size: 1.8rem; margin-bottom: 0.5rem; display: block; }
-    .btn-label { font-weight: 700; font-size: 1.05rem; color: #111; display: block; margin-bottom: 0.2rem; }
-    .btn-desc { font-size: 0.85rem; color: #666; font-weight: 400; display: block; line-height: 1.3; }
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+        background: transparent;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        padding: 4px 2px;
+    }}
+    .home-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+    }}
+    @media (max-width: 600px) {{
+        .home-grid {{ grid-template-columns: repeat(2, 1fr); }}
+    }}
+    @media (max-width: 380px) {{
+        .home-grid {{ grid-template-columns: 1fr; }}
+    }}
+    .home-card {{
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 1.25rem 1.1rem 1.1rem;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #efefef;
+        border-top: 4px solid var(--card-color, #000000);
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }}
+    .home-card:hover {{
+        transform: translateY(-5px);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+    }}
+    .home-card:active {{
+        transform: scale(0.97);
+    }}
+    .c-icon {{
+        font-size: 1.85rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }}
+    .c-label {{
+        font-weight: 700;
+        font-size: 0.97rem;
+        color: #111111;
+        display: block;
+        margin-bottom: 0.3rem;
+        line-height: 1.2;
+    }}
+    .c-desc {{
+        font-size: 0.79rem;
+        color: #666666;
+        line-height: 1.4;
+        display: block;
+    }}
     </style>
-    """, unsafe_allow_html=True)
-
-    # Grid de columnas para los botones
-    cols = st.columns(3)
-    for i, m in enumerate(allowed):
-        with cols[i % 3]:
-            # El botón nativo con HTML inyectado en el label para el diseño
-            # Nota: Usamos markdown dentro del label para los iconos y descripciones
-            button_label = f"{m['icon']} {m['label']}\n\n{m['desc']}"
-            if st.button(button_label, key=f"nav_{m['id']}", use_container_width=True):
-                st.session_state.current_page = m["id"]
-                st.rerun()
-    
-
+    </head><body>
+    <div class="home-grid">{cards_items}
+    </div>
+    <script>
+    function navigate(page) {{
+        window.parent.location.href = window.parent.location.pathname + '?nav=' + page;
+    }}
+    </script>
+    </body></html>
+    """
+    components.html(grid_html, height=grid_height, scrolling=False)
 
     # Footer
     st.markdown("---")
