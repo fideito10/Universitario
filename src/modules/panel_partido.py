@@ -1,5 +1,6 @@
 import os
 import re
+import base64
 from collections import defaultdict
 import streamlit as st
 import pandas as pd
@@ -7,6 +8,50 @@ import plotly.express as px
 import plotly.graph_objects as go
 import gspread
 from src.utils.credentials import get_service_account_credentials
+
+# ── Mapa de escudos ──
+_ESCUDOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "Escudos")
+
+_ESCUDO_MAP = {
+    "universitario": "Universitariodelaplata.png",
+    "culp":          "Universitariodelaplata.png",
+    "hurling":       "Hurling.png",
+    "cirano":        "San Cirano.png",
+    "san cirano":    "San Cirano.png",
+    "cirano":        "San Cirano.png",
+    "gimnasia":      "Gimnasia y Esgrima.png",
+    "olivos":        "Olivos.png",
+    "pucara":        "Pucara.png",
+    "pueyrredon":    "Pueyrredon.png",
+    "san andres":    "San Andres.png",
+    "andres":        "San Andres.png",
+    "san albano":    "San Albano.png",
+    "albano":        "San Albano.png",
+    "san fernando":  "San Fernando.png",
+    "fernando":      "San Fernando.png",
+    "san luis":      "San Luis.png",
+    "sanluis":       "San Luis.png",
+    "lomas":         "Lomas Athletic.png",
+    "francesa":      "Deportiva Francesa.png",
+    "curupayti":     "Curupayti.png",
+    "adf":           "Deportiva Francesa.png",
+}
+
+def _get_escudo_b64(team_name: str) -> str:
+    """Devuelve el escudo en base64 para embeber en HTML, o '' si no encuentra."""
+    key = team_name.lower().strip()
+    filename = None
+    for k, v in _ESCUDO_MAP.items():
+        if k in key:
+            filename = v
+            break
+    if not filename:
+        return ""
+    path = os.path.join(_ESCUDOS_DIR, filename)
+    if not os.path.exists(path):
+        return ""
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
 
 def rugby_analysis_module():
     # ─────────────────────────────────────────────
@@ -161,19 +206,34 @@ def rugby_analysis_module():
     res_txt = "VICTORIA" if s_l > s_r else ("DERROTA" if s_l < s_r else "EMPATE")
 
     # 1) TACKLES (DETALLE)
+    # Cada fila = 1 evento de tackle. Player puede tener múltiples jugadores separados por "|"
+    # Se cuenta: total (apariciones), efectivos (bien/detiene), fallados (mal/falla), dobles
     tck_rows = find_rows("TACKLE")
-    tck_map = defaultdict(lambda: {"ok": 0, "fail": 0})
+    tck_map = defaultdict(lambda: {"total": 0, "ok": 0, "fail": 0, "doble": 0})
     for r in tck_rows:
-        p = clean_player(r.get("player") or r.get("name") or r.get("jugador"))
-        if p and (not r.get("team") or r.get("team") == TEAM_LOCAL):
-            tck_map[p]["ok"] += get_int(r.get("bueno") or r.get("bien (detiene)") or r.get("ok", 0))
-            tck_map[p]["fail"] += get_int(r.get("malo") or r.get("mal (falla)") or r.get("fail", 0))
-    df_tck = pd.DataFrame([{"Jugador": k, "Total": v["ok"]+v["fail"], "Efectivos": v["ok"], "Fallados": v["fail"]} for k,v in tck_map.items()])
+        if r.get("team") and r.get("team") != TEAM_LOCAL:
+            continue
+        raw_player = r.get("player") or r.get("name") or r.get("jugador") or ""
+        jugadores = [j.strip() for j in str(raw_player).split("|") if j.strip()]
+        for raw_p in jugadores:
+            p = clean_player(raw_p)
+            if p:
+                tck_map[p]["total"] += 1
+                tck_map[p]["ok"]    += get_int(r.get("bueno") or r.get("bien (detiene)") or r.get("ok", 0))
+                tck_map[p]["fail"]  += get_int(r.get("malo") or r.get("mal (falla)") or r.get("fail", 0))
+                tck_map[p]["doble"] += get_int(r.get("doble tackle") or r.get("doble", 0))
+    df_tck = pd.DataFrame([{
+        "Jugador": k,
+        "Total": v["total"],
+        "Efectivos": v["ok"],
+        "Fallados": v["fail"],
+        "Dobles": v["doble"],
+        "% Efectividad": round(v["ok"] / v["total"] * 100) if v["total"] else 0
+    } for k, v in tck_map.items()])
     total_tackles, total_buenos, pct_efectividad = 0, 0, 0
     if not df_tck.empty:
-        df_tck["% Efectividad"] = (df_tck["Efectivos"] / df_tck["Total"].replace(0, 1) * 100).round(1)
         df_tck = df_tck.sort_values("Total", ascending=False)
-        total_tackles, total_buenos = df_tck["Total"].sum(), df_tck["Efectivos"].sum()
+        total_tackles, total_buenos = int(df_tck["Total"].sum()), int(df_tck["Efectivos"].sum())
         pct_efectividad = pct_l(total_buenos, total_tackles)
 
     # 2) QUIEBRES
@@ -183,6 +243,14 @@ def rugby_analysis_module():
         p = clean_player(r.get("player") or r.get("jugador") or r.get("name"))
         if p and (not r.get("team") or r.get("team") == TEAM_LOCAL): qbr_map[p] += 1
     df_qbr = pd.DataFrame([{"Jugador": k, "Quiebres": v} for k,v in qbr_map.items()]).sort_values("Quiebres", ascending=False)
+
+    # 2b) SCRUMS
+    scr_rows = find_rows("SCRUM")
+    scrum_nuestros = sum(1 for r in scr_rows if r.get("team") == TEAM_LOCAL or "PROPIO" in str(r.get("quien","")).upper() or "NOSOTRO" in str(r.get("quien","")).upper() or (not r.get("team") and not r.get("quien")))
+    scrum_rival    = sum(1 for r in scr_rows if r.get("team") == TEAM_RIVAL or "RIVAL" in str(r.get("quien","")).upper())
+    # Si no hay distinción por team/quien, dividir el total
+    if scrum_nuestros == 0 and scrum_rival == 0 and scr_rows:
+        scrum_nuestros = len(scr_rows)
 
     # 3) KICKS
     kck_rows = find_rows("KICK")
@@ -228,18 +296,46 @@ def rugby_analysis_module():
     total_penales, total_pescas = pnl_u, pesca_recupera
     total_enf = sum(1 for r in find_rows("FORZADO") if not r.get("team") or r.get("team") == TEAM_LOCAL)
 
-    # 6) LINE OUT
+    # 6) LINE OUT  (columnas reales de la hoja)
     lin_rows = find_rows("LINE")
-    lin_prop = [r for r in lin_rows if "PROPIO" in str(r.get("quien","")).upper() or r.get("team") == TEAM_LOCAL]
-    lin_total_prop = len(lin_prop)
-    lin_limpia_prop = sum(1 for r in lin_prop if "LIMPIA" in str(r.get("resultado","")).upper() or get_int(r.get("limpia",0)))
-    lin_perdida_prop = sum(1 for r in lin_prop if "PERDIDA" in str(r.get("resultado","")).upper() or get_int(r.get("perdida",0)))
-    lin_robada_prop = sum(1 for r in lin_prop if "ROBADA" in str(r.get("resultado","")).upper() or get_int(r.get("robada",0)))
-    lin_riv = [r for r in lin_rows if "RIVAL" in str(r.get("quien","")).upper() or r.get("team") == TEAM_RIVAL]
-    lin_total_riv = len(lin_riv)
-    lin_limpia_riv = sum(1 for r in lin_riv if "LIMPIA" in str(r.get("resultado","")).upper())
-    lin_robada_riv = sum(1 for r in lin_riv if "ROBADA" in str(r.get("resultado","")).upper())
-    lin_perdida_riv = lin_total_riv - lin_limpia_riv - lin_robada_riv
+    # Helpers para leer columnas con variaciones de nombre
+    def _lin(r, *keys):
+        for k in keys:
+            for rk in r.keys():
+                if k.lower() in rk.lower():
+                    return get_int(r[rk])
+        return 0
+
+    lin_total     = len(lin_rows)
+    lin_prop_rows = [r for r in lin_rows if _lin(r, "propio") or r.get("team") == TEAM_LOCAL]
+    lin_riv_rows  = [r for r in lin_rows if _lin(r, "rival")  or r.get("team") == TEAM_RIVAL]
+    # Si no hay distincion, usar todos como propios
+    if not lin_prop_rows and not lin_riv_rows:
+        lin_prop_rows = lin_rows
+
+    lin_total_prop   = len(lin_prop_rows)
+    lin_total_riv    = len(lin_riv_rows)
+
+    # Resultados de NUESTROS lines
+    lin_limpia   = sum(_lin(r, "pelota limpia")        for r in lin_prop_rows)
+    lin_sucia    = sum(_lin(r, "pelota sucia")         for r in lin_prop_rows)
+    lin_robada   = sum(_lin(r, "robada")               for r in lin_prop_rows)
+    lin_perdida  = sum(_lin(r, "perdida")              for r in lin_prop_rows)
+    lin_torcida  = sum(_lin(r, "torcida")              for r in lin_prop_rows)
+    lin_pasada   = sum(_lin(r, "pasada")               for r in lin_prop_rows)
+    lin_rapido   = sum(_lin(r, "tiro rapido", "rapido") for r in lin_prop_rows)
+    lin_inf_u    = sum(_lin(r, "infracci", "para u", "infraccion para u") for r in lin_prop_rows)
+    lin_inf_riv  = sum(_lin(r, "infracci", "para rival") for r in lin_prop_rows)
+    # Posiciones del lanzamiento
+    lin_2m   = sum(_lin(r, "2-mar", "2 mar", "2m") for r in lin_prop_rows)
+    lin_4m   = sum(_lin(r, "4-may", "4 may", "4m") for r in lin_prop_rows)
+    lin_6m   = sum(_lin(r, "6-jul", "6 jul", "6m") for r in lin_prop_rows)
+
+    # Escudos en base64
+    b64_local = _get_escudo_b64(NAME_LOCAL)
+    b64_rival = _get_escudo_b64(NAME_RIVAL)
+    img_local = f'<img src="data:image/png;base64,{b64_local}" style="height:90px;object-fit:contain;"/>' if b64_local else f'<div class="team-name">{NAME_LOCAL}</div>'
+    img_rival = f'<img src="data:image/png;base64,{b64_rival}" style="height:90px;object-fit:contain;"/>' if b64_rival else f'<div class="team-name">{NAME_RIVAL}</div>'
 
     # Renderizado UI
     with st.container():
@@ -251,9 +347,19 @@ def rugby_analysis_module():
             </div>
             <div class="scoreboard">
                 <div class="score-teams">
-                    <div class="team-block"><div class="team-name">{NAME_LOCAL}</div><div class="team-score">{s_l}</div><div class="score-detail">{t_l}T · {g_l}G · {p_l}P</div></div>
+                    <div class="team-block">
+                        {img_local}
+                        <div class="team-name" style="margin-top:8px">{NAME_LOCAL}</div>
+                        <div class="team-score">{s_l}</div>
+                        <div class="score-detail">{t_l}T · {g_l}G · {p_l}P</div>
+                    </div>
                     <div class="score-dash">vs</div>
-                    <div class="team-block"><div class="team-name">{NAME_RIVAL}</div><div class="team-score">{s_r}</div><div class="score-detail">{t_r}T · {g_r}G · {p_r}P</div></div>
+                    <div class="team-block">
+                        {img_rival}
+                        <div class="team-name" style="margin-top:8px">{NAME_RIVAL}</div>
+                        <div class="team-score">{s_r}</div>
+                        <div class="score-detail">{t_r}T · {g_r}G · {p_r}P</div>
+                    </div>
                 </div>
                 <div style="margin-top:25px; font-weight:900; font-size:1.5rem; letter-spacing:2px; text-align:center;">{res_txt}</div>
             </div>
@@ -283,28 +389,57 @@ def rugby_analysis_module():
         fig_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280,
                                 margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
         st.plotly_chart(fig_donut, use_container_width=True)
-        st.dataframe(df_tck[["Jugador","Total","Efectivos","Fallados","% Efectividad"]].head(8), use_container_width=True, hide_index=True)
+        _df = df_tck[["Jugador","Total","Efectivos","Fallados","Dobles","% Efectividad"]].head(8)
+        st.dataframe(
+            _df.style
+                .set_properties(**{"background-color": "#1c2030", "color": "#c9d1d9",
+                                   "border": "1px solid #2d3748", "font-size": "13px"})
+                .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
+                                    ("color", "#58a6ff"), ("font-weight", "700"),
+                                    ("font-size", "11px"), ("text-transform", "uppercase"),
+                                    ("border-bottom", "2px solid #30363d")]}]),
+            use_container_width=True, hide_index=True
+        )
 
-    # ── QUIEBRES ──
+    # ── QUIEBRES + SCRUMS ──
     st.markdown('<div class="section-header">💥 Quiebres de Línea</div>', unsafe_allow_html=True)
-    col3, col4 = st.columns([2, 3])
-    with col3:
+    col_qbr, col_scr = st.columns([2, 3])
+    with col_qbr:
         if not df_qbr.empty:
             fig_qbr = px.bar(df_qbr, x="Quiebres", y="Jugador", orientation="h", color="Quiebres",
                              color_continuous_scale=["#1f6feb", "#58a6ff"], text="Quiebres")
             fig_qbr.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280,
                                   margin=dict(l=0, r=0, t=10, b=10), showlegend=False, yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_qbr, use_container_width=True)
-        else: st.info("Sin datos de quiebres")
-    with col4:
-        if qbr_rows:
-            detalle = []
-            for r in qbr_rows:
-                pn = clean_player(r.get("Player") or r.get("jugador") or r.get("name")) or "Sin ID"
-                tipo = "Fija" if get_int(r.get("Fija",0)) else ("Móvil" if get_int(r.get("Movil",0)) else "Libre")
-                res_q = "Marca Puntos 🏆" if get_int(r.get("Marca puntos",0)) else ("Conecta 🔗" if get_int(r.get("Conecta compañero",0)) else ("Mantiene 🔒" if get_int(r.get("Mantiene posesión",0)) else "Pierde ❌"))
-                detalle.append({"Jugador": pn, "Tipo": tipo, "Resultado": res_q})
-            st.dataframe(pd.DataFrame(detalle), use_container_width=True, hide_index=True, height=250)
+        else:
+            st.info("Sin datos de quiebres")
+    with col_scr:
+        st.markdown('<div class="section-header">🏟️ Scrums</div>', unsafe_allow_html=True)
+        total_scrums = scrum_nuestros + scrum_rival
+        if total_scrums > 0:
+            fig_scr = go.Figure(go.Pie(
+                labels=[NAME_LOCAL, NAME_RIVAL],
+                values=[scrum_nuestros, scrum_rival],
+                hole=0.55,
+                marker_colors=["#58a6ff", "#f85149"],
+                textinfo="label+value+percent",
+                textfont=dict(size=13),
+            ))
+            fig_scr.add_annotation(
+                text=f"{total_scrums}<br><span style='font-size:11px'>total</span>",
+                font=dict(size=22, color="#c9d1d9"),
+                showarrow=False
+            )
+            fig_scr.update_layout(
+                paper_bgcolor="#161b22", plot_bgcolor="#161b22",
+                font_color="#c9d1d9", height=280,
+                margin=dict(l=0, r=0, t=10, b=0),
+                showlegend=True,
+                legend=dict(orientation="h", y=-0.1, font=dict(color="#8b949e"))
+            )
+            st.plotly_chart(fig_scr, use_container_width=True)
+        else:
+            st.info("Sin datos de scrums")
 
     # ── KICKS ──
     st.markdown('<div class="section-header">🦵 Kicks por Jugador</div>', unsafe_allow_html=True)
@@ -315,7 +450,18 @@ def rugby_analysis_module():
         fig_kck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=320,
                               margin=dict(l=0, r=0, t=10, b=10), legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_kck, use_container_width=True)
-    with col6: st.dataframe(df_kck[["Jugador","Total Kicks","Gana Terreno","Territorial","% Efectividad"]], use_container_width=True, hide_index=True)
+    with col6:
+        _df_kck = df_kck[["Jugador","Total Kicks","Gana Terreno","Territorial","% Efectividad"]]
+        st.dataframe(
+            _df_kck.style
+                .set_properties(**{"background-color": "#1c2030", "color": "#c9d1d9",
+                                   "border": "1px solid #2d3748", "font-size": "13px"})
+                .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
+                                    ("color", "#58a6ff"), ("font-weight", "700"),
+                                    ("font-size", "11px"), ("text-transform", "uppercase"),
+                                    ("border-bottom", "2px solid #30363d")]}]),
+            use_container_width=True, hide_index=True
+        )
 
     # ── PESCA ──
     st.markdown('<div class="section-header">🎣 Pesca (Restart Contest)</div>', unsafe_allow_html=True)
@@ -335,7 +481,17 @@ def rugby_analysis_module():
             fig_psc.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=240,
                                   margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_psc, use_container_width=True)
-    with col9: st.dataframe(df_psc, use_container_width=True, hide_index=True)
+    with col9:
+        st.dataframe(
+            df_psc.style
+                .set_properties(**{"background-color": "#1c2030", "color": "#c9d1d9",
+                                   "border": "1px solid #2d3748", "font-size": "13px"})
+                .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
+                                    ("color", "#58a6ff"), ("font-weight", "700"),
+                                    ("font-size", "11px"), ("text-transform", "uppercase"),
+                                    ("border-bottom", "2px solid #30363d")]}]),
+            use_container_width=True, hide_index=True
+        )
 
     # ── PENALES ──
     st.markdown('<div class="section-header">🟡 Penales y Free Kicks</div>', unsafe_allow_html=True)
@@ -356,25 +512,451 @@ def rugby_analysis_module():
             fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280, margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_pnl_jug, use_container_width=True)
 
-    # ── LINE ──
+    # ── LINE OUT ──
     st.markdown('<div class="section-header">📏 Line Out</div>', unsafe_allow_html=True)
-    c13, c14 = st.columns(2)
-    with c13:
+
+    # KPIs superiores
+    pct_limpia_prop = round(lin_limpia / lin_total_prop * 100) if lin_total_prop else 0
+    st.markdown(f"""
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#58a6ff">{lin_total}</div>
+            <div class="kpi-label">Total Lines</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#3fb950">{lin_total_prop}</div>
+            <div class="kpi-label">Lines Propios</div>
+            <div class="kpi-sub">{NAME_LOCAL}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#f85149">{lin_total_riv}</div>
+            <div class="kpi-label">Lines Rivales</div>
+            <div class="kpi-sub">{NAME_RIVAL}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#3fb950">{lin_limpia}</div>
+            <div class="kpi-label">Pelota Limpia</div>
+            <div class="kpi-sub">{pct_limpia_prop}% de los propios</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#f85149">{lin_robada}</div>
+            <div class="kpi-label">Robadas</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#e3b341">{lin_perdida}</div>
+            <div class="kpi-label">Perdidas</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Desglose completo nuestros lines
+    lin_col1, lin_col2 = st.columns(2)
+    with lin_col1:
         st.markdown(f"""
-        <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;margin-bottom:12px">
-            <div style="font-size:0.85rem;color:#58a6ff;font-weight:700;margin-bottom:12px">🔵 Lines Propias ({lin_total_prop})</div>
-            <div style="color:#c9d1d9;font-size:0.9rem">✅ Limpia: {lin_limpia_prop} | ❌ Perdida: {lin_perdida_prop} | 🔄 Robada: {lin_robada_prop}</div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:18px">
+            <div style="font-size:0.85rem;color:#58a6ff;font-weight:700;margin-bottom:12px;text-transform:uppercase">
+                🔵 Nuestros Lines — Resultados ({lin_total_prop} totales)
+            </div>
+            <table style="width:100%;border-collapse:collapse;color:#c9d1d9;font-size:0.9rem">
+              <tr><td style="padding:5px 0">✅ Pelota Limpia</td>  <td style="text-align:right;font-weight:700;color:#3fb950">{lin_limpia}</td></tr>
+              <tr><td style="padding:5px 0">🛑 Pelota Sucia</td>   <td style="text-align:right;font-weight:700;color:#e3b341">{lin_sucia}</td></tr>
+              <tr><td style="padding:5px 0">❌ Robada</td>          <td style="text-align:right;font-weight:700;color:#f85149">{lin_robada}</td></tr>
+              <tr><td style="padding:5px 0">❌ Perdida</td>         <td style="text-align:right;font-weight:700;color:#f85149">{lin_perdida}</td></tr>
+              <tr><td style="padding:5px 0">↪️ Torcida</td>         <td style="text-align:right;font-weight:700;color:#8b949e">{lin_torcida}</td></tr>
+              <tr><td style="padding:5px 0">➡️ Pasada</td>          <td style="text-align:right;font-weight:700;color:#8b949e">{lin_pasada}</td></tr>
+              <tr><td style="padding:5px 0">⚡ Tiro Rápido</td>      <td style="text-align:right;font-weight:700;color:#a371f7">{lin_rapido}</td></tr>
+              <tr><td style="padding:5px 0">🟢 Infracción para U</td><td style="text-align:right;font-weight:700;color:#3fb950">{lin_inf_u}</td></tr>
+              <tr><td style="padding:5px 0">🔴 Infracción Rival</td> <td style="text-align:right;font-weight:700;color:#f85149">{lin_inf_riv}</td></tr>
+            </table>
         </div>
         """, unsafe_allow_html=True)
-    with c14:
-        st.markdown(f"""
-        <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;margin-bottom:12px">
-            <div style="font-size:0.85rem;color:#f85149;font-weight:700;margin-bottom:12px">🔴 Lines Rivales ({lin_total_riv})</div>
-            <div style="color:#c9d1d9;font-size:0.9rem">✅ Limpia: {lin_limpia_riv} | 🔄 Robada: {lin_robada_riv}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with lin_col2:
+        # Grafico de posicion del lanzamiento
+        results_data = {
+            "Resultado": ["Limpia", "Sucia", "Robada", "Perdida", "Torcida", "Pasada", "T. Rápido"],
+            "N°":        [lin_limpia, lin_sucia, lin_robada, lin_perdida, lin_torcida, lin_pasada, lin_rapido]
+        }
+        df_lin_res = pd.DataFrame(results_data)
+        df_lin_res = df_lin_res[df_lin_res["N°"] > 0]
+        if not df_lin_res.empty:
+            color_map = {"Limpia": "#3fb950", "Sucia": "#e3b341", "Robada": "#f85149",
+                         "Perdida": "#f85149", "Torcida": "#8b949e", "Pasada": "#58a6ff", "T. Rápido": "#a371f7"}
+            fig_lin = px.bar(df_lin_res, x="Resultado", y="N°", text="N°",
+                             color="Resultado", color_discrete_map=color_map)
+            fig_lin.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22",
+                                  font_color="#c9d1d9", height=280, showlegend=False,
+                                  margin=dict(l=0, r=0, t=10, b=10),
+                                  yaxis=dict(gridcolor="#21262d"))
+            fig_lin.update_traces(textfont_color="#fff", textposition="outside")
+            st.plotly_chart(fig_lin, use_container_width=True)
+        # Posicion de lanzamiento
+        if lin_2m + lin_4m + lin_6m > 0:
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px;margin-top:10px">
+                <div style="font-size:0.8rem;color:#8b949e;font-weight:700;margin-bottom:8px;text-transform:uppercase">Posición de lanzamiento</div>
+                <div style="display:flex;gap:16px;justify-content:center">
+                    <div style="text-align:center"><div style="font-size:1.6rem;font-weight:900;color:#58a6ff">{lin_2m}</div><div style="font-size:0.75rem;color:#8b949e">2 hombre</div></div>
+                    <div style="text-align:center"><div style="font-size:1.6rem;font-weight:900;color:#58a6ff">{lin_4m}</div><div style="font-size:0.75rem;color:#8b949e">4 hombre</div></div>
+                    <div style="text-align:center"><div style="font-size:1.6rem;font-weight:900;color:#58a6ff">{lin_6m}</div><div style="font-size:0.75rem;color:#8b949e">6 hombre</div></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("""<div style="text-align:center; color:#484f58; font-size:0.8rem; margin-top:50px; padding:20px; border-top:1px solid #21262d">Club Universitario de La Plata · Sistema de Rendimiento</div>""", unsafe_allow_html=True)
+
+    # ── BOTÓN EXPORTAR PDF ──
+    st.markdown("---")
+
+    # Guardamos el PDF en session_state para que sobreviva al rerun de Streamlit
+    pdf_key = f"pdf_bytes_{selected_match}"
+
+    col_pdf_l, col_pdf_c, col_pdf_r = st.columns([2, 1, 2])
+    with col_pdf_c:
+        if st.button("📄 Generar PDF", use_container_width=True, type="primary", key="btn_gen_pdf"):
+            with st.spinner("Generando informe PDF..."):
+                st.session_state[pdf_key] = _generar_pdf(
+                    selected_match=selected_match,
+                    name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
+                    s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
+                    t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
+                    total_tackles=total_tackles, total_buenos=total_buenos,
+                    pct_efectividad=pct_efectividad, df_tck=df_tck,
+                    df_qbr=df_qbr,
+                    scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
+                    df_kck=df_kck,
+                    pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
+                    pesca_rival=pesca_rival,
+                    pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
+                    lin_total=lin_total, lin_total_prop=lin_total_prop,
+                    lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
+                    lin_robada=lin_robada, lin_perdida=lin_perdida,
+                    lin_sucia=lin_sucia, lin_torcida=lin_torcida,
+                    lin_rapido=lin_rapido,
+                )
+
+    # El download_button se muestra siempre que haya bytes en session_state
+    # (sobrevive al rerun que dispara Streamlit al hacer clic)
+    if st.session_state.get(pdf_key):
+        col_dl_l, col_dl_c, col_dl_r = st.columns([2, 1, 2])
+        with col_dl_c:
+            st.download_button(
+                label="⬇️ Descargar PDF",
+                data=st.session_state[pdf_key],
+                file_name=f"informe_{selected_match.replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="btn_dl_pdf",
+            )
+
+
+def _generar_pdf(**kw):
+    """Genera un PDF completo del informe del partido con reportlab."""
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle, HRFlowable)
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            leftMargin=1.8*cm, rightMargin=1.8*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+
+    # ── Paleta ──
+    NEGRO    = colors.HexColor("#0d1117")
+    AZUL     = colors.HexColor("#58a6ff")
+    VERDE    = colors.HexColor("#3fb950")
+    ROJO     = colors.HexColor("#f85149")
+    GRIS_OSC = colors.HexColor("#161b22")
+    GRIS_MED = colors.HexColor("#1c2030")
+    GRIS_TXT = colors.HexColor("#c9d1d9")
+    BLANCO   = colors.white
+    AMARILLO = colors.HexColor("#e3b341")
+
+    styles = getSampleStyleSheet()
+
+    def st_title(text, color=BLANCO):
+        return ParagraphStyle("t", fontSize=22, fontName="Helvetica-Bold",
+                               textColor=color, alignment=TA_CENTER, spaceAfter=4)
+
+    def st_h2(color=AZUL):
+        return ParagraphStyle("h2", fontSize=13, fontName="Helvetica-Bold",
+                               textColor=color, spaceBefore=14, spaceAfter=6)
+
+    def st_normal():
+        return ParagraphStyle("n", fontSize=9, fontName="Helvetica",
+                               textColor=GRIS_TXT, spaceAfter=3)
+
+    def st_small():
+        return ParagraphStyle("s", fontSize=8, fontName="Helvetica",
+                               textColor=colors.HexColor("#8b949e"), spaceAfter=2)
+
+    def tabla_header_style():
+        return TableStyle([
+            ("BACKGROUND",  (0,0), (-1,0), GRIS_OSC),
+            ("TEXTCOLOR",   (0,0), (-1,0), AZUL),
+            ("FONTNAME",    (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE",    (0,0), (-1,0), 8),
+            ("ALIGN",       (0,0), (-1,-1), "CENTER"),
+            ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
+            ("ROWBACKGROUNDS", (0,1), (-1,-1), [GRIS_MED, NEGRO]),
+            ("TEXTCOLOR",   (0,1), (-1,-1), GRIS_TXT),
+            ("FONTSIZE",    (0,1), (-1,-1), 8),
+            ("GRID",        (0,0), (-1,-1), 0.3, colors.HexColor("#2d3748")),
+            ("ROWHEIGHT",   (0,0), (-1,-1), 18),
+            ("LEFTPADDING",  (0,0), (-1,-1), 6),
+            ("RIGHTPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING",   (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING",(0,0), (-1,-1), 3),
+        ])
+
+    story = []
+    W = A4[0] - 3.6*cm   # ancho util
+
+    # ══ PORTADA ══
+    story.append(Spacer(1, 0.5*cm))
+    portada_data = [[Paragraph(
+        f'<font color="#58a6ff"><b>CLUB UNIVERSITARIO DE LA PLATA</b></font><br/>'
+        f'<font color="#c9d1d9" size="14">Informe de Partido</font><br/>'
+        f'<font color="#8b949e" size="10">{kw["selected_match"]}</font>',
+        ParagraphStyle("p", fontSize=20, fontName="Helvetica-Bold",
+                        textColor=BLANCO, alignment=TA_CENTER)
+    )]]
+    t_portada = Table(portada_data, colWidths=[W])
+    t_portada.setStyle(TableStyle([
+        ("BACKGROUND",   (0,0), (-1,-1), NEGRO),
+        ("ROUNDEDCORNERS", [12]),
+        ("LEFTPADDING",  (0,0), (-1,-1), 20),
+        ("RIGHTPADDING", (0,0), (-1,-1), 20),
+        ("TOPPADDING",   (0,0), (-1,-1), 24),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 24),
+        ("BOX",          (0,0), (-1,-1), 1.5, AZUL),
+    ]))
+    story.append(t_portada)
+    story.append(Spacer(1, 0.6*cm))
+
+    # ── Marcador ──
+    story.append(Paragraph("RESULTADO", st_h2(AZUL)))
+    story.append(HRFlowable(width=W, thickness=1, color=AZUL, spaceAfter=6))
+
+    res_color = {"VICTORIA": VERDE, "DERROTA": ROJO, "EMPATE": AMARILLO}.get(kw["res_txt"], BLANCO)
+    marc_data = [
+        [Paragraph(f'<b>{kw["name_local"]}</b>', ParagraphStyle("ml", fontSize=14, fontName="Helvetica-Bold", textColor=AZUL, alignment=TA_CENTER)),
+         Paragraph(f'<b>{kw["s_l"]}</b>', ParagraphStyle("sl", fontSize=28, fontName="Helvetica-Bold", textColor=BLANCO, alignment=TA_CENTER)),
+         Paragraph(f'<b>vs</b>', ParagraphStyle("vs", fontSize=14, fontName="Helvetica-Bold", textColor=colors.HexColor("#484f58"), alignment=TA_CENTER)),
+         Paragraph(f'<b>{kw["s_r"]}</b>', ParagraphStyle("sr", fontSize=28, fontName="Helvetica-Bold", textColor=BLANCO, alignment=TA_CENTER)),
+         Paragraph(f'<b>{kw["name_rival"]}</b>', ParagraphStyle("mr", fontSize=14, fontName="Helvetica-Bold", textColor=ROJO, alignment=TA_CENTER))],
+        [Paragraph(f'{kw["t_l"]}T · {kw["g_l"]}G · {kw["p_l"]}P', ParagraphStyle("dl", fontSize=8, fontName="Helvetica", textColor=GRIS_TXT, alignment=TA_CENTER)),
+         Paragraph(f'<font color="#{"3fb950" if kw["s_l"] > kw["s_r"] else "f85149" if kw["s_l"] < kw["s_r"] else "e3b341"}"><b>{kw["res_txt"]}</b></font>',
+                   ParagraphStyle("res", fontSize=11, fontName="Helvetica-Bold", textColor=BLANCO, alignment=TA_CENTER)),
+         "", "",
+         Paragraph(f'{kw["t_r"]}T · {kw["g_r"]}G · {kw["p_r"]}P', ParagraphStyle("dr", fontSize=8, fontName="Helvetica", textColor=GRIS_TXT, alignment=TA_CENTER))],
+    ]
+    t_marc = Table(marc_data, colWidths=[W*0.25, W*0.15, W*0.2, W*0.15, W*0.25])
+    t_marc.setStyle(TableStyle([
+        ("BACKGROUND",  (0,0), (-1,-1), GRIS_OSC),
+        ("ALIGN",       (0,0), (-1,-1), "CENTER"),
+        ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
+        ("SPAN",        (1,1), (3,1)),
+        ("TOPPADDING",  (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 8),
+        ("BOX",         (0,0), (-1,-1), 0.5, colors.HexColor("#30363d")),
+    ]))
+    story.append(t_marc)
+    story.append(Spacer(1, 0.5*cm))
+
+    # ── Tackles ──
+    story.append(Paragraph("⚡ TACKLES", st_h2(AZUL)))
+    story.append(HRFlowable(width=W, thickness=0.5, color=GRIS_OSC, spaceAfter=4))
+    kpi_tck = [
+        [Paragraph("Total", st_small()), Paragraph("Efectivos", st_small()),
+         Paragraph("Fallados", st_small()), Paragraph("% Efectividad", st_small())],
+        [Paragraph(f'<b>{kw["total_tackles"]}</b>', ParagraphStyle("v", fontSize=16, fontName="Helvetica-Bold", textColor=BLANCO, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#3fb950">{kw["total_buenos"]}</font></b>', ParagraphStyle("v2", fontSize=16, fontName="Helvetica-Bold", textColor=VERDE, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#f85149">{kw["total_tackles"]-kw["total_buenos"]}</font></b>', ParagraphStyle("v3", fontSize=16, fontName="Helvetica-Bold", textColor=ROJO, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#58a6ff">{kw["pct_efectividad"]}%</font></b>', ParagraphStyle("v4", fontSize=16, fontName="Helvetica-Bold", textColor=AZUL, alignment=TA_CENTER))],
+    ]
+    t_kpi_tck = Table(kpi_tck, colWidths=[W/4]*4)
+    t_kpi_tck.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), GRIS_MED),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#30363d")),
+        ("LINEBELOW", (0,0), (-1,0), 1, AZUL),
+    ]))
+    story.append(t_kpi_tck)
+    story.append(Spacer(1, 0.3*cm))
+
+    if not kw["df_tck"].empty:
+        df = kw["df_tck"].head(12)
+        header = [["Jugador", "Total", "Efectivos", "Fallados", "Dobles", "% Efect."]]
+        rows = [[r["Jugador"], r["Total"], r["Efectivos"], r["Fallados"], r["Dobles"], f'{r["% Efectividad"]}%']
+                for _, r in df.iterrows()]
+        t = Table(header + rows, colWidths=[W*0.4, W*0.12, W*0.12, W*0.12, W*0.12, W*0.12])
+        t.setStyle(tabla_header_style())
+        story.append(t)
+
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Quiebres + Scrums ──
+    story.append(Paragraph("💥 QUIEBRES DE LÍNEA  |  🏟️ SCRUMS", st_h2(AZUL)))
+    story.append(HRFlowable(width=W, thickness=0.5, color=GRIS_OSC, spaceAfter=4))
+
+    col_izq, col_der = [], []
+    if not kw["df_qbr"].empty:
+        qhdr = [["Jugador", "Quiebres"]]
+        qrows = [[r["Jugador"], r["Quiebres"]] for _, r in kw["df_qbr"].iterrows()]
+        tq = Table(qhdr + qrows, colWidths=[W*0.22, W*0.1])
+        tq.setStyle(tabla_header_style())
+        story.append(tq)
+    scrum_data = [
+        [Paragraph("Scrums Nuestros", st_small()), Paragraph("Scrums Rival", st_small())],
+        [Paragraph(f'<b><font color="#58a6ff">{kw["scrum_nuestros"]}</font></b>',
+                   ParagraphStyle("sc", fontSize=18, fontName="Helvetica-Bold", textColor=AZUL, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#f85149">{kw["scrum_rival"]}</font></b>',
+                   ParagraphStyle("sc2", fontSize=18, fontName="Helvetica-Bold", textColor=ROJO, alignment=TA_CENTER))],
+    ]
+    ts = Table(scrum_data, colWidths=[W/2, W/2])
+    ts.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), GRIS_MED),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#30363d")),
+        ("LINEBELOW", (0,0), (-1,0), 1, AZUL),
+    ]))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(ts)
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Kicks ──
+    story.append(Paragraph("🦵 KICKS POR JUGADOR", st_h2(AZUL)))
+    story.append(HRFlowable(width=W, thickness=0.5, color=GRIS_OSC, spaceAfter=4))
+    if not kw["df_kck"].empty:
+        khdr = [["Jugador", "Total Kicks", "Gana Terreno", "Territorial", "% Efect."]]
+        krows = [[r["Jugador"], r["Total Kicks"], r["Gana Terreno"], r["Territorial"], f'{r["% Efectividad"]}%']
+                 for _, r in kw["df_kck"].iterrows()]
+        tk = Table(khdr + krows, colWidths=[W*0.35, W*0.16, W*0.18, W*0.16, W*0.15])
+        tk.setStyle(tabla_header_style())
+        story.append(tk)
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Pesca ──
+    story.append(Paragraph("🎣 PESCA (RESTART CONTEST)", st_h2(AZUL)))
+    story.append(HRFlowable(width=W, thickness=0.5, color=GRIS_OSC, spaceAfter=4))
+    pesca_kpi = [
+        [Paragraph("Pesquemos", st_small()), Paragraph("Recuperadas", st_small()), Paragraph("Rival Pesca", st_small())],
+        [Paragraph(f'<b>{kw["pesca_nosotros"]}</b>', ParagraphStyle("pk1", fontSize=16, fontName="Helvetica-Bold", textColor=BLANCO, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#3fb950">{kw["pesca_recupera"]}</font></b>', ParagraphStyle("pk2", fontSize=16, fontName="Helvetica-Bold", textColor=VERDE, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#f85149">{kw["pesca_rival"]}</font></b>', ParagraphStyle("pk3", fontSize=16, fontName="Helvetica-Bold", textColor=ROJO, alignment=TA_CENTER))],
+    ]
+    tp = Table(pesca_kpi, colWidths=[W/3]*3)
+    tp.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), GRIS_MED),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#30363d")),
+        ("LINEBELOW", (0,0), (-1,0), 1, AZUL),
+    ]))
+    story.append(tp)
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Penales ──
+    story.append(Paragraph("🟡 PENALES Y FREE KICKS", st_h2(AZUL)))
+    story.append(HRFlowable(width=W, thickness=0.5, color=GRIS_OSC, spaceAfter=4))
+    pen_kpi = [
+        [Paragraph("Nuestros", st_small()), Paragraph("Rival", st_small())],
+        [Paragraph(f'<b><font color="#f85149">{kw["pnl_u"]}</font></b>', ParagraphStyle("pp1", fontSize=18, fontName="Helvetica-Bold", textColor=ROJO, alignment=TA_CENTER)),
+         Paragraph(f'<b>{kw["pnl_rival"]}</b>', ParagraphStyle("pp2", fontSize=18, fontName="Helvetica-Bold", textColor=BLANCO, alignment=TA_CENTER))],
+    ]
+    tpen = Table(pen_kpi, colWidths=[W/2, W/2])
+    tpen.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), GRIS_MED),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#30363d")),
+        ("LINEBELOW", (0,0), (-1,0), 1, AZUL),
+    ]))
+    story.append(tpen)
+    if not kw["df_causas"].empty:
+        story.append(Spacer(1, 0.2*cm))
+        chdr = [["Causa", "Total"]]
+        crows = [[r["Causa"], r["Total"]] for _, r in kw["df_causas"].iterrows()]
+        tc = Table(chdr + crows, colWidths=[W*0.75, W*0.25])
+        tc.setStyle(tabla_header_style())
+        story.append(tc)
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Line Out ──
+    story.append(Paragraph("📏 LINE OUT", st_h2(AZUL)))
+    story.append(HRFlowable(width=W, thickness=0.5, color=GRIS_OSC, spaceAfter=4))
+    lin_kpi = [
+        [Paragraph("Total Lines", st_small()), Paragraph("Propios", st_small()),
+         Paragraph("Rivales", st_small()), Paragraph("P. Limpia", st_small()),
+         Paragraph("Robadas", st_small()), Paragraph("Perdidas", st_small())],
+        [Paragraph(f'<b>{kw["lin_total"]}</b>', ParagraphStyle("lk1", fontSize=14, fontName="Helvetica-Bold", textColor=AZUL, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#3fb950">{kw["lin_total_prop"]}</font></b>', ParagraphStyle("lk2", fontSize=14, fontName="Helvetica-Bold", textColor=VERDE, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#f85149">{kw["lin_total_riv"]}</font></b>', ParagraphStyle("lk3", fontSize=14, fontName="Helvetica-Bold", textColor=ROJO, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#3fb950">{kw["lin_limpia"]}</font></b>', ParagraphStyle("lk4", fontSize=14, fontName="Helvetica-Bold", textColor=VERDE, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#f85149">{kw["lin_robada"]}</font></b>', ParagraphStyle("lk5", fontSize=14, fontName="Helvetica-Bold", textColor=ROJO, alignment=TA_CENTER)),
+         Paragraph(f'<b><font color="#e3b341">{kw["lin_perdida"]}</font></b>', ParagraphStyle("lk6", fontSize=14, fontName="Helvetica-Bold", textColor=AMARILLO, alignment=TA_CENTER))],
+    ]
+    tlin = Table(lin_kpi, colWidths=[W/6]*6)
+    tlin.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), GRIS_MED),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#30363d")),
+        ("LINEBELOW", (0,0), (-1,0), 1, AZUL),
+    ]))
+    story.append(tlin)
+
+    lin_det = [
+        [Paragraph("Sucia", st_small()), Paragraph("Torcida", st_small()),
+         Paragraph("Pasada", st_small()), Paragraph("Tiro Rápido", st_small())],
+        [Paragraph(f'<b>{kw["lin_sucia"]}</b>', ParagraphStyle("ld1", fontSize=12, fontName="Helvetica-Bold", textColor=AMARILLO, alignment=TA_CENTER)),
+         Paragraph(f'<b>{kw["lin_torcida"]}</b>', ParagraphStyle("ld2", fontSize=12, fontName="Helvetica-Bold", textColor=GRIS_TXT, alignment=TA_CENTER)),
+         Paragraph(f'<b>{kw["lin_rapido"]}</b>', ParagraphStyle("ld3", fontSize=12, fontName="Helvetica-Bold", textColor=GRIS_TXT, alignment=TA_CENTER)),
+         Paragraph(f'<b>{kw["lin_rapido"]}</b>', ParagraphStyle("ld4", fontSize=12, fontName="Helvetica-Bold", textColor=colors.HexColor("#a371f7"), alignment=TA_CENTER))],
+    ]
+    tlin2 = Table(lin_det, colWidths=[W/4]*4)
+    tlin2.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), NEGRO),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#30363d")),
+    ]))
+    story.append(Spacer(1, 0.15*cm))
+    story.append(tlin2)
+
+    # ── Footer ──
+    story.append(Spacer(1, 1*cm))
+    story.append(HRFlowable(width=W, thickness=0.5, color=GRIS_OSC))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(Paragraph(
+        "Club Universitario de La Plata · Sistema de Análisis de Rendimiento · 2026",
+        ParagraphStyle("footer", fontSize=7, fontName="Helvetica",
+                        textColor=colors.HexColor("#484f58"), alignment=TA_CENTER)
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.read()
+
 
 if __name__ == "__main__":
     rugby_analysis_module()
