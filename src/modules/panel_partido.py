@@ -381,14 +381,14 @@ def rugby_analysis_module():
                          labels={"Total": "N° Tackles", "Jugador": ""}, text="Total")
         fig_tck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=420,
                               margin=dict(l=0, r=20, t=10, b=10), yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig_tck, use_container_width=True)
+        st.plotly_chart(fig_tck, use_container_width=True, key="chart_tackles_bar")
     with col2:
         fig_donut = go.Figure(go.Pie(labels=["Efectivos", "Fallados"], values=[total_buenos, total_tackles-total_buenos],
                                      hole=0.65, marker_colors=["#3fb950", "#f85149"], textinfo="percent"))
         fig_donut.add_annotation(text=f"{pct_efectividad}%", font=dict(size=32, color="#3fb950"), showarrow=False)
         fig_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280,
                                 margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-        st.plotly_chart(fig_donut, use_container_width=True)
+        st.plotly_chart(fig_donut, use_container_width=True, key="chart_tackles_donut")
         _df = df_tck[["Jugador","Total","Efectivos","Fallados","Dobles","% Efectividad"]].head(8)
         st.dataframe(
             _df.style
@@ -398,7 +398,7 @@ def rugby_analysis_module():
                                     ("color", "#58a6ff"), ("font-weight", "700"),
                                     ("font-size", "11px"), ("text-transform", "uppercase"),
                                     ("border-bottom", "2px solid #30363d")]}]),
-            use_container_width=True, hide_index=True
+            use_container_width=True, hide_index=True, key="df_tackles"
         )
 
     # ── QUIEBRES + SCRUMS ──
@@ -410,7 +410,7 @@ def rugby_analysis_module():
                              color_continuous_scale=["#1f6feb", "#58a6ff"], text="Quiebres")
             fig_qbr.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280,
                                   margin=dict(l=0, r=0, t=10, b=10), showlegend=False, yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_qbr, use_container_width=True)
+            st.plotly_chart(fig_qbr, use_container_width=True, key="chart_quiebres")
         else:
             st.info("Sin datos de quiebres")
     with col_scr:
@@ -437,7 +437,7 @@ def rugby_analysis_module():
                 showlegend=True,
                 legend=dict(orientation="h", y=-0.1, font=dict(color="#8b949e"))
             )
-            st.plotly_chart(fig_scr, use_container_width=True)
+            st.plotly_chart(fig_scr, use_container_width=True, key="chart_scrums")
         else:
             st.info("Sin datos de scrums")
 
@@ -449,7 +449,7 @@ def rugby_analysis_module():
                          color_discrete_map={"Gana Terreno": "#3fb950", "Territorial": "#58a6ff"}, text_auto=True)
         fig_kck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=320,
                               margin=dict(l=0, r=0, t=10, b=10), legend=dict(orientation="h", y=1.1))
-        st.plotly_chart(fig_kck, use_container_width=True)
+        st.plotly_chart(fig_kck, use_container_width=True, key="chart_kicks")
     with col6:
         _df_kck = df_kck[["Jugador","Total Kicks","Gana Terreno","Territorial","% Efectividad"]]
         st.dataframe(
@@ -460,7 +460,7 @@ def rugby_analysis_module():
                                     ("color", "#58a6ff"), ("font-weight", "700"),
                                     ("font-size", "11px"), ("text-transform", "uppercase"),
                                     ("border-bottom", "2px solid #30363d")]}]),
-            use_container_width=True, hide_index=True
+            use_container_width=True, hide_index=True, key="df_kicks"
         )
 
     # ── PESCA ──
@@ -480,7 +480,7 @@ def rugby_analysis_module():
                              color_continuous_scale=["#1f6feb", "#3fb950"], text="Total")
             fig_psc.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=240,
                                   margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_psc, use_container_width=True)
+            st.plotly_chart(fig_psc, use_container_width=True, key="chart_pesca")
     with col9:
         st.dataframe(
             df_psc.style
@@ -490,7 +490,7 @@ def rugby_analysis_module():
                                     ("color", "#58a6ff"), ("font-weight", "700"),
                                     ("font-size", "11px"), ("text-transform", "uppercase"),
                                     ("border-bottom", "2px solid #30363d")]}]),
-            use_container_width=True, hide_index=True
+            use_container_width=True, hide_index=True, key="df_pesca"
         )
 
     # ── PENALES ──
@@ -500,17 +500,17 @@ def rugby_analysis_module():
         fig_pnl_donut = go.Figure(go.Pie(labels=["A favor", "En contra"], values=[pnl_u, pnl_rival], hole=0.6,
                                          marker_colors=["#3fb950", "#f85149"], textinfo="value"))
         fig_pnl_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=240, margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
-        st.plotly_chart(fig_pnl_donut, use_container_width=True)
+        st.plotly_chart(fig_pnl_donut, use_container_width=True, key="chart_penales_donut")
     with c11:
         if not df_causas.empty:
             fig_causas = px.bar(df_causas, x="Total", y="Causa", orientation="h", text="Total", color_discrete_sequence=["#f85149"])
             fig_causas.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280, margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_causas, use_container_width=True)
+            st.plotly_chart(fig_causas, use_container_width=True, key="chart_causas")
     with c12:
         if not df_pnl_jug.empty:
             fig_pnl_jug = px.bar(df_pnl_jug, x="Penales Cometidos", y="Jugador", orientation="h", text="Penales Cometidos", color_discrete_sequence=["#e3b341"])
             fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280, margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_pnl_jug, use_container_width=True)
+            st.plotly_chart(fig_pnl_jug, use_container_width=True, key="chart_penales_jug")
 
     # ── LINE OUT ──
     st.markdown('<div class="section-header">📏 Line Out</div>', unsafe_allow_html=True)
@@ -588,7 +588,7 @@ def rugby_analysis_module():
                                   margin=dict(l=0, r=0, t=10, b=10),
                                   yaxis=dict(gridcolor="#21262d"))
             fig_lin.update_traces(textfont_color="#fff", textposition="outside")
-            st.plotly_chart(fig_lin, use_container_width=True)
+            st.plotly_chart(fig_lin, use_container_width=True, key="chart_lineout")
         # Posicion de lanzamiento
         if lin_2m + lin_4m + lin_6m > 0:
             st.markdown(f"""
