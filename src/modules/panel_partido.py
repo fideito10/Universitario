@@ -575,10 +575,10 @@ def rugby_analysis_module():
         )
 
     # ── QUIEBRES + SCRUMS ──
-    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #3fb950;"><h2 style="color: #3fb950; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">💥 QUIEBRES DE LÍNEA</h2></div>', unsafe_allow_html=True)
     df_qbr = df_qbr[~df_qbr["Jugador"].str.contains("Rival", case=False, na=False)]
-    col_qbr, col_scr = st.columns([2, 3])
+    col_qbr, col_scr = st.columns([1, 1])
     with col_qbr:
+        st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #3fb950;"><h2 style="color: #3fb950; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">💥 QUIEBRES DE LÍNEA</h2></div>', unsafe_allow_html=True)
         if not df_qbr.empty:
             fig_qbr = px.bar(df_qbr, x="Quiebres", y="Jugador", orientation="h", color="Quiebres",
                              color_continuous_scale=["#1f6feb", "#58a6ff"], text="Quiebres")
