@@ -53,6 +53,115 @@ def _get_escudo_b64(team_name: str) -> str:
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
+
+# ── MAPA DE DNI Y FOTOS ──
+import unicodedata
+from src.modules.dashboard_360 import crear_dataframe_integrado, normalizar_dni
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _cargar_mapa_dni_nombres():
+    try:
+        df = crear_dataframe_integrado()
+        if df.empty: return {}
+        
+        mapa = {}
+        # Identificar columnas
+        col_dni = next((c for c in df.columns if 'DNI' in c.upper() or 'DOCUMENTO' in c.upper()), None)
+        col_nombre = next((c for c in df.columns if 'NOMBRE' in c.upper()), None)
+        col_apellido = next((c for c in df.columns if 'APELLIDO' in c.upper()), None)
+        
+        if not col_dni or (not col_nombre and not col_apellido): return {}
+        
+        for _, row in df.iterrows():
+            dni = str(row[col_dni]).replace('.0', '').strip()
+            if not dni or dni.lower() == 'nan': continue
+            
+            n = str(row[col_nombre]).strip() if col_nombre else ''
+            a = str(row[col_apellido]).strip() if col_apellido else ''
+            
+            def _norm(t):
+                if not t: return ""
+                t = t.replace("'", "").replace('"', '')
+                t = unicodedata.normalize('NFKD', t).encode('ASCII', 'ignore').decode('utf-8')
+                return t.lower().strip()
+                
+            nombres = []
+            if a and n:
+                nombres.append(f"{_norm(a)} {_norm(n)}")
+                nombres.append(f"{_norm(n)} {_norm(a)}")
+                nombres.append(_norm(a))
+                nombres.append(_norm(n))
+            elif a:
+                nombres.append(_norm(a))
+            elif n:
+                nombres.append(_norm(n))
+                
+            for nm in nombres:
+                if nm and nm not in mapa:
+                    mapa[nm] = dni
+        return mapa
+    except:
+        return {}
+
+def _buscar_dni_por_nombre(nombre_jugador, mapa):
+    if not nombre_jugador or not mapa: return None
+    
+    def _norm(t):
+        if not t: return ""
+        t = t.replace("'", "").replace('"', '')
+        t = unicodedata.normalize('NFKD', t).encode('ASCII', 'ignore').decode('utf-8')
+        return t.lower().strip()
+        
+    n = _norm(nombre_jugador)
+    
+    if n in mapa: return mapa[n]
+    
+    for k, v in mapa.items():
+        if k in n or n in k:
+            return v
+            
+    parts = n.split()
+    for p in parts:
+        if len(p) > 3:
+            for k, v in mapa.items():
+                if p in k:
+                    return v
+    return None
+
+def _get_foto_b64(nombre_jugador, mapa):
+    dni = _buscar_dni_por_nombre(nombre_jugador, mapa)
+    if not dni: return ""
+    
+    # buscar en assets/fotos_jugadores
+    import os, base64
+    fotos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "fotos_jugadores")
+    path = os.path.join(fotos_dir, f"{dni}.jpeg")
+    if not os.path.exists(path):
+        path = os.path.join(fotos_dir, f"{dni}.jpg")
+        if not os.path.exists(path):
+            path = os.path.join(fotos_dir, f"{dni}.png")
+            if not os.path.exists(path): return ""
+            
+    try:
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except:
+        return ""
+
+def _player_card_html(nombre, stat_label, stat_value, color, mapa_dni):
+    foto_b64 = _get_foto_b64(nombre, mapa_dni)
+    img_html = f'<img src="data:image/jpeg;base64,{foto_b64}" style="width:75px;height:75px;border-radius:50%;object-fit:cover;border:3px solid {color};margin-bottom:8px;"/>' if foto_b64 else f'<div style="width:75px;height:75px;border-radius:50%;background:#1c2030;border:3px solid {color};margin-bottom:8px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#8b949e">👤</div>'
+    
+    return f'''
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:15px; text-align:center; display:flex; flex-direction:column; align-items:center; height:100%; border-top:4px solid {color}; box-shadow:0 4px 12px rgba(0,0,0,0.2)">
+        {img_html}
+        <div style="font-size:0.85rem;font-weight:700;color:#c9d1d9;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{nombre}</div>
+        <div style="font-size:2rem;font-weight:900;color:{color};line-height:1;margin:5px 0;">{stat_value}</div>
+        <div style="font-size:0.75rem;color:#8b949e;text-transform:uppercase;font-weight:700;letter-spacing:1px;">{stat_label}</div>
+    </div>
+    '''
+
+
 def rugby_analysis_module():
     # ─────────────────────────────────────────────
     # LÓGICA DE PROCESAMIENTO
@@ -372,49 +481,79 @@ def rugby_analysis_module():
         </div>
         """, unsafe_allow_html=True)
 
-    # ── TACKLES ──
-    st.markdown('<div class="section-header">⚡ Tackles por Jugador</div>', unsafe_allow_html=True)
+
+    # ── LIDERES DEL PARTIDO ──
+    mapa_dni = _cargar_mapa_dni_nombres()
+    
+    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #fff;"><h2 style="color: #fff; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🏆 LÍDERES DEL PARTIDO</h2></div>', unsafe_allow_html=True)
+    
+    lideres_cols = st.columns(4)
+    
+    with lideres_cols[0]:
+        if not df_tck.empty:
+            lider = df_tck.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Tackles", lider["Total"], "#e3b341", mapa_dni), unsafe_allow_html=True)
+            
+    with lideres_cols[1]:
+        if not df_qbr.empty:
+            lider = df_qbr.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Quiebres", lider["Quiebres"], "#3fb950", mapa_dni), unsafe_allow_html=True)
+            
+    with lideres_cols[2]:
+        if not df_kck.empty:
+            lider = df_kck.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Kicks", lider["Total Kicks"], "#a371f7", mapa_dni), unsafe_allow_html=True)
+            
+    with lideres_cols[3]:
+        if not df_pnl_jug.empty:
+            lider = df_pnl_jug.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Penales Cometidos", lider["Penales Cometidos"], "#f85149", mapa_dni), unsafe_allow_html=True)
+            
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+        # ── TACKLES ──
+    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #e3b341;"><h2 style="color: #e3b341; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">⚡ TACKLES POR JUGADOR</h2></div>', unsafe_allow_html=True)
     col1, col2 = st.columns([3, 2])
     with col1:
         fig_tck = px.bar(df_tck.head(12), x="Total", y="Jugador", orientation="h", color="% Efectividad",
                          color_continuous_scale=["#f85149", "#e3b341", "#3fb950"], range_color=[40, 100],
                          labels={"Total": "N° Tackles", "Jugador": ""}, text="Total")
-        fig_tck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=420,
-                              margin=dict(l=0, r=20, t=10, b=10), yaxis=dict(autorange="reversed"))
+        fig_tck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=600,
+                              margin=dict(l=0, r=100, t=10, b=10), yaxis=dict(autorange="reversed"), font=dict(family="Arial Black", size=18))
         st.plotly_chart(fig_tck, use_container_width=True, key="chart_tackles_bar")
     with col2:
         fig_donut = go.Figure(go.Pie(labels=["Efectivos", "Fallados"], values=[total_buenos, total_tackles-total_buenos],
-                                     hole=0.65, marker_colors=["#3fb950", "#f85149"], textinfo="percent"))
-        fig_donut.add_annotation(text=f"{pct_efectividad}%", font=dict(size=32, color="#3fb950"), showarrow=False)
+                                     hole=0.65, marker_colors=["#3fb950", "#f85149"], textinfo="label+percent"))
+        fig_donut.add_annotation(text=f"<span style='font-size:38px;font-weight:900;color:#3fb950'>{pct_efectividad}%</span><br><span style='font-size:12px;color:#8b949e;font-weight:bold'>EFECTIVIDAD</span>", font=dict(size=38, color="#3fb950", weight=900), showarrow=False)
         fig_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280,
                                 margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
         st.plotly_chart(fig_donut, use_container_width=True, key="chart_tackles_donut")
         _df = df_tck[["Jugador","Total","Efectivos","Fallados","Dobles","% Efectividad"]].head(8)
         st.dataframe(
             _df.style
-                .set_properties(**{"background-color": "#1c2030", "color": "#c9d1d9",
-                                   "border": "1px solid #2d3748", "font-size": "13px"})
+                .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "18px", "padding": "12px"})
                 .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
                                     ("color", "#58a6ff"), ("font-weight", "700"),
-                                    ("font-size", "11px"), ("text-transform", "uppercase"),
+                                    ("font-size", "16px"), ("text-transform", "uppercase"),
                                     ("border-bottom", "2px solid #30363d")]}]),
             use_container_width=True, hide_index=True, key="df_tackles"
         )
 
     # ── QUIEBRES + SCRUMS ──
-    st.markdown('<div class="section-header">💥 Quiebres de Línea</div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #3fb950;"><h2 style="color: #3fb950; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">💥 QUIEBRES DE LÍNEA</h2></div>', unsafe_allow_html=True)
+    df_qbr = df_qbr[~df_qbr["Jugador"].str.contains("Rival", case=False, na=False)]
     col_qbr, col_scr = st.columns([2, 3])
     with col_qbr:
         if not df_qbr.empty:
             fig_qbr = px.bar(df_qbr, x="Quiebres", y="Jugador", orientation="h", color="Quiebres",
                              color_continuous_scale=["#1f6feb", "#58a6ff"], text="Quiebres")
-            fig_qbr.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280,
-                                  margin=dict(l=0, r=0, t=10, b=10), showlegend=False, yaxis=dict(autorange="reversed"))
+            fig_qbr.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 450,
+                                  margin=dict(l=0, r=0, t=10, b=10), showlegend=False, yaxis=dict(autorange="reversed"), font=dict(family="Arial Black", size=16))
             st.plotly_chart(fig_qbr, use_container_width=True, key="chart_quiebres")
         else:
             st.info("Sin datos de quiebres")
     with col_scr:
-        st.markdown('<div class="section-header">🏟️ Scrums</div>', unsafe_allow_html=True)
+        st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #58a6ff;"><h2 style="color: #58a6ff; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🏟️ SCRUMS</h2></div>', unsafe_allow_html=True)
         total_scrums = scrum_nuestros + scrum_rival
         if total_scrums > 0:
             fig_scr = go.Figure(go.Pie(
@@ -422,19 +561,19 @@ def rugby_analysis_module():
                 values=[scrum_nuestros, scrum_rival],
                 hole=0.55,
                 marker_colors=["#58a6ff", "#f85149"],
-                textinfo="label+value+percent",
-                textfont=dict(size=13),
+                textinfo="label+percent",
+                textfont=dict(family="Arial Black", size=14, color="white"),
             ))
             fig_scr.add_annotation(
-                text=f"{total_scrums}<br><span style='font-size:11px'>total</span>",
+                text=f"<span style='font-size:38px;font-weight:900;color:#58a6ff'>{total_scrums}</span><br><span style='font-size:12px;color:#8b949e;font-weight:bold'>TOTAL SCRUMS</span>",
                 font=dict(size=22, color="#c9d1d9"),
                 showarrow=False
             )
             fig_scr.update_layout(
                 paper_bgcolor="#161b22", plot_bgcolor="#161b22",
-                font_color="#c9d1d9", height=280,
+                font_color="#c9d1d9", height= 450,
                 margin=dict(l=0, r=0, t=10, b=0),
-                showlegend=True,
+                showlegend=False,
                 legend=dict(orientation="h", y=-0.1, font=dict(color="#8b949e"))
             )
             st.plotly_chart(fig_scr, use_container_width=True, key="chart_scrums")
@@ -442,30 +581,29 @@ def rugby_analysis_module():
             st.info("Sin datos de scrums")
 
     # ── KICKS ──
-    st.markdown('<div class="section-header">🦵 Kicks por Jugador</div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #a371f7;"><h2 style="color: #a371f7; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🦵 KICKS POR JUGADOR</h2></div>', unsafe_allow_html=True)
     col5, col6 = st.columns([3, 2])
     with col5:
         fig_kck = px.bar(df_kck, x="Jugador", y=["Gana Terreno", "Territorial"], barmode="group",
                          color_discrete_map={"Gana Terreno": "#3fb950", "Territorial": "#58a6ff"}, text_auto=True)
-        fig_kck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=320,
-                              margin=dict(l=0, r=0, t=10, b=10), legend=dict(orientation="h", y=1.1))
+        fig_kck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 450,
+                              margin=dict(l=0, r=0, t=10, b=10), legend=dict(orientation="h", y=1.1), font=dict(family="Arial Black", size=14))
         st.plotly_chart(fig_kck, use_container_width=True, key="chart_kicks")
     with col6:
         _df_kck = df_kck[["Jugador","Total Kicks","Gana Terreno","Territorial","% Efectividad"]]
         st.dataframe(
             _df_kck.style
-                .set_properties(**{"background-color": "#1c2030", "color": "#c9d1d9",
-                                   "border": "1px solid #2d3748", "font-size": "13px"})
+                .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "18px", "padding": "12px"})
                 .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
                                     ("color", "#58a6ff"), ("font-weight", "700"),
-                                    ("font-size", "11px"), ("text-transform", "uppercase"),
+                                    ("font-size", "16px"), ("text-transform", "uppercase"),
                                     ("border-bottom", "2px solid #30363d")]}]),
             use_container_width=True, hide_index=True, key="df_kicks"
         )
 
     # ── PESCA ──
-    st.markdown('<div class="section-header">🎣 Pesca (Restart Contest)</div>', unsafe_allow_html=True)
-    col7, col8, col9 = st.columns(3)
+    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #1f6feb;"><h2 style="color: #1f6feb; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🎣 PESCA (RESTART CONTEST)</h2></div>', unsafe_allow_html=True)
+    col7, col8, col9 = st.columns([1, 2, 2])
     with col7:
         st.markdown(f"""
         <div class="kpi-grid" style="flex-direction:column; gap:12px">
@@ -478,38 +616,33 @@ def rugby_analysis_module():
         if not df_psc.empty:
             fig_psc = px.bar(df_psc, x="Total", y="Jugador", orientation="h", color="Recupera",
                              color_continuous_scale=["#1f6feb", "#3fb950"], text="Total")
-            fig_psc.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=240,
-                                  margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
+            fig_psc.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350,
+                                  margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"), font=dict(family="Arial Black", size=14))
             st.plotly_chart(fig_psc, use_container_width=True, key="chart_pesca")
     with col9:
         st.dataframe(
             df_psc.style
-                .set_properties(**{"background-color": "#1c2030", "color": "#c9d1d9",
-                                   "border": "1px solid #2d3748", "font-size": "13px"})
+                .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "18px", "padding": "12px"})
                 .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
                                     ("color", "#58a6ff"), ("font-weight", "700"),
-                                    ("font-size", "11px"), ("text-transform", "uppercase"),
+                                    ("font-size", "16px"), ("text-transform", "uppercase"),
                                     ("border-bottom", "2px solid #30363d")]}]),
             use_container_width=True, hide_index=True, key="df_pesca"
         )
 
     # ── PENALES ──
-    st.markdown('<div class="section-header">🟡 Penales y Free Kicks</div>', unsafe_allow_html=True)
-    c10, c11, c12 = st.columns([1, 2, 2])
+    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #e3b341;"><h2 style="color: #e3b341; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🟡 PENALES Y FREE KICKS</h2></div>', unsafe_allow_html=True)
+    c10, c11 = st.columns([2, 3])
     with c10:
         fig_pnl_donut = go.Figure(go.Pie(labels=["A favor", "En contra"], values=[pnl_u, pnl_rival], hole=0.6,
-                                         marker_colors=["#3fb950", "#f85149"], textinfo="value"))
-        fig_pnl_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=240, margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
+                                         marker_colors=["#3fb950", "#f85149"], textinfo="label+value"))
+        fig_pnl_donut.add_annotation(text=f"<span style=\'font-size:38px;font-weight:900;color:#e3b341\'>{pnl_total}</span><br><span style=\'font-size:12px;color:#8b949e;font-weight:bold\'>TOTAL</span>", showarrow=False)
+        fig_pnl_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350, font=dict(family="Arial Black", size=14), margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
         st.plotly_chart(fig_pnl_donut, use_container_width=True, key="chart_penales_donut")
     with c11:
-        if not df_causas.empty:
-            fig_causas = px.bar(df_causas, x="Total", y="Causa", orientation="h", text="Total", color_discrete_sequence=["#f85149"])
-            fig_causas.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280, margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_causas, use_container_width=True, key="chart_causas")
-    with c12:
         if not df_pnl_jug.empty:
             fig_pnl_jug = px.bar(df_pnl_jug, x="Penales Cometidos", y="Jugador", orientation="h", text="Penales Cometidos", color_discrete_sequence=["#e3b341"])
-            fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280, margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
+            fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350, font=dict(family="Arial Black", size=14), margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_pnl_jug, use_container_width=True, key="chart_penales_jug")
 
     # ── LINE OUT ──
