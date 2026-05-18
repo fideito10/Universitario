@@ -623,29 +623,121 @@ def rugby_analysis_module():
     # ── LIDERES DEL PARTIDO ──
     mapa_dni = _cargar_mapa_dni_nombres()
     
+    # ── CALCULOS PARA LIDERES NUEVOS ──
+    # A) Apoyos, Primero y Segundo en el Ruck (desde 2 MOVILES)
+    mov_rows = find_rows("MOVILES")
+    apoyos_map = defaultdict(int)
+    primero_map = defaultdict(int)
+    segundo_map = defaultdict(int)
+    
+    for r in mov_rows:
+        is_propio = get_int(r.get("propio"))
+        team = r.get("team") or ""
+        if is_propio or "CULP" in team.upper() or "UNI" in team.upper() or not team:
+            raw_p = r.get("player") or r.get("jugador") or ""
+            players = [clean_player(p.strip()) for p in raw_p.split("|") if p.strip()]
+            if not players: continue
+            
+            # Apoyos
+            for p in players:
+                apoyos_map[p] += 1
+                
+            # Primero en el Ruck
+            is_first = get_int(r.get("1"))
+            if is_first:
+                primero_map[players[0]] += 1
+                
+            # Segundo en el Ruck
+            is_second = get_int(r.get("2"))
+            if is_second:
+                p_seg = players[1] if len(players) > 1 else players[0]
+                segundo_map[p_seg] += 1
+                
+    df_apoyos = pd.DataFrame([{"Jugador": k, "Apoyos": v} for k, v in apoyos_map.items()])
+    if not df_apoyos.empty:
+        df_apoyos = df_apoyos.sort_values("Apoyos", ascending=False)
+        
+    df_primero = pd.DataFrame([{"Jugador": k, "Primero": v} for k, v in primero_map.items()])
+    if not df_primero.empty:
+        df_primero = df_primero.sort_values("Primero", ascending=False)
+        
+    df_segundo = pd.DataFrame([{"Jugador": k, "Segundo": v} for k, v in segundo_map.items()])
+    if not df_segundo.empty:
+        df_segundo = df_segundo.sort_values("Segundo", ascending=False)
+
+    # B) Puntos por Jugador (desde 12 PUNTOS (-))
+    pts_all = find_rows("PUNTOS")
+    pts_map = defaultdict(int)
+    for r in pts_all:
+        is_propio = get_int(r.get("propio"))
+        is_rival = get_int(r.get("rival"))
+        if is_rival and not is_propio:
+            continue
+        raw_p = r.get("player") or r.get("jugador") or ""
+        p = clean_player(raw_p)
+        if p:
+            tries = get_int(r.get("try"))
+            goals = get_int(r.get("goal"))
+            penals = get_int(r.get("penal"))
+            drops = get_int(r.get("drop"))
+            try_penal = get_int(r.get("try penal"))
+            pts = tries * 5 + goals * 2 + penals * 3 + drops * 3 + try_penal * 7
+            pts_map[p] += pts
+            
+    df_puntos_jug = pd.DataFrame([{"Jugador": k, "Puntos": v} for k, v in pts_map.items()])
+    if not df_puntos_jug.empty:
+        df_puntos_jug = df_puntos_jug.sort_values("Puntos", ascending=False)
+
+    # C) Pesca Ordenada por Recupera primero
+    df_psc_sorted = pd.DataFrame()
+    if not df_psc.empty:
+        df_psc_sorted = df_psc.sort_values(by=["Recupera", "Total"], ascending=False)
+
+    # ── RENDER DE LÍDERES ──
     st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #fff;"><h2 style="color: #fff; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🏆 LÍDERES DEL PARTIDO</h2></div>', unsafe_allow_html=True)
     
-    lideres_cols = st.columns(4)
+    # Fila 1: 4 Columnas (Tackles, Quiebres, Apoyos, Puntos)
+    lideres_cols_1 = st.columns(4)
     
-    with lideres_cols[0]:
+    with lideres_cols_1[0]:
         if not df_tck.empty:
             lider = df_tck.iloc[0]
             st.markdown(_player_card_html(lider["Jugador"], "Tackles", lider["Total"], "#e3b341", mapa_dni), unsafe_allow_html=True)
             
-    with lideres_cols[1]:
+    with lideres_cols_1[1]:
         if not df_qbr.empty:
             lider = df_qbr.iloc[0]
             st.markdown(_player_card_html(lider["Jugador"], "Quiebres", lider["Quiebres"], "#3fb950", mapa_dni), unsafe_allow_html=True)
             
-    with lideres_cols[2]:
-        if not df_kck.empty:
-            lider = df_kck.iloc[0]
-            st.markdown(_player_card_html(lider["Jugador"], "Kicks", lider["Total Kicks"], "#a371f7", mapa_dni), unsafe_allow_html=True)
+    with lideres_cols_1[2]:
+        if not df_apoyos.empty:
+            lider = df_apoyos.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Apoyos (Ruck)", lider["Apoyos"], "#58a6ff", mapa_dni), unsafe_allow_html=True)
             
-    with lideres_cols[3]:
-        if not df_pnl_jug.empty:
-            lider = df_pnl_jug.iloc[0]
-            st.markdown(_player_card_html(lider["Jugador"], "Penales Cometidos", lider["Penales Cometidos"], "#f85149", mapa_dni), unsafe_allow_html=True)
+    with lideres_cols_1[3]:
+        if not df_puntos_jug.empty:
+            lider = df_puntos_jug.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Puntos Marcados", lider["Puntos"], "#a371f7", mapa_dni), unsafe_allow_html=True)
+            
+    st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+    
+    # Fila 2: 3 Columnas (Pesca, Primero Ruck, Segundo Ruck)
+    lideres_cols_2 = st.columns(3)
+    
+    with lideres_cols_2[0]:
+        if not df_psc_sorted.empty:
+            lider = df_psc_sorted.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Pescas", lider["Recupera"], "#1f6feb", mapa_dni), unsafe_allow_html=True)
+            
+    with lideres_cols_2[1]:
+        if not df_primero.empty:
+            lider = df_primero.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Primero en Ruck", lider["Primero"], "#ff7b72", mapa_dni), unsafe_allow_html=True)
+            
+    with lideres_cols_2[2]:
+        if not df_segundo.empty:
+            lider = df_segundo.iloc[0]
+            st.markdown(_player_card_html(lider["Jugador"], "Segundo en Ruck", lider["Segundo"], "#f2e05a", mapa_dni), unsafe_allow_html=True)
             
     st.markdown("<br>", unsafe_allow_html=True)
     
