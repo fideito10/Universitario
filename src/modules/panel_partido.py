@@ -181,10 +181,31 @@ def rugby_analysis_module():
 
     def clean_player(name):
         if not name: return None
-        name = str(name).strip()
-        name = re.sub(r"^\d+[-.\s]+", "", name).strip()
-        if not name or name.lower() in ["player", "nan", "jugador", "null"]: return None
-        return name.title()
+        
+        # Corregir codificación rota de caracteres de Google Sheets (UTF-8 interpretado como CP1252/Windows-1252)
+        replacements = {
+            "\u00c3\u0081": "Á",
+            "\u00c3\u201c": "Ó",
+            "\u00c3\u008d": "Í",
+            "\u00c3\u0161": "Ú",
+            "\u00c3\u2018": "Ñ",
+            "\u00c3\u2030": "É",
+            "\u00c3\u00a1": "á",
+            "\u00c3\u00a9": "é",
+            "\u00c3\u00ad": "í",
+            "\u00c3\u00b3": "ó",
+            "\u00c3\u00ba": "ú",
+            "\u00c3\u00b1": "ñ",
+        }
+        name_str = str(name)
+        for bad, good in replacements.items():
+            name_str = name_str.replace(bad, good)
+            
+        name_str = name_str.strip()
+        name_str = re.sub(r"^\d+[-.\s]+", "", name_str).strip()
+        if not name_str or name_str.lower() in ["player", "nan", "jugador", "null"]: return None
+        return name_str.title()
+
 
     def parse_sheet_data(rows_list):
         sections = {}
