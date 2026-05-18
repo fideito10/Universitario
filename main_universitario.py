@@ -678,7 +678,7 @@ def main_dashboard():
         """, unsafe_allow_html=True)
 
         st.markdown("#### 🧭 Navegación")
-        if st.button("🏠 Inicio", use_container_width=True):
+        if st.button("🏠 Inicio", use_container_width=True, key="btn_inicio_top"):
             st.session_state.current_page = "dashboard"
             st.rerun()
         if auth_manager.has_permission("perfil"):
@@ -725,6 +725,13 @@ def main_dashboard():
             if st.button("📋 Pasar Lista", use_container_width=True):
                 st.session_state.current_page = "lista"
                 st.rerun()
+
+        st.markdown("---")
+        if st.button("🏠 Volver al Inicio", use_container_width=True, key="btn_volver_inicio_bottom"):
+            st.session_state.current_page = "dashboard"
+            st.rerun()
+        if st.button("🚪 Cerrar Sesión", use_container_width=True, key="btn_cerrar_sesion_bottom"):
+            auth_manager.logout()
 
     # ===== MOBILE BOTTOM NAV =====
     # Construir items segun permisos
