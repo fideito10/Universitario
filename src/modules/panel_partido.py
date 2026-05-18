@@ -39,10 +39,15 @@ _ESCUDO_MAP = {
 
 def _get_escudo_b64(team_name: str) -> str:
     """Devuelve el escudo en base64 para embeber en HTML, o '' si no encuentra."""
-    key = team_name.lower().strip()
+    import unicodedata
+    def norm(t):
+        return unicodedata.normalize('NFKD', t).encode('ASCII', 'ignore').decode('utf-8').lower().strip()
+    
+    key = norm(team_name)
     filename = None
     for k, v in _ESCUDO_MAP.items():
-        if k in key:
+        norm_k = norm(k)
+        if norm_k in key or key in norm_k:
             filename = v
             break
     if not filename:
@@ -299,8 +304,9 @@ def rugby_analysis_module():
     TEAM_LOCAL = next((t for t in teams if any(x in t.upper() for x in ["CULP", "UNI", "UNIVERSITARIO"])), "LOCAL")
     TEAM_RIVAL = next((t for t in teams if t != TEAM_LOCAL), "RIVAL")
     NAME_LOCAL = "Universitario"
-    NAME_RIVAL = TEAM_RIVAL.split("(")[0].replace("006","").strip() if "006" in TEAM_RIVAL else TEAM_RIVAL
-    if not NAME_RIVAL or NAME_RIVAL.upper() == "RIVAL": NAME_RIVAL = "Rival"
+    # El nombre visible del rival es el partido seleccionado en la UI (nombre de la pestaña/hoja)
+    # Esto soluciona los problemas de copiado/clonación de pestañas donde el analista no renombró las filas internas.
+    NAME_RIVAL = selected_match.strip() if selected_match else "Rival"
     
     def calc_score(team_id):
         rows = [r for r in pts_rows if r.get("team") == team_id]
