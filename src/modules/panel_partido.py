@@ -753,7 +753,7 @@ def rugby_analysis_module():
                          color_continuous_scale=["#f85149", "#e3b341", "#3fb950"], range_color=[40, 100],
                          labels={"Total": "N° Tackles", "Jugador": ""}, text="Total")
         fig_tck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=600,
-                              margin=dict(l=0, r=100, t=10, b=10), yaxis=dict(autorange="reversed"), font=dict(family="Arial Black", size=18))
+                              margin=dict(l=220, r=40, t=10, b=10), yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=18, color="#ffffff")), font=dict(family="Arial Black", size=18))
         st.plotly_chart(fig_tck, use_container_width=True, key="chart_tackles_bar")
     with col2:
         fig_donut = go.Figure(go.Pie(labels=["Efectivos", "Fallados"], values=[total_buenos, total_tackles-total_buenos],
@@ -782,7 +782,7 @@ def rugby_analysis_module():
             fig_qbr = px.bar(df_qbr, x="Quiebres", y="Jugador", orientation="h", color="Quiebres",
                              color_continuous_scale=["#1f6feb", "#58a6ff"], text="Quiebres")
             fig_qbr.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 450,
-                                  margin=dict(l=0, r=0, t=10, b=10), showlegend=False, yaxis=dict(autorange="reversed"), font=dict(family="Arial Black", size=16))
+                                  margin=dict(l=220, r=20, t=10, b=10), showlegend=False, yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=16, color="#ffffff")), font=dict(family="Arial Black", size=16))
             st.plotly_chart(fig_qbr, use_container_width=True, key="chart_quiebres")
         else:
             st.info("Sin datos de quiebres")
@@ -856,7 +856,7 @@ def rugby_analysis_module():
             fig_types = px.bar(df_kck, x="Jugador", y=["Territorial", "Bajo Presión", "A Disputar / Cajón", "Otros Tipos"],
                                barmode="stack", color_discrete_sequence=["#1f6feb", "#58a6ff", "#3fb950", "#e3b341"])
             fig_types.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=400,
-                                    margin=dict(l=0, r=0, t=10, b=10), legend=dict(orientation="h", y=1.1, font=dict(size=12)), font=dict(family="Arial Black", size=12))
+                                    margin=dict(l=40, r=20, t=10, b=140), legend=dict(orientation="h", y=1.15, font=dict(size=12)), xaxis=dict(tickfont=dict(family="Arial Black", size=15, color="#ffffff")), font=dict(family="Arial Black", size=14))
             st.plotly_chart(fig_types, use_container_width=True, key="chart_kicks_types")
         else:
             st.info("Sin datos de kicks")
@@ -922,7 +922,7 @@ def rugby_analysis_module():
             fig_psc = px.bar(df_psc, x="Total", y="Jugador", orientation="h", color="Recupera",
                              color_continuous_scale=["#1f6feb", "#3fb950"], text="Total")
             fig_psc.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350,
-                                  margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"), font=dict(family="Arial Black", size=14))
+                                  margin=dict(l=220, r=20, t=10, b=10), yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=16, color="#ffffff")), font=dict(family="Arial Black", size=16))
             st.plotly_chart(fig_psc, use_container_width=True, key="chart_pesca")
     with col9:
         st.dataframe(
@@ -947,7 +947,7 @@ def rugby_analysis_module():
     with c11:
         if not df_pnl_jug.empty:
             fig_pnl_jug = px.bar(df_pnl_jug, x="Penales Cometidos", y="Jugador", orientation="h", text="Penales Cometidos", color_discrete_sequence=["#e3b341"])
-            fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350, font=dict(family="Arial Black", size=14), margin=dict(l=0, r=0, t=10, b=10), yaxis=dict(autorange="reversed"))
+            fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350, font=dict(family="Arial Black", size=16), margin=dict(l=220, r=20, t=10, b=10), yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=16, color="#ffffff")))
             st.plotly_chart(fig_pnl_jug, use_container_width=True, key="chart_penales_jug")
 
     # ── LINE OUT ──
