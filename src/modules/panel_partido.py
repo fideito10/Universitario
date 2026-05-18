@@ -398,17 +398,120 @@ def rugby_analysis_module():
 
     # 3) KICKS
     kck_rows = find_rows("KICK")
-    kck_map = defaultdict(lambda: {"gana": 0, "terr": 0})
+    
+    def get_val(r, name):
+        name_clean = name.lower().replace(" ","").replace("ó","o").replace("ó","o").replace("í","i").replace("á","a").replace("ú","u").replace("ñ","n").replace("é","e")
+        for k, v in r.items():
+            k_clean = k.lower().replace(" ","").replace("ó","o").replace("ó","o").replace("í","i").replace("á","a").replace("ú","u").replace("ñ","n").replace("é","e").replace("","o")
+            if name_clean in k_clean or k_clean in name_clean:
+                return get_int(v)
+        return 0
+
+    kck_map = defaultdict(lambda: {
+        "total": 0,
+        "territorial": 0,
+        "bajo_presion": 0,
+        "a_disputar": 0,
+        "otros_tipos": 0,
+        "gana": 0,
+        "no_gana": 0,
+        "recupero": 0,
+        "no_recupero": 0,
+        "errores": 0
+    })
+    
+    # Team cumulative stats
+    team_kicks_stats = {
+        "total": len(kck_rows),
+        "territorial": 0,
+        "bajo_presion": 0,
+        "a_disputar": 0,
+        "rastron": 0,
+        "sombrero": 0,
+        "pase": 0,
+        "50_22": 0,
+        "gana": 0,
+        "no_gana": 0,
+        "recupero": 0,
+        "no_recupero": 0,
+        "pelota_tapada": 0,
+        "directo_touch": 0,
+        "directo_ingoal": 0,
+        "palos_errados": 0,
+        "mala_ejecucion": 0,
+        "penal_touch": 0
+    }
+    
     for r in kck_rows:
+        # Sum up team-level metrics
+        team_kicks_stats["territorial"] += get_val(r, "territorial")
+        team_kicks_stats["bajo_presion"] += get_val(r, "bajo presion")
+        team_kicks_stats["a_disputar"] += get_val(r, "a disputar")
+        team_kicks_stats["rastron"] += get_val(r, "rastron")
+        team_kicks_stats["sombrero"] += get_val(r, "sombrero")
+        team_kicks_stats["pase"] += get_val(r, "pase")
+        team_kicks_stats["50_22"] += get_val(r, "50 - 22") or get_val(r, "50-22")
+        
+        team_kicks_stats["gana"] += get_val(r, "gana terreno")
+        team_kicks_stats["no_gana"] += get_val(r, "no gana terreno")
+        team_kicks_stats["recupero"] += get_val(r, "recupero posesion")
+        team_kicks_stats["no_recupero"] += get_val(r, "no recupero posesion")
+        
+        team_kicks_stats["pelota_tapada"] += get_val(r, "pelota tapada")
+        team_kicks_stats["directo_touch"] += get_val(r, "directo touch")
+        team_kicks_stats["directo_ingoal"] += get_val(r, "directo ingoal")
+        team_kicks_stats["palos_errados"] += get_val(r, "palos errados")
+        team_kicks_stats["mala_ejecucion"] += get_val(r, "mala ejecucion")
+        team_kicks_stats["penal_touch"] += get_val(r, "penal touch")
+        
+        # Player level metrics
         p = clean_player(r.get("player") or r.get("jugador") or r.get("name"))
         if p and (not r.get("team") or r.get("team") == TEAM_LOCAL):
-            kck_map[p]["gana"] += get_int(r.get("gana terreno") or r.get("ok", 0))
-            kck_map[p]["terr"] += get_int(r.get("territorial", 0))
+            kck_map[p]["total"] += 1
+            kck_map[p]["territorial"] += get_val(r, "territorial")
+            kck_map[p]["bajo_presion"] += get_val(r, "bajo presion")
+            kck_map[p]["a_disputar"] += get_val(r, "a disputar")
+            
+            otros = (get_val(r, "rastron") + 
+                     get_val(r, "sombrero") + 
+                     get_val(r, "pase") + 
+                     (get_val(r, "50 - 22") or get_val(r, "50-22")))
+            kck_map[p]["otros_tipos"] += otros
+            
+            kck_map[p]["gana"] += get_val(r, "gana terreno")
+            kck_map[p]["no_gana"] += get_val(r, "no gana terreno")
+            kck_map[p]["recupero"] += get_val(r, "recupero posesion")
+            kck_map[p]["no_recupero"] += get_val(r, "no recupero posesion")
+            
+            errs = (get_val(r, "pelota tapada") + 
+                    get_val(r, "directo touch") + 
+                    get_val(r, "directo ingoal") + 
+                    get_val(r, "palos errados") + 
+                    get_val(r, "mala ejecucion") + 
+                    get_val(r, "penal touch"))
+            kck_map[p]["errores"] += errs
+            
     kck_list = []
     for k, v in kck_map.items():
-        tot = v["gana"] + v["terr"]
-        kck_list.append({"Jugador": k, "Total Kicks": tot, "Gana Terreno": v["gana"], "Territorial": v["terr"], "% Efectividad": pct_l(v["gana"], tot)})
-    df_kck = pd.DataFrame(kck_list).sort_values("Total Kicks", ascending=False)
+        kck_list.append({
+            "Jugador": k,
+            "Total Kicks": v["total"],
+            "Gana Terreno": v["gana"],
+            "Territorial": v["territorial"],
+            "Bajo Presión": v["bajo_presion"],
+            "A Disputar / Cajón": v["a_disputar"],
+            "Otros Tipos": v["otros_tipos"],
+            "Recuperó Posesión": v["recupero"],
+            "Errores": v["errores"],
+            "% Efectividad": round(v["gana"] / v["total"] * 100) if v["total"] else 0
+        })
+        
+    df_kck = pd.DataFrame(kck_list)
+    if not df_kck.empty:
+        df_kck = df_kck.sort_values("Total Kicks", ascending=False)
+    else:
+        df_kck = pd.DataFrame(columns=["Jugador", "Total Kicks", "Gana Terreno", "Territorial", "Bajo Presión", "A Disputar / Cajón", "Otros Tipos", "Recuperó Posesión", "Errores", "% Efectividad"])
+
 
     # 4) PESCA
     psc_rows = find_rows("PESCA")
@@ -616,24 +719,95 @@ def rugby_analysis_module():
             st.info("Sin datos de scrums")
 
     # ── KICKS ──
-    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #a371f7;"><h2 style="color: #a371f7; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🦵 KICKS POR JUGADOR</h2></div>', unsafe_allow_html=True)
-    col5, col6 = st.columns([3, 2])
-    with col5:
-        fig_kck = px.bar(df_kck, x="Jugador", y=["Gana Terreno", "Territorial"], barmode="group",
-                         color_discrete_map={"Gana Terreno": "#3fb950", "Territorial": "#58a6ff"}, text_auto=True)
-        fig_kck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 450,
-                              margin=dict(l=0, r=0, t=10, b=10), legend=dict(orientation="h", y=1.1), font=dict(family="Arial Black", size=14))
-        st.plotly_chart(fig_kck, use_container_width=True, key="chart_kicks")
-    with col6:
-        _df_kck = df_kck[["Jugador","Total Kicks","Gana Terreno","Territorial","% Efectividad"]]
+    st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #a371f7;"><h2 style="color: #a371f7; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🦵 ANÁLISIS DE KICKS (PATADAS)</h2></div>', unsafe_allow_html=True)
+    
+    kicks_total_team = len(kck_rows)
+    kicks_gana_team = team_kicks_stats["gana"]
+    kicks_pct_efectiva = round(kicks_gana_team / kicks_total_team * 100) if kicks_total_team else 0
+    kicks_recup_team = team_kicks_stats["recupero"]
+    kicks_errors_team = (team_kicks_stats["pelota_tapada"] + 
+                         team_kicks_stats["directo_touch"] + 
+                         team_kicks_stats["directo_ingoal"] + 
+                         team_kicks_stats["palos_errados"] + 
+                         team_kicks_stats["mala_ejecucion"] + 
+                         team_kicks_stats["penal_touch"])
+    
+    st.markdown(f"""
+    <div class="kpi-grid" style="margin-bottom: 25px;">
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#a371f7">{kicks_total_team}</div>
+            <div class="kpi-label">Kicks Totales</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#3fb950">{kicks_pct_efectiva}%</div>
+            <div class="kpi-label">Efectividad (% Gana Terreno)</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#58a6ff">{kicks_recup_team}</div>
+            <div class="kpi-label">Posesiones Recuperadas</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" style="color:#f85149">{kicks_errors_team}</div>
+            <div class="kpi-label">Kicks Fallidos / Errores</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_kck1, col_kck2 = st.columns([1, 1])
+    with col_kck1:
+        st.markdown('<h3 style="color: #a371f7; font-size: 20px; font-weight: 700; margin-bottom: 10px;">📊 TIPOS DE KICKS POR JUGADOR</h3>', unsafe_allow_html=True)
+        if not df_kck.empty:
+            fig_types = px.bar(df_kck, x="Jugador", y=["Territorial", "Bajo Presión", "A Disputar / Cajón", "Otros Tipos"],
+                               barmode="stack", color_discrete_sequence=["#1f6feb", "#58a6ff", "#3fb950", "#e3b341"])
+            fig_types.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=400,
+                                    margin=dict(l=0, r=0, t=10, b=10), legend=dict(orientation="h", y=1.1, font=dict(size=12)), font=dict(family="Arial Black", size=12))
+            st.plotly_chart(fig_types, use_container_width=True, key="chart_kicks_types")
+        else:
+            st.info("Sin datos de kicks")
+            
+    with col_kck2:
+        st.markdown('<h3 style="color: #a371f7; font-size: 20px; font-weight: 700; margin-bottom: 10px;">🎯 DISTRIBUCIÓN DE KICKS DEL EQUIPO</h3>', unsafe_allow_html=True)
+        t_types_vals = [
+            team_kicks_stats["territorial"],
+            team_kicks_stats["bajo_presion"],
+            team_kicks_stats["a_disputar"],
+            (team_kicks_stats["rastron"] + team_kicks_stats["sombrero"] + team_kicks_stats["pase"] + team_kicks_stats["50_22"])
+        ]
+        t_types_labels = ["Territorial", "Bajo Presión", "A Disputar / Cajón", "Otros Kicks"]
+        
+        if sum(t_types_vals) > 0:
+            fig_donut_kck = go.Figure(go.Pie(
+                labels=t_types_labels,
+                values=t_types_vals,
+                hole=0.6,
+                marker_colors=["#1f6feb", "#58a6ff", "#3fb950", "#e3b341"],
+                textinfo="label+percent",
+                textfont=dict(family="Arial Black", size=12, color="white")
+            ))
+            fig_donut_kck.add_annotation(
+                text=f"<span style='font-size:32px;font-weight:900;color:#a371f7'>{kicks_total_team}</span><br><span style='font-size:10px;color:#8b949e;font-weight:bold'>TOTAL KICKS</span>",
+                showarrow=False
+            )
+            fig_donut_kck.update_layout(
+                paper_bgcolor="#161b22", plot_bgcolor="#161b22",
+                font_color="#c9d1d9", height=400,
+                margin=dict(l=0, r=0, t=10, b=0),
+                showlegend=False
+            )
+            st.plotly_chart(fig_donut_kck, use_container_width=True, key="chart_kicks_donut")
+        else:
+            st.info("Sin datos de tipos de kicks")
+            
+    st.markdown('<h3 style="color: #a371f7; font-size: 20px; font-weight: 700; margin-top: 20px; margin-bottom: 10px;">📋 DETALLE DE KICKS POR JUGADOR</h3>', unsafe_allow_html=True)
+    if not df_kck.empty:
         st.dataframe(
-            _df_kck.style
+            df_kck.style
                 .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "18px", "padding": "12px"})
                 .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
-                                    ("color", "#58a6ff"), ("font-weight", "700"),
+                                    ("color", "#a371f7"), ("font-weight", "700"),
                                     ("font-size", "16px"), ("text-transform", "uppercase"),
                                     ("border-bottom", "2px solid #30363d")]}]),
-            use_container_width=True, hide_index=True, key="df_kicks"
+            use_container_width=True, hide_index=True, key="df_kicks_detailed"
         )
 
     # ── PESCA ──
