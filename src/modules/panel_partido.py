@@ -323,7 +323,11 @@ def rugby_analysis_module():
     # 1) TACKLES (DETALLE)
     # Cada fila = 1 evento de tackle. Player puede tener múltiples jugadores separados por "|"
     # Se cuenta: total (apariciones), efectivos (bien/detiene), fallados (mal/falla), dobles
-    tck_rows = find_rows("TACKLE")
+    # Filtrar para evitar que 'TACKLES RECIBIDOS' cuente como tackles realizados
+    tck_rows = []
+    for k in data.keys():
+        if "TACKLE" in k.upper() and "RECIBIDO" not in k.upper():
+            tck_rows.extend(data[k]["rows"])
     tck_map = defaultdict(lambda: {"total": 0, "ok": 0, "fail": 0, "doble": 0})
     for r in tck_rows:
         if r.get("team") and r.get("team") != TEAM_LOCAL:
@@ -352,7 +356,11 @@ def rugby_analysis_module():
         pct_efectividad = pct_l(total_buenos, total_tackles)
 
     # 2) QUIEBRES
-    qbr_rows = find_rows("QUIEBRE")
+    # Filtrar para evitar que los quiebres del rival se mezclen
+    qbr_rows = []
+    for k in data.keys():
+        if "QUIEBRE" in k.upper() and "RIVAL" not in k.upper():
+            qbr_rows.extend(data[k]["rows"])
     qbr_map = defaultdict(int)
     for r in qbr_rows:
         p = clean_player(r.get("player") or r.get("jugador") or r.get("name"))
