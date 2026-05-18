@@ -402,7 +402,7 @@ def rugby_analysis_module():
     def get_val(r, name):
         name_clean = name.lower().replace(" ","").replace("ó","o").replace("ó","o").replace("í","i").replace("á","a").replace("ú","u").replace("ñ","n").replace("é","e")
         for k, v in r.items():
-            k_clean = k.lower().replace(" ","").replace("ó","o").replace("ó","o").replace("í","i").replace("á","a").replace("ú","u").replace("ñ","n").replace("é","e").replace("","o")
+            k_clean = k.lower().replace(" ","").replace("ó","o").replace("í","i").replace("á","a").replace("ú","u").replace("ñ","n").replace("é","e")
             if name_clean in k_clean or k_clean in name_clean:
                 return get_int(v)
         return 0
