@@ -155,14 +155,18 @@ def _get_foto_b64(nombre_jugador, mapa):
 
 def _player_card_html(nombre, stat_label, stat_value, color, mapa_dni):
     foto_b64 = _get_foto_b64(nombre, mapa_dni)
-    img_html = f'<img src="data:image/jpeg;base64,{foto_b64}" style="width:75px;height:75px;border-radius:50%;object-fit:cover;border:3px solid {color};margin-bottom:8px;"/>' if foto_b64 else f'<div style="width:75px;height:75px;border-radius:50%;background:#1c2030;border:3px solid {color};margin-bottom:8px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#8b949e">👤</div>'
+    img_html = f'<img src="data:image/jpeg;base64,{foto_b64}" style="width:85px;height:85px;border-radius:50%;object-fit:cover;border:3px solid {color};margin-bottom:10px;box-shadow:0 4px 8px rgba(0,0,0,0.3);"/>' if foto_b64 else f'<div style="width:85px;height:85px;border-radius:50%;background:#1c2030;border:3px solid {color};margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#8b949e;box-shadow:0 4px 8px rgba(0,0,0,0.3)">👤</div>'
     
     return f'''
-    <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:15px; text-align:center; display:flex; flex-direction:column; align-items:center; height:100%; border-top:4px solid {color}; box-shadow:0 4px 12px rgba(0,0,0,0.2)">
-        {img_html}
-        <div style="font-size:0.85rem;font-weight:700;color:#c9d1d9;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{nombre}</div>
-        <div style="font-size:2rem;font-weight:900;color:{color};line-height:1;margin:5px 0;">{stat_value}</div>
-        <div style="font-size:0.75rem;color:#8b949e;text-transform:uppercase;font-weight:700;letter-spacing:1px;">{stat_label}</div>
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:18px 12px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:space-between; height:100%; min-height:240px; border-top:4px solid {color}; box-shadow:0 6px 16px rgba(0,0,0,0.3)">
+        <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
+            {img_html}
+            <div style="font-size:1.15rem; font-weight:800; color:#ffffff; line-height:1.25; margin-top:8px; margin-bottom:5px; text-align:center; word-break:break-word; min-height:46px; display:flex; align-items:center; justify-content:center; width:100%;">{nombre}</div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
+            <div style="font-size:2.2rem; font-weight:900; color:{color}; line-height:1; margin:8px 0 2px 0;">{stat_value}</div>
+            <div style="font-size:0.8rem; color:#8b949e; text-transform:uppercase; font-weight:700; letter-spacing:1px; line-height:1.2;">{stat_label}</div>
+        </div>
     </div>
     '''
 
