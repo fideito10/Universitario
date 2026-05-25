@@ -12,6 +12,17 @@ from src.modules.administracion import JugadoresMaestroManager
 from src.utils.credentials import get_credentials_dict
 
 # ==========================================
+# TESTS DE FUERZA (editar según necesidad)
+# ==========================================
+TESTS_DE_FUERZA = [
+    "Fuerza",
+    "Press de Banca",
+    "Sentadilla",
+    "Peso Muerto",
+    "Banco Plano",
+]
+
+# ==========================================
 # GESTIÓN DE CREDENCIALES Y CONEXIÓN
 # ==========================================
 
@@ -69,7 +80,45 @@ def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.
             raise Exception(f"No se encontró la pestaña '{nombre_hoja}'. Pestañas disponibles: {nombres_hojas}")
         
         all_data = worksheet.get_all_values()
-        return pd.DataFrame(all_data[1:], columns=all_data[0]) if all_data else pd.DataFrame()
+        if not all_data:
+            return pd.DataFrame()
+
+        def clean_value(val):
+            if pd.isna(val):
+                return val
+            s = str(val).strip()
+            if (s.startswith("'") and s.endswith("'")) or (s.startswith('"') and s.endswith('"')):
+                s = s[1:-1].strip()
+            return s
+
+        def make_unique_columns(cols):
+            seen = {}
+            unique = []
+            for col in cols:
+                col = clean_value(col)
+                if col == "":
+                    base = "__blank__"
+                else:
+                    base = col
+                if base in seen:
+                    seen[base] += 1
+                    unique.append(f"{base}_{seen[base]}")
+                else:
+                    seen[base] = 0
+                    unique.append(base)
+            return unique
+
+        headers = make_unique_columns(all_data[0])
+        data_rows = [[clean_value(cell) for cell in row] for row in all_data[1:]]
+        df = pd.DataFrame(data_rows, columns=headers)
+        # Eliminar columnas sin nombre de encabezado o columnas generadas por encabezados vacíos repetidos.
+        cols_to_drop = [
+            c for c in df.columns
+            if str(c).strip() == "" or str(c).startswith("__blank__")
+        ]
+        if cols_to_drop:
+            df = df.drop(columns=cols_to_drop)
+        return df
 
     except gspread.exceptions.SpreadsheetNotFound:
         st.error("❌ Google Sheet no encontrado. Verifica el ID y permisos.")
@@ -82,6 +131,79 @@ def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.
     except Exception as e:
         st.error(f"❌ Error al cargar la hoja: {e}")
         return pd.DataFrame()
+
+
+def obtener_pesos_por_dni() -> pd.DataFrame:
+    """
+    Carga la hoja de nutrición y retorna un DataFrame con el último peso
+    registrado por jugador, indexado por DNI_merge.
+
+    Returns:
+        pd.DataFrame con columnas ['DNI_merge', 'Peso (kg)']
+    """
+    SHEET_NUTRICION_ID = "1CpAklgxgcVJrIWRWt-yJW4u6EkTcIeQqqp87kllsUqo"
+    HOJA_NUTRICION = "Respuestas de formulario 1"
+
+    try:
+        creds_info = get_google_credentials()
+        if creds_info is None:
+            return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
+
+        SCOPES = [
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive'
+        ]
+        credenciales = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+        gc = gspread.authorize(credenciales)
+        sh = gc.open_by_key(SHEET_NUTRICION_ID)
+        ws = sh.worksheet(HOJA_NUTRICION)
+        data = ws.get_all_values()
+
+        if not data:
+            return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
+
+        df_nutr = pd.DataFrame(data[1:], columns=data[0])
+
+        # Columna DNI (flexible: 'Dni', 'DNI', etc.)
+        col_dni = next((c for c in df_nutr.columns if c.strip().lower() == 'dni'), None)
+        if not col_dni:
+            return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
+
+        # Columna de peso: preferir la que tenga 'peso' y 'kg'
+        col_peso = next(
+            (c for c in df_nutr.columns if 'peso' in c.lower() and 'kg' in c.lower()),
+            next((c for c in df_nutr.columns if 'peso' in c.lower()), None)
+        )
+        if not col_peso:
+            return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
+
+        df_nutr['DNI_merge'] = df_nutr[col_dni].astype(str).str.strip()
+
+        # Ordenar por fecha descendente para quedarse con el registro más reciente por DNI
+        col_fecha = next(
+            (c for c in df_nutr.columns if any(p in c.lower() for p in ['fecha', 'marca', 'time'])),
+            None
+        )
+        if col_fecha:
+            df_nutr[col_fecha] = pd.to_datetime(df_nutr[col_fecha], dayfirst=True, errors='coerce')
+            df_nutr = df_nutr.sort_values(col_fecha, ascending=False)
+
+        # Convertir peso a numérico (maneja coma/punto y sufijo 'kg')
+        df_nutr['Peso (kg)'] = (
+            df_nutr[col_peso].astype(str)
+            .str.replace('kg', '', case=False)
+            .str.replace(',', '.')
+            .str.strip()
+        )
+        df_nutr['Peso (kg)'] = pd.to_numeric(df_nutr['Peso (kg)'], errors='coerce')
+        df_nutr = df_nutr[df_nutr['Peso (kg)'] > 0]
+
+        # Último registro por DNI (primero después del sort descendente)
+        df_pesos = df_nutr.drop_duplicates(subset=['DNI_merge'], keep='first')[['DNI_merge', 'Peso (kg)']]
+        return df_pesos.reset_index(drop=True)
+
+    except Exception:
+        return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
 
 # ==========================================
 # FUNCIONES DE CONVERSIÓN DE DATOS
@@ -182,7 +304,7 @@ def resaltar_valores(s):
     is_low = s_float < s_float.quantile(0.25)
     return ['background-color: #b6fcd5' if h else 'background-color: #ffb6b6' if l else '' for h, l in zip(is_high, is_low)]
 
-def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="", subtest_sel="", categoria_sel="", posicion_sel=""):
+def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="", subtest_sel="", categoria_sel="", posicion_sel="", es_test_fuerza=False):
     """
     Crea visualización de alto impacto mostrando TOP 3 y BOTTOM 3 jugadores en contenedores separados
     """
@@ -194,10 +316,10 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="",
     df_filtrado['valor_original'] = df_filtrado[valor_col]
     
     # Calcular promedio por jugador (usando valores numéricos)
-    df_promedio = df_filtrado.groupby(jugador_col).agg({
-        valor_col: 'mean',
-        'valor_original': 'first'  # Mantener un valor original para referencia
-    }).reset_index()
+    agg_dict = {valor_col: 'mean', 'valor_original': 'first'}
+    if es_test_fuerza and 'F. Relativa' in df_filtrado.columns:
+        agg_dict['F. Relativa'] = 'mean'
+    df_promedio = df_filtrado.groupby(jugador_col).agg(agg_dict).reset_index()
     
     # Obtener unidad
     unidad = df_filtrado['unidad'].iloc[0] if 'unidad' in df_filtrado.columns else ""
@@ -260,10 +382,14 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="",
                 # Caso C: Valor numérico normal
                 texto_valor = f"{row[valor_col]:.2f} {unidad}"
             
+            fr_str = ""
+            if es_test_fuerza and 'F. Relativa' in row.index and pd.notna(row['F. Relativa']):
+                fr_str = f"<br><span style='font-size:0.85em;color:#2E7D32;'>⚡ F. Relativa: {row['F. Relativa']:.2f}</span>"
+
             st.markdown(f"""
                 <div style='background-color: #E8F5E9; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #2E7D32;'>
                     <strong>{medalla} {row[jugador_col]}</strong><br>
-                    <span style='font-size: 1.2em; font-weight: bold; color: #1B5E20;'>{texto_valor}</span>
+                    <span style='font-size: 1.2em; font-weight: bold; color: #1B5E20;'>{texto_valor}</span>{fr_str}
                 </div>
             """, unsafe_allow_html=True)
     
@@ -295,14 +421,18 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="",
             else:
                 texto_valor = f"{row[valor_col]:.2f} {unidad}"
             
+            fr_str = ""
+            if es_test_fuerza and 'F. Relativa' in row.index and pd.notna(row['F. Relativa']):
+                fr_str = f"<br><span style='font-size:0.85em;color:#C62828;'>⚡ F. Relativa: {row['F. Relativa']:.2f}</span>"
+
             st.markdown(f"""
                 <div style='background-color: #FFEBEE; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #C62828;'>
                     <strong>{row[jugador_col]}</strong><br>
-                    <span style='font-size: 1.2em; font-weight: bold; color: #B71C1C;'>{texto_valor}</span>
+                    <span style='font-size: 1.2em; font-weight: bold; color: #B71C1C;'>{texto_valor}</span>{fr_str}
                 </div>
             """, unsafe_allow_html=True)
 
-def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
+def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col, es_test_fuerza=False):
     """
     Muestra una tabla con código de colores según rendimiento vs promedio.
     Versión robusta que maneja errores de visualización y formatos de tiempo.
@@ -354,7 +484,8 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
             destinos_agregados.add(dest)
     
     # Crear DF para vista incluyendo la columna de valor para el styling y la Fecha
-    df_view = df_calc[cols_existentes + [valor_col, 'valor_original', 'Fecha Test']].copy()
+    cols_extra_fuerza = [c for c in ['Peso (kg)', 'F. Relativa'] if c in df_calc.columns and es_test_fuerza]
+    df_view = df_calc[cols_existentes + [valor_col, 'valor_original', 'Fecha Test'] + cols_extra_fuerza].copy()
     df_view = df_view.rename(columns=cols_map)
     
     # Crear columna de texto formateado "Resultado"
@@ -384,7 +515,8 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
     
     # Reordenar columnas: Solo información deseada
     # Las renombradas primero, luego Resultado, luego Fecha Test, luego columnas auxiliares (ocultas)
-    cols_ordenadas = cols_unicas + ['Resultado', 'Fecha Test', valor_col, 'valor_original']
+    cols_extras_ordenadas = [c for c in ['Peso (kg)', 'F. Relativa'] if c in df_view.columns]
+    cols_ordenadas = cols_unicas + ['Resultado', 'Fecha Test'] + cols_extras_ordenadas + [valor_col, 'valor_original']
     df_view = df_view[cols_ordenadas]
     
     # Función de estilo
@@ -450,8 +582,11 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
             hide_index=True,
             height=500,
             column_config={
-                valor_col: None,          # Ocultar visualmente la columna valor
-                "valor_original": None    # Ocultar visualmente la columna valor original
+                valor_col: None,
+                "valor_original": None,
+                **({"Peso (kg)": st.column_config.NumberColumn("Peso (kg)", format="%.1f kg"),
+                    "F. Relativa": st.column_config.NumberColumn("F. Relativa", format="%.2f"),
+                } if es_test_fuerza else {})
             }
         )
     except Exception as e:
@@ -462,8 +597,11 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
             use_container_width=True,
             hide_index=True,
             column_config={
-                valor_col: None,          # Ocultar visualmente la columna valor
-                "valor_original": None    # Ocultar visualmente la columna original
+                valor_col: None,
+                "valor_original": None,
+                **({"Peso (kg)": st.column_config.NumberColumn("Peso (kg)", format="%.1f kg"),
+                    "F. Relativa": st.column_config.NumberColumn("F. Relativa", format="%.2f"),
+                } if es_test_fuerza else {})
             }
         )
 
@@ -529,19 +667,34 @@ def physical_area():
     # Asegurar DNI como string para el merge
     col_dni_test = 'Dni' if 'Dni' in df_test.columns else 'DNI' if 'DNI' in df_test.columns else None
     
+    def normalizar_dni(serie):
+        """Convierte DNIs a solo dígitos: '44.725.980' → '44725980'"""
+        import re
+        return serie.astype(str).apply(lambda x: re.sub(r'\D', '', x.split('.0')[0]))
+
     if col_dni_test:
-        df_test['DNI_merge'] = df_test[col_dni_test].astype(str).str.strip()
+        df_test['DNI_merge'] = normalizar_dni(df_test[col_dni_test])
     else:
         st.error(f"❌ No se encontró columna DNI en Test Físico. Columnas: {df_test.columns.tolist()}")
         return
-        
-    df_players['DNI_merge'] = df_players['DNI'].astype(str).str.strip()
-    
+
+    df_players['DNI_merge'] = normalizar_dni(df_players['DNI'])
+
+    # ==========================================
+    # Nota: Se removió el panel de diagnóstico interno para evitar conflictos
+    # con columnas duplicadas en la hoja de Google Sheets y mejorar estabilidad.
+    # ==========================================
+
     # Unificar DataFrames (INNER JOIN para mostrar solo tests de jugadores en BD central)
     df = pd.merge(df_test, df_players, on='DNI_merge', how='inner', suffixes=('_test', '_central'))
     
     # Construir campos combinados y mapear columnas
     df['Nombre y Apellido'] = df['Nombre'].astype(str) + " " + df['Apellido'].astype(str)
+
+    # Normalizar texto de Test y Subtest: quitar espacios y unificar capitalización
+    # Esto evita duplicados como "banco plano" y "Banco Plano" en los filtros
+    df['Test']    = df['Test'].astype(str).str.strip().str.title()
+    df['Subtest'] = df['Subtest'].astype(str).str.strip().str.title()
 
     # Definición de Columnas
     categoria_col = "Categoria" # Viene de la base central, sin tilde
@@ -624,20 +777,45 @@ def physical_area():
     # PROCESAMIENTO Y VISUALIZACIÓN
     # ==========================================
     
+    # Copiar para evitar SettingWithCopyWarning
+    df_final = df_final.copy()
+
     # Guardar valores originales antes de convertir
     df_final['valor_original'] = df_final[valor_col]
-    
+
     # Convertir valores a números para análisis (maneja tiempos y números)
     df_final[valor_col] = df_final[valor_col].apply(convertir_valor_a_numero)
 
+    # ---- FUERZA RELATIVA ----
+    # Verificar si el test seleccionado es de fuerza (comparación case-insensitive)
+    es_test_fuerza = any(test_sel.strip().lower() == t.strip().lower() for t in TESTS_DE_FUERZA)
+
+    if es_test_fuerza:
+        with st.spinner("⚖️ Cargando pesos desde área de nutrición..."):
+            df_pesos = obtener_pesos_por_dni()
+
+        if not df_pesos.empty:
+            df_final = df_final.merge(df_pesos, on='DNI_merge', how='left')
+            df_final['F. Relativa'] = (
+                df_final[valor_col] / df_final['Peso (kg)']
+            ).where(
+                df_final['Peso (kg)'].notna() & (df_final['Peso (kg)'] > 0) & df_final[valor_col].notna()
+            ).round(2)
+
+            # Los jugadores sin peso seguirán calculando F. Relativa como NaN en el dataframe,
+            # pero sin mostrar advertencia visible al usuario
+        else:
+            st.warning("⚠️ No se encontraron datos de peso en nutrición para calcular la fuerza relativa.")
+            es_test_fuerza = False
+
     if not df_final.empty:
         st.markdown("<br>", unsafe_allow_html=True)
-        # 1. Gráfico de Top/Bottom (Pasando el Test y Subtest para el título)
-        mostrar_grafico_top_bottom(df_final, jugador_col, valor_col, test_sel, subtest_sel, categoria_sel, posicion_sel)
-        
+        # 1. Gráfico de Top/Bottom
+        mostrar_grafico_top_bottom(df_final, jugador_col, valor_col, test_sel, subtest_sel, categoria_sel, posicion_sel, es_test_fuerza)
+
         st.markdown("---")
-        
+
         # 2. Tabla Detallada
-        mostrar_tabla_estilizada(df_final, valor_col, test_col, subtest_col)
+        mostrar_tabla_estilizada(df_final, valor_col, test_col, subtest_col, es_test_fuerza)
     else:
         st.info("No hay datos para mostrar con la selección actual.")

@@ -658,146 +658,6 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
 
-def main_dashboard():
-    load_universitario_styles()
-    auth_manager = AuthManager()
-    user = st.session_state.user
-
-    # ===== SIDEBAR =====
-    with st.sidebar:
-        st.markdown(f"""
-        <div style="text-align:center; padding:1rem 0.5rem 0.75rem; margin-bottom:0.5rem;">
-            <div style="font-size:2.5rem;">🏉</div>
-            <div style="font-weight:700; font-size:1.05rem; color:white; margin-top:0.25rem;">
-                {user['nombre']}
-            </div>
-            <div style="font-size:0.8rem; color:rgba(255,255,255,0.55); margin-top:0.15rem;">
-                {user['rol']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("#### 🧭 Navegación")
-        if st.button("🏠 Inicio", use_container_width=True, key="btn_inicio_top"):
-            st.session_state.current_page = "dashboard"
-            st.rerun()
-        if auth_manager.has_permission("perfil"):
-            label_perfil = "👤 Mi Perfil" if user.get('rol') == "Jugador" else "👤 Perfil"
-            if st.button(label_perfil, use_container_width=True):
-                st.session_state.current_page = "perfil"
-                st.rerun()
-
-        st.markdown("#### 📋 Módulos")
-        modules = [
-            ("🏥 Área Médica",    "medica"),
-            ("🥗 Nutrición",      "nutricion"),
-            ("🏋️ Área Física",   "fisica"),
-            ("📝 Bienestar",      "wellness"),
-            ("📝 Informe Médico", "reporte_medico"),
-        ]
-        for label, page_id in modules:
-            if auth_manager.has_permission(page_id):
-                if st.button(label, use_container_width=True):
-                    st.session_state.current_page = page_id
-                    st.rerun()
-
-        st.markdown("#### 📋 Staff Técnico")
-        staff_modules = [
-            ("📊 Análisis de Partido", "analisis_partido"),
-            ("📊 Panel de control 360°", "dashboard_360"),
-        ]
-        for label, page_id in staff_modules:
-            if auth_manager.has_permission(page_id):
-                if st.button(label, use_container_width=True):
-                    st.session_state.current_page = page_id
-                    st.rerun()
-
-        st.markdown("#### ⚙️ Admin")
-        if auth_manager.has_permission("bot"):
-            if st.button("🧠 Asistente IA", use_container_width=True):
-                st.session_state.current_page = "bot"
-                st.rerun()
-        if auth_manager.has_permission("administracion"):
-            if st.button("👥 Gestión Jugadores", use_container_width=True):
-                st.session_state.current_page = "administracion"
-                st.rerun()
-        if auth_manager.has_permission("lista"):
-            if st.button("📋 Pasar Lista", use_container_width=True):
-                st.session_state.current_page = "lista"
-                st.rerun()
-
-        st.markdown("---")
-        if st.button("🏠 Volver al Inicio", use_container_width=True, key="btn_volver_inicio_bottom"):
-            st.session_state.current_page = "dashboard"
-            st.rerun()
-        if st.button("🚪 Cerrar Sesión", use_container_width=True, key="btn_cerrar_sesion_bottom"):
-            auth_manager.logout()
-
-    # ===== MOBILE BOTTOM NAV =====
-    # Construir items segun permisos
-    nav_items = [("\U0001f3e0", "Inicio", "dashboard")]
-    if auth_manager.has_permission("perfil"):
-        nav_items.append(("\U0001f464", "Perfil", "perfil"))
-    if auth_manager.has_permission("fisica"):
-        nav_items.append(("\U0001f3cb", "Fisica", "fisica"))
-    if auth_manager.has_permission("medica"):
-        nav_items.append(("\U0001f3e5", "Medica", "medica"))
-    if auth_manager.has_permission("nutricion"):
-        nav_items.append(("\U0001f957", "Nutricion", "nutricion"))
-    if auth_manager.has_permission("wellness"):
-        nav_items.append(("\U0001f4dd", "Wellness", "wellness"))
-    nav_items = nav_items[:5]
-
-
-        # ===== ROUTING =====
-    page = st.session_state.get('current_page', 'dashboard')
-    if not auth_manager.has_permission(page):
-        st.error("🚫 No tienes permiso para acceder a este módulo.")
-        st.session_state.current_page = "dashboard"
-        st.rerun()
-
-    if page == "dashboard":
-        dashboard_main()
-    elif page == "medica":
-        from src.modules.areamedica import main_streamlit
-        main_streamlit()
-    elif page == "nutricion":
-        import src.modules.areanutricion as mod_nutricion
-        import importlib
-        importlib.reload(mod_nutricion)
-        if hasattr(mod_nutricion, 'main_nutricion'):
-            mod_nutricion.main_nutricion()
-        else:
-            st.error(f"Error: No se encuentra 'main_nutricion'")
-    elif page == "fisica":
-        from src.modules.areafisica import physical_area
-        physical_area()
-    elif page == "dashboard_360":
-        from src.modules.dashboard_360 import panel_profesional_jugador
-        panel_profesional_jugador()
-    elif page == "reporte_medico":
-        from src.modules.reportemedico import main_reporte_medico
-        main_reporte_medico()
-    elif page == "bot":
-        from src.modules.bot import main_bot
-        main_bot()
-    elif page == "administracion":
-        from src.modules.administracion import main_administracion
-        main_administracion()
-    elif page == "perfil":
-        from src.modules.perfil_jugador import main_perfil_jugador
-        main_perfil_jugador()
-    elif page == "wellness":
-        from src.modules.wellness import wellness_module
-        wellness_module()
-    elif page == "analisis_partido":
-        from src.modules.panel_partido import rugby_analysis_module
-        rugby_analysis_module()
-    elif page == "lista":
-        from src.modules.Lista import main_lista
-        main_lista()
-
-
 def dashboard_main():
     """Dashboard principal del Club Universitario"""
     auth_manager = AuthManager()
@@ -840,90 +700,28 @@ def dashboard_main():
         st.info("No tenés módulos habilitados para tu rol.")
         return
 
-    # --- Grilla de tarjetas con components.html (HTML/CSS/JS puro, sin abrir nueva ventana) ---
-    rows = (len(allowed) + 2) // 3
-    grid_height = rows * 190 + 30
 
-    cards_items = ""
-    for m in allowed:
-        cards_items += f"""
-        <div class="home-card" style="--card-color:{m['color']};" onclick="navigate('{m['id']}')">
-            <span class="c-icon">{m['icon']}</span>
-            <span class="c-label">{m['label']}</span>
-            <span class="c-desc">{m['desc']}</span>
-        </div>"""
-
-    grid_html = f"""
-    <!DOCTYPE html><html><head>
-    <meta charset="utf-8">
-    <style>
-    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{
-        background: transparent;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        padding: 4px 2px;
-    }}
-    .home-grid {{
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 14px;
-    }}
-    @media (max-width: 600px) {{
-        .home-grid {{ grid-template-columns: repeat(2, 1fr); }}
-    }}
-    @media (max-width: 380px) {{
-        .home-grid {{ grid-template-columns: 1fr; }}
-    }}
-    .home-card {{
-        background: #ffffff;
-        border-radius: 14px;
-        padding: 1.25rem 1.1rem 1.1rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        border: 1px solid #efefef;
-        border-top: 4px solid var(--card-color, #000000);
-        cursor: pointer;
-        transition: transform 0.18s ease, box-shadow 0.18s ease;
-        user-select: none;
-        -webkit-tap-highlight-color: transparent;
-    }}
-    .home-card:hover {{
-        transform: translateY(-5px);
-        box-shadow: 0 10px 28px rgba(0,0,0,0.14);
-    }}
-    .home-card:active {{
-        transform: scale(0.97);
-    }}
-    .c-icon {{
-        font-size: 1.85rem;
-        display: block;
-        margin-bottom: 0.5rem;
-    }}
-    .c-label {{
-        font-weight: 700;
-        font-size: 0.97rem;
-        color: #111111;
-        display: block;
-        margin-bottom: 0.3rem;
-        line-height: 1.2;
-    }}
-    .c-desc {{
-        font-size: 0.79rem;
-        color: #666666;
-        line-height: 1.4;
-        display: block;
-    }}
-    </style>
-    </head><body>
-    <div class="home-grid">{cards_items}
-    </div>
-    <script>
-    function navigate(page) {{
-        window.parent.location.href = window.parent.location.pathname + '?nav=' + page;
-    }}
-    </script>
-    </body></html>
-    """
-    components.html(grid_html, height=grid_height, scrolling=False)
+    # --- Grilla de tarjetas con botones Streamlit ---
+    cols = st.columns(3)
+    for idx, m in enumerate(allowed):
+        with cols[idx % 3]:
+            st.markdown(f"""
+                <div style='background: #fff; border-radius: 14px; padding: 1.25rem 1.1rem 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #efefef; border-top: 4px solid {m['color']}; margin-bottom: 18px; min-height: 140px;'>
+                    <div style='font-size:1.85rem; margin-bottom:0.5rem'>{m['icon']}</div>
+                    <div style='font-weight:700; font-size:0.97rem; color:#111; margin-bottom:0.3rem; line-height:1.2'>{m['label']}</div>
+                    <div style='font-size:0.79rem; color:#666; line-height:1.4'>{m['desc']}</div>
+                    <div style='margin-top:1rem;'>
+                        <form action="#" method="post">
+                        </form>
+                        <div style='text-align:center;'>
+                        {st.button('Ir a ' + m['label'], key='btn_grid_' + m['id'], use_container_width=True)}
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.session_state.get('btn_grid_' + m['id']):
+                st.session_state.current_page = m['id']
+                st.rerun()
 
     # Footer
     st.markdown("---")
@@ -938,19 +736,6 @@ def main():
     # Inicializar session state
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
-    
-    # Manejo de navegación por parámetros de URL (para las tarjetas-botón)
-    if "nav" in st.query_params:
-        new_page = st.query_params["nav"]
-        # Solo navegar si el usuario está autenticado y tiene permiso
-        if st.session_state.authenticated:
-            auth = AuthManager()
-            if auth.has_permission(new_page):
-                st.session_state.current_page = new_page
-        
-        # Limpiar parámetros para evitar bucles y que la URL quede limpia
-        st.query_params.clear()
-        st.rerun()
 
     inject_mobile_meta()
     
@@ -960,7 +745,136 @@ def main():
     if not st.session_state.authenticated:
         login_page()
     else:
-        main_dashboard()
+        # Usuario autenticado: cargar estilos y mostrar app
+        load_universitario_styles()
+        auth_manager = AuthManager()
+        user = st.session_state.user
+
+        # Verificar navegación por parámetros de URL (desde los botones del dashboard)
+        if "nav" in st.query_params:
+            new_page = st.query_params["nav"]
+            if auth_manager.has_permission(new_page):
+                st.session_state.current_page = new_page
+            st.query_params.clear()
+            st.rerun()
+
+        # ===== SIDEBAR =====
+        with st.sidebar:
+            st.markdown(f"""
+            <div style="text-align:center; padding:1rem 0.5rem 0.75rem; margin-bottom:0.5rem;">
+                <div style="font-size:2.5rem;">🏉</div>
+                <div style="font-weight:700; font-size:1.05rem; color:white; margin-top:0.25rem;">
+                    {user['nombre']}
+                </div>
+                <div style="font-size:0.8rem; color:rgba(255,255,255,0.55); margin-top:0.15rem;">
+                    {user['rol']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("#### 🧭 Navegación")
+            if st.button("🏠 Inicio", use_container_width=True, key="btn_inicio_top"):
+                st.session_state.current_page = "dashboard"
+                st.rerun()
+            if auth_manager.has_permission("perfil"):
+                label_perfil = "👤 Mi Perfil" if user.get('rol') == "Jugador" else "👤 Perfil"
+                if st.button(label_perfil, use_container_width=True):
+                    st.session_state.current_page = "perfil"
+                    st.rerun()
+
+            st.markdown("#### 📋 Módulos")
+            modules = [
+                ("🏥 Área Médica",    "medica"),
+                ("🥗 Nutrición",      "nutricion"),
+                ("🏋️ Área Física",   "fisica"),
+                ("📝 Bienestar",      "wellness"),
+                ("📝 Informe Médico", "reporte_medico"),
+            ]
+            for label, page_id in modules:
+                if auth_manager.has_permission(page_id):
+                    if st.button(label, use_container_width=True):
+                        st.session_state.current_page = page_id
+                        st.rerun()
+
+            st.markdown("#### 📋 Staff Técnico")
+            staff_modules = [
+                ("📊 Análisis de Partido", "analisis_partido"),
+                ("📊 Panel de control 360°", "dashboard_360"),
+            ]
+            for label, page_id in staff_modules:
+                if auth_manager.has_permission(page_id):
+                    if st.button(label, use_container_width=True):
+                        st.session_state.current_page = page_id
+                        st.rerun()
+
+            st.markdown("#### ⚙️ Admin")
+            if auth_manager.has_permission("bot"):
+                if st.button("🧠 Asistente IA", use_container_width=True):
+                    st.session_state.current_page = "bot"
+                    st.rerun()
+            if auth_manager.has_permission("administracion"):
+                if st.button("👥 Gestión Jugadores", use_container_width=True):
+                    st.session_state.current_page = "administracion"
+                    st.rerun()
+            if auth_manager.has_permission("lista"):
+                if st.button("📋 Pasar Lista", use_container_width=True):
+                    st.session_state.current_page = "lista"
+                    st.rerun()
+
+            st.markdown("---")
+            if st.button("🏠 Volver al Inicio", use_container_width=True, key="btn_volver_inicio_bottom"):
+                st.session_state.current_page = "dashboard"
+                st.rerun()
+            if st.button("🚪 Cerrar Sesión", use_container_width=True, key="btn_cerrar_sesion_bottom"):
+                auth_manager.logout()
+
+        # ===== ROUTING =====
+        page = st.session_state.get('current_page', 'dashboard')
+        if not auth_manager.has_permission(page):
+            st.error("🚫 No tienes permiso para acceder a este módulo.")
+            st.session_state.current_page = "dashboard"
+            st.rerun()
+
+        if page == "dashboard":
+            dashboard_main()
+        elif page == "medica":
+            from src.modules.areamedica import main_streamlit
+            main_streamlit()
+        elif page == "nutricion":
+            import src.modules.areanutricion as mod_nutricion
+            import importlib
+            importlib.reload(mod_nutricion)
+            if hasattr(mod_nutricion, 'main_nutricion'):
+                mod_nutricion.main_nutricion()
+            else:
+                st.error(f"Error: No se encuentra 'main_nutricion'")
+        elif page == "fisica":
+            from src.modules.areafisica import physical_area
+            physical_area()
+        elif page == "dashboard_360":
+            from src.modules.dashboard_360 import panel_profesional_jugador
+            panel_profesional_jugador()
+        elif page == "reporte_medico":
+            from src.modules.reportemedico import main_reporte_medico
+            main_reporte_medico()
+        elif page == "bot":
+            from src.modules.bot import main_bot
+            main_bot()
+        elif page == "administracion":
+            from src.modules.administracion import main_administracion
+            main_administracion()
+        elif page == "perfil":
+            from src.modules.perfil_jugador import main_perfil_jugador
+            main_perfil_jugador()
+        elif page == "wellness":
+            from src.modules.wellness import wellness_module
+            wellness_module()
+        elif page == "analisis_partido":
+            from src.modules.panel_partido import rugby_analysis_module
+            rugby_analysis_module()
+        elif page == "lista":
+            from src.modules.Lista import main_lista
+            main_lista()
 
 if __name__ == "__main__":
     main()
