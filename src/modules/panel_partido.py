@@ -85,6 +85,10 @@ def _cargar_mapa_dni_nombres():
             n = str(row[col_nombre]).strip() if col_nombre else ''
             a = str(row[col_apellido]).strip() if col_apellido else ''
             
+            if n.lower() in ['nan', 'none']: n = ''
+            if a.lower() in ['nan', 'none']: a = ''
+            if not n and not a: continue
+            
             def _norm(t):
                 if not t: return ""
                 t = t.replace("'", "").replace('"', '')
@@ -315,13 +319,29 @@ def _cargar_detalles_jugadores():
             if pos.lower() in ['nan', 'none', '']: pos = 'N/A'
             if cat.lower() in ['nan', 'none', '']: cat = 'N/A'
             
+            if n.lower() in ['nan', 'none']: n = ''
+            if a.lower() in ['nan', 'none']: a = ''
+            
             nombre_completo = f"{n} {a}".strip() if n and a else (n or a or f"Jugador {dni}")
-            detalles[dni] = {
-                "nombre": nombre_completo,
-                "posicion": pos,
-                "categoria": cat,
-                "dni": dni
-            }
+            
+            if dni not in detalles:
+                detalles[dni] = {
+                    "nombre": nombre_completo,
+                    "posicion": pos,
+                    "categoria": cat,
+                    "dni": dni
+                }
+            else:
+                existing = detalles[dni]
+                new_is_valid = nombre_completo and not nombre_completo.startswith("Jugador ")
+                existing_is_placeholder = not existing["nombre"] or existing["nombre"].startswith("Jugador ")
+                
+                if new_is_valid and existing_is_placeholder:
+                    existing["nombre"] = nombre_completo
+                if pos != 'N/A' and existing["posicion"] == 'N/A':
+                    existing["posicion"] = pos
+                if cat != 'N/A' and existing["categoria"] == 'N/A':
+                    existing["categoria"] = cat
         return detalles
     except:
         return {}
@@ -1335,35 +1355,33 @@ def rugby_analysis_module():
         # Guardamos el PDF en session_state para que sobreviva al rerun de Streamlit
         pdf_key = f"pdf_bytes_{selected_match}"
 
-        col_pdf_l, col_pdf_c, col_pdf_r = st.columns([2, 1, 2])
-        with col_pdf_c:
-            if st.button("📄 Generar PDF", use_container_width=True, type="primary", key="btn_gen_pdf"):
-                with st.spinner("Generando informe PDF..."):
-                    st.session_state[pdf_key] = _generar_pdf(
-                        selected_match=selected_match,
-                        name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
-                        s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
-                        t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
-                        total_tackles=total_tackles, total_buenos=total_buenos,
-                        pct_efectividad=pct_efectividad, df_tck=df_tck,
-                        df_qbr=df_qbr,
-                        scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
-                        df_kck=df_kck,
-                        pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
-                        pesca_rival=pesca_rival,
-                        pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
-                        lin_total=lin_total, lin_total_prop=lin_total_prop,
-                        lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
-                        lin_robada=lin_robada, lin_perdida=lin_perdida,
-                        lin_sucia=lin_sucia, lin_torcida=lin_torcida,
-                        lin_rapido=lin_rapido,
-                    )
-
-        # El download_button se muestra siempre que haya bytes en session_state
-        # (sobrevive al rerun que dispara Streamlit al hacer clic)
         if st.session_state.get(pdf_key):
-            col_dl_l, col_dl_c, col_dl_r = st.columns([2, 1, 2])
-            with col_dl_c:
+            # Si ya se generó, mostramos ambos botones lado a lado ocupando bien la pantalla
+            col_gen, col_dl = st.columns(2)
+            with col_gen:
+                if st.button("📄 Generar de nuevo", use_container_width=True, type="secondary", key="btn_gen_pdf_again"):
+                    with st.spinner("Generando informe PDF..."):
+                        st.session_state[pdf_key] = _generar_pdf(
+                            selected_match=selected_match,
+                            name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
+                            s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
+                            t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
+                            total_tackles=total_tackles, total_buenos=total_buenos,
+                            pct_efectividad=pct_efectividad, df_tck=df_tck,
+                            df_qbr=df_qbr,
+                            scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
+                            df_kck=df_kck,
+                            pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
+                            pesca_rival=pesca_rival,
+                            pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
+                            lin_total=lin_total, lin_total_prop=lin_total_prop,
+                            lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
+                            lin_robada=lin_robada, lin_perdida=lin_perdida,
+                            lin_sucia=lin_sucia, lin_torcida=lin_torcida,
+                            lin_rapido=lin_rapido,
+                        )
+                        st.rerun()
+            with col_dl:
                 st.download_button(
                     label="⬇️ Descargar PDF",
                     data=st.session_state[pdf_key],
@@ -1372,6 +1390,32 @@ def rugby_analysis_module():
                     use_container_width=True,
                     key="btn_dl_pdf",
                 )
+        else:
+            # Si no se ha generado, mostramos el botón centrado y con ancho responsivo
+            col_pdf_l, col_pdf_c, col_pdf_r = st.columns([1, 2, 1])
+            with col_pdf_c:
+                if st.button("📄 Generar PDF", use_container_width=True, type="primary", key="btn_gen_pdf"):
+                    with st.spinner("Generando informe PDF..."):
+                        st.session_state[pdf_key] = _generar_pdf(
+                            selected_match=selected_match,
+                            name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
+                            s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
+                            t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
+                            total_tackles=total_tackles, total_buenos=total_buenos,
+                            pct_efectividad=pct_efectividad, df_tck=df_tck,
+                            df_qbr=df_qbr,
+                            scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
+                            df_kck=df_kck,
+                            pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
+                            pesca_rival=pesca_rival,
+                            pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
+                            lin_total=lin_total, lin_total_prop=lin_total_prop,
+                            lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
+                            lin_robada=lin_robada, lin_perdida=lin_perdida,
+                            lin_sucia=lin_sucia, lin_torcida=lin_torcida,
+                            lin_rapido=lin_rapido,
+                        )
+                        st.rerun()
 
     with tab_individual:
         # Obtener jugadores participantes en el partido actual
