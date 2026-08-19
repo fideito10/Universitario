@@ -51,7 +51,8 @@ class AuthManager:
                 "dashboard", "perfil", "nutricion", "wellness", "dashboard_360", "bot"
             ],
             "Jugador": [
-                "dashboard", "perfil", "wellness", "dashboard_360", "nutricion", "fisica"
+                "dashboard", "perfil", "wellness", "dashboard_360", "nutricion", "fisica",
+                "analisis_partido"
             ]
         }
 

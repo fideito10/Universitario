@@ -10,6 +10,37 @@ from plotly.subplots import make_subplots
 import gspread
 from src.utils.credentials import get_service_account_credentials
 
+# ── Helpers de tiempo para Tiempo Neto de Juego ──
+def _time_to_seconds(t: str) -> float:
+    """Convierte 'M:SS,mmm' o 'H:MM:SS,mmm' a segundos (float)."""
+    try:
+        t = t.strip().replace(",", ".")
+        parts = [float(p) for p in t.split(":")]
+        if len(parts) == 3:
+            return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        elif len(parts) == 2:
+            return parts[0] * 60 + parts[1]
+    except Exception:
+        pass
+    return 0.0
+
+def _seconds_to_clock(s: float) -> str:
+    s = max(0.0, s)
+    m = int(s // 60)
+    sec = s - m * 60
+    return f"{m}:{sec:04.1f}"
+
+def _merge_intervals(intervals):
+    intervals = sorted(intervals)
+    merged = []
+    for start, stop in intervals:
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], stop))
+        else:
+            merged.append([start, stop])
+    return merged
+
+
 # ── Mapa de escudos ──
 _ESCUDOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "Escudos")
 
@@ -1346,6 +1377,218 @@ def rugby_analysis_module():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+        # ─────────────────────────────────────────────────────────
+        # ⏱ TIEMPO NETO DE JUEGO
+        # ─────────────────────────────────────────────────────────
+        CATS_EXCLUIR = {"sustituciones", "personal (*)"}
+        _intervals = []
+        for cat_name, cat_content in data.items():
+            if cat_name.lower().strip() in CATS_EXCLUIR:
+                continue
+            for row in cat_content.get("rows", []):
+                s_raw = row.get("start", "") or row.get("Start", "")
+                e_raw = row.get("stop", "")  or row.get("Stop", "")
+                if not s_raw or not e_raw:
+                    continue
+                s_sec = _time_to_seconds(str(s_raw))
+                e_sec = _time_to_seconds(str(e_raw))
+                if e_sec > s_sec:
+                    _intervals.append((s_sec, e_sec))
+
+        tnj_net = tnj_dead = tnj_et = tnj_dead_sin_et = tnj_paradas = 0
+        tnj_span = 0
+        _merged = []
+        if _intervals:
+            _merged = _merge_intervals(_intervals)
+            tnj_net  = sum(e - s for s, e in _merged)
+            tnj_span = _merged[-1][1] - _merged[0][0]
+            _gaps = sorted(
+                [((_merged[i][0] - _merged[i-1][1]),
+                   _merged[i-1][1], _merged[i][0])
+                 for i in range(1, len(_merged))],
+                reverse=True
+            )
+            if _gaps:
+                tnj_et   = _gaps[0][0]
+                tnj_dead = tnj_span - tnj_net
+                tnj_dead_sin_et = max(0, tnj_dead - tnj_et)
+                tnj_paradas = len(_gaps) - 1
+
+        st.markdown('<div style="background-color:#161b22;padding:15px;border-radius:10px;margin-bottom:20px;border-left:5px solid #58a6ff;"><h2 style="color:#58a6ff;font-size:28px;margin:0;font-weight:900;letter-spacing:1px;">⏱ TIEMPO NETO DE JUEGO</h2></div>', unsafe_allow_html=True)
+
+        tnj_cols = st.columns(5)
+        _tnj_data = [
+            ("⚽ Tiempo Neto",          _seconds_to_clock(tnj_net),           f"{tnj_net/60:.1f} min",          "#3fb950"),
+            ("💀 Tiempo Muerto",         _seconds_to_clock(tnj_dead),          f"{tnj_dead/60:.1f} min",         "#f85149"),
+            ("🕐 Entretiempo Est.",       _seconds_to_clock(tnj_et),            f"{tnj_et/60:.1f} min",           "#e3b341"),
+            ("⏸ T. Muerto (sin ET)",     _seconds_to_clock(tnj_dead_sin_et),   f"{tnj_dead_sin_et/60:.1f} min",  "#8b949e"),
+            ("🛑 Paradas",               str(tnj_paradas),                     "(excl. entretiempo)",            "#a371f7"),
+        ]
+        for col_tnj, (lbl, val, sub, clr) in zip(tnj_cols, _tnj_data):
+            with col_tnj:
+                st.markdown(f"""
+                <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                            padding:18px 12px;text-align:center;border-top:4px solid {clr}">
+                    <div style="font-size:1.8rem;font-weight:900;color:{clr};line-height:1">{val}</div>
+                    <div style="font-size:0.72rem;color:#8b949e;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">{lbl}</div>
+                    <div style="font-size:0.8rem;color:#58a6ff;margin-top:4px;font-weight:600">{sub}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        if tnj_net > 0 and tnj_dead > 0:
+            _tnj_donut = go.Figure(go.Pie(
+                labels=["Juego Activo", "Tiempo Muerto (sin ET)", "Entretiempo"],
+                values=[tnj_net, tnj_dead_sin_et, tnj_et],
+                hole=0.6,
+                marker_colors=["#3fb950", "#f85149", "#e3b341"],
+                textinfo="percent",
+                textfont_size=13,
+            ))
+            _pct_neto = round(tnj_net / tnj_span * 100) if tnj_span else 0
+            _tnj_donut.add_annotation(
+                text=f"<span style='font-size:32px;font-weight:900;color:#3fb950'>{_pct_neto}%</span>"
+                     f"<br><span style='font-size:11px;color:#8b949e'>TIEMPO NETO</span>",
+                showarrow=False
+            )
+            _tnj_donut.update_layout(
+                paper_bgcolor="#161b22", plot_bgcolor="#161b22",
+                font_color="#c9d1d9", height=280,
+                margin=dict(l=0, r=0, t=20, b=0),
+                legend=dict(orientation="h", y=-0.15, font=dict(color="#8b949e", size=12)),
+            )
+            _col_d1, _col_d2, _col_d3 = st.columns([1, 2, 1])
+            with _col_d2:
+                st.plotly_chart(_tnj_donut, use_container_width=True, key="chart_tiempo_neto_donut")
+
+        # ─────────────────────────────────────────────────────────
+        # 📊 SECUENCIAS DE POSESIÓN (solo CULP — 03 POSESION)
+        # ─────────────────────────────────────────────────────────
+        _pos_rows = []
+        for cat_name, cat_content in data.items():
+            if "POSESION" in cat_name.upper() or "POSESIÓN" in cat_name.upper():
+                _pos_rows.extend(cat_content.get("rows", []))
+
+        _secuencias = []
+        for r in _pos_rows:
+            s_raw = r.get("start", "") or r.get("Start", "")
+            e_raw = r.get("stop", "")  or r.get("Stop", "")
+            if not s_raw or not e_raw:
+                continue
+            dur = _time_to_seconds(str(e_raw)) - _time_to_seconds(str(s_raw))
+            if dur > 0:
+                _secuencias.append(dur)
+
+        st.markdown('<div style="background-color:#161b22;padding:15px;border-radius:10px;margin:30px 0 20px 0;border-left:5px solid #a371f7;"><h2 style="color:#a371f7;font-size:28px;margin:0;font-weight:900;letter-spacing:1px;">📊 SECUENCIAS DE POSESIÓN</h2></div>', unsafe_allow_html=True)
+
+        if _secuencias:
+            _cortas  = [d for d in _secuencias if d <= 35]
+            _medias  = [d for d in _secuencias if 35 < d <= 90]
+            _largas  = [d for d in _secuencias if d > 90]
+            _total_s = len(_secuencias)
+
+            # KPI cards
+            _seq_kpi_cols = st.columns(4)
+            _seq_kpi_data = [
+                ("🟢 Cortas (0–35\")",        len(_cortas),  f"Prom: {sum(_cortas)/len(_cortas):.0f}s" if _cortas else "",   "#3fb950"),
+                ("🟡 Medias (35\"–1:30)",      len(_medias),  f"Prom: {sum(_medias)/len(_medias):.0f}s" if _medias else "",   "#e3b341"),
+                ("🔴 Largas (>1:30)",          len(_largas),  f"Prom: {sum(_largas)/len(_largas):.0f}s" if _largas else "",   "#f85149"),
+                ("⏱ Duración Promedio",        f"{sum(_secuencias)/_total_s:.0f}s",
+                                               f"Máx: {max(_secuencias):.0f}s · Total: {_total_s}",                           "#58a6ff"),
+            ]
+            for _sc, (_lbl, _val, _sub, _clr) in zip(_seq_kpi_cols, _seq_kpi_data):
+                with _sc:
+                    st.markdown(f"""
+                    <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                                padding:18px 12px;text-align:center;border-top:4px solid {_clr}">
+                        <div style="font-size:2rem;font-weight:900;color:{_clr};line-height:1">{_val}</div>
+                        <div style="font-size:0.72rem;color:#8b949e;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">{_lbl}</div>
+                        <div style="font-size:0.8rem;color:#ffffff;margin-top:4px;font-weight:600;opacity:0.8">{_sub}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Gráfico: barras de distribución por rango
+            _df_seq_dist = pd.DataFrame([
+                {"Rango": "🟢 Cortas (0–35s)",    "Cantidad": len(_cortas),  "color": "#3fb950"},
+                {"Rango": "🟡 Medias (35s–1:30)",  "Cantidad": len(_medias),  "color": "#e3b341"},
+                {"Rango": "🔴 Largas (>1:30)",     "Cantidad": len(_largas),  "color": "#f85149"},
+            ])
+            _fig_seq = px.bar(
+                _df_seq_dist, x="Rango", y="Cantidad",
+                color="Rango",
+                color_discrete_map={
+                    "🟢 Cortas (0–35s)":   "#3fb950",
+                    "🟡 Medias (35s–1:30)": "#e3b341",
+                    "🔴 Largas (>1:30)":    "#f85149",
+                },
+                text="Cantidad",
+            )
+            _fig_seq.update_layout(
+                paper_bgcolor="#161b22", plot_bgcolor="#161b22",
+                font_color="#c9d1d9", height=300, showlegend=False,
+                margin=dict(l=20, r=20, t=10, b=10),
+                yaxis=dict(gridcolor="#21262d", title="N° Secuencias"),
+                xaxis=dict(title=""),
+                font=dict(family="Arial Black", size=15),
+            )
+            _fig_seq.update_traces(textfont_color="#fff", textposition="outside")
+
+            # Histograma de duraciones individuales
+            _fig_hist = px.histogram(
+                x=_secuencias,
+                nbins=20,
+                labels={"x": "Duración (s)"},
+                color_discrete_sequence=["#58a6ff"],
+            )
+            _fig_hist.update_layout(
+                paper_bgcolor="#161b22", plot_bgcolor="#161b22",
+                font_color="#c9d1d9", height=300, showlegend=False,
+                margin=dict(l=20, r=20, t=10, b=10),
+                yaxis=dict(gridcolor="#21262d", title="Frecuencia"),
+                xaxis=dict(title="Duración (segundos)", gridcolor="#21262d"),
+                bargap=0.05,
+            )
+            # Líneas verticales de corte
+            for _x_cut, _col_cut, _lbl_cut in [(35, "#e3b341", "35s"), (90, "#f85149", "1:30")]:
+                _fig_hist.add_vline(x=_x_cut, line_dash="dash",
+                                    line_color=_col_cut, line_width=2,
+                                    annotation_text=_lbl_cut,
+                                    annotation_font_color=_col_cut)
+
+            _col_bar_seq, _col_hist_seq = st.columns(2)
+            with _col_bar_seq:
+                st.markdown('<h4 style="color:#ffffff;font-size:15px;font-weight:700;margin-bottom:8px">📊 DISTRIBUCIÓN POR RANGO</h4>', unsafe_allow_html=True)
+                st.plotly_chart(_fig_seq, use_container_width=True, key="chart_seq_dist")
+            with _col_hist_seq:
+                st.markdown('<h4 style="color:#ffffff;font-size:15px;font-weight:700;margin-bottom:8px">📈 HISTOGRAMA DE DURACIONES</h4>', unsafe_allow_html=True)
+                st.plotly_chart(_fig_hist, use_container_width=True, key="chart_seq_hist")
+
+            # Tabla detallada de secuencias
+            _df_seq_tabla = pd.DataFrame([
+                {
+                    "#":         i + 1,
+                    "Duración":  f"{d:.0f}s  ({_seconds_to_clock(d)})",
+                    "Rango":     ("🟢 Corta" if d <= 35 else ("🟡 Media" if d <= 90 else "🔴 Larga")),
+                    "Duración (s)": round(d, 1),
+                }
+                for i, d in enumerate(_secuencias)
+            ])
+            st.markdown('<h4 style="color:#ffffff;font-size:15px;font-weight:700;margin-top:15px;margin-bottom:8px">📋 DETALLE DE SECUENCIAS</h4>', unsafe_allow_html=True)
+            st.dataframe(
+                _df_seq_tabla[["#", "Duración", "Rango"]].style
+                    .set_properties(**{"background-color": "#161b22", "color": "#ffffff",
+                                       "border-bottom": "1px solid #30363d", "font-size": "14px", "padding": "8px"})
+                    .set_table_styles([{"selector": "th", "props": [
+                        ("background-color", "#161b22"), ("color", "#a371f7"),
+                        ("font-weight", "700"), ("font-size", "13px"),
+                        ("text-transform", "uppercase"), ("border-bottom", "2px solid #30363d")
+                    ]}]),
+                use_container_width=True, hide_index=True, key="df_secuencias"
+            )
+        else:
+            st.info("Sin datos de posesión (categoría '03 POSESION') en este partido.")
 
         st.markdown("""<div style="text-align:center; color:#484f58; font-size:0.8rem; margin-top:50px; padding:20px; border-top:1px solid #21262d">Club Universitario de La Plata · Sistema de Rendimiento</div>""", unsafe_allow_html=True)
 
