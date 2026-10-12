@@ -3,6 +3,17 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+def _mobile_fig(fig, height=320):
+    """Margenes, altura y leyenda compactos para pantallas chicas."""
+    fig.update_layout(
+        height=height,
+        margin=dict(l=10, r=10, t=50, b=10),
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
+        title=dict(font=dict(size=14)),
+    )
+    return fig
+
+
 def main_kpi():
     # Configuración de la página y estilos (si se ejecuta standalone, aunque probablemente sea un módulo)
     # Si es módulo, heredará estilos, pero aseguramos consistencia.
@@ -30,6 +41,23 @@ def main_kpi():
         }
         .stHeader {
             background-color: transparent;
+        }
+        @media (max-width: 768px) {
+            .kpi-card { padding: 12px; }
+            .kpi-value { font-size: 1.6rem; }
+            .kpi-label { font-size: 0.8rem; }
+            h1 { font-size: 1.5rem !important; }
+            h3 { font-size: 1.1rem !important; }
+            h4 { font-size: 1rem !important; }
+            div[data-testid="stMetricValue"] { font-size: 1.5rem; }
+            div[data-testid="stMetricLabel"] p { font-size: 0.8rem; white-space: normal; }
+            div[data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.5rem !important; }
+            div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
+            div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                min-width: 100% !important; flex: 1 1 100% !important;
+            }
+            .stButton > button, .stFormSubmitButton > button { min-height: 44px; width: 100%; }
+            div[data-testid="stDataFrame"] { overflow-x: auto; }
         }
     </style>
     """, unsafe_allow_html=True)
@@ -139,7 +167,7 @@ def main_kpi():
             plot_bgcolor='rgba(0,0,0,0)',
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        st.plotly_chart(fig_tackles, use_container_width=True)
+        st.plotly_chart(_mobile_fig(fig_tackles), use_container_width=True)
 
     with row1_col2:
         st.markdown("#### ⚔️ Zona Roja (22m)")
@@ -157,7 +185,7 @@ def main_kpi():
             plot_bgcolor='rgba(0,0,0,0)',
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        st.plotly_chart(fig_22, use_container_width=True)
+        st.plotly_chart(_mobile_fig(fig_22), use_container_width=True)
 
     st.markdown("---")
 
@@ -184,7 +212,7 @@ def main_kpi():
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)'
             )
-            st.plotly_chart(fig_radar, use_container_width=True)
+            st.plotly_chart(_mobile_fig(fig_radar), use_container_width=True)
 
     with row2_col2:
         st.markdown("#### ⚠️ Disciplina")
@@ -197,11 +225,11 @@ def main_kpi():
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)'
         )
-        st.plotly_chart(fig_penales, use_container_width=True)
+        st.plotly_chart(_mobile_fig(fig_penales), use_container_width=True)
 
     # Tabla de Datos Crudos
     with st.expander("Ver Planilla de Datos"):
-        st.dataframe(df.style.highlight_max(axis=0, color='#333333'))
+        st.dataframe(df.style.highlight_max(axis=0, color='#333333'), use_container_width=True)
 
 if __name__ == "__main__":
     main_kpi()

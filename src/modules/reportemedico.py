@@ -280,6 +280,12 @@ def main_reporte_medico():
         text-align: center;
         margin: 0.5rem 0;
     }
+    @media (max-width: 768px) {
+        .main-header { padding: 1rem; margin-bottom: 1rem; }
+        .main-header h1 { font-size: 1.5rem; }
+        .filter-container, .resumen-card { padding: 0.75rem; }
+        .stButton > button, [data-testid="stFormSubmitButton"] > button { width: 100%; min-height: 44px; }
+    }
     </style>
     """, unsafe_allow_html=True)
     

@@ -168,6 +168,19 @@ def main_administracion():
         <h1>👥 Administración - Universitario</h1>
         <h3>Gestión de Jugadores Base Maestra</h3>
     </div>
+    <style>
+    @media (max-width: 768px) {
+        .main-header h1 { font-size: 1.4rem !important; }
+        .main-header h3 { font-size: 0.95rem !important; }
+        [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.5rem !important; }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] { min-width: 100% !important; flex: 1 1 100% !important; }
+        div[data-baseweb="select"] > div { min-height: 48px; }
+        .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button { min-height: 48px; width: 100%; }
+        .stTabs [data-baseweb="tab"] { padding: 0.5rem 0.6rem; font-size: 0.9rem; }
+        [data-testid="stDataFrame"] { max-width: 100%; overflow-x: auto; }
+    }
+    </style>
     """, unsafe_allow_html=True)
     
     # ✅ FIX: Agregar key único al botón del sidebar

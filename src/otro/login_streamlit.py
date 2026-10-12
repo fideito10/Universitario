@@ -226,16 +226,39 @@ def load_css():
         animation: fadeIn 0.6s ease-out;
     }
     
-    /* Responsive */
+    /* Responsive - mobile */
     @media (max-width: 768px) {
+        .main .block-container, [data-testid="stMainBlockContainer"] {
+            padding: 1.5rem 0.9rem calc(2rem + env(safe-area-inset-bottom)) !important;
+            max-width: 100% !important;
+        }
         .main-title {
-            font-size: 2rem;
+            font-size: 1.6rem;
         }
-        
+        .subtitle { font-size: 0.95rem; margin-bottom: 1rem; }
         .main-container {
-            margin: 1rem;
-            padding: 1.5rem;
+            margin: 0.5rem 0;
+            padding: 1rem;
         }
+        .stTextInput input {
+            min-height: 48px;
+            font-size: 16px;
+        }
+        .stButton > button, .stFormSubmitButton > button {
+            min-height: 50px;
+            width: 100%;
+            font-size: 1rem;
+        }
+        [data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+        .stTabs [data-baseweb="tab-list"] { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+        .stTabs [data-baseweb="tab"] { min-height: 44px; white-space: nowrap; }
+        .stCheckbox { min-height: 44px; }
+        img { max-width: 100%; height: auto; }
     }
     </style>
     """, unsafe_allow_html=True)

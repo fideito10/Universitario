@@ -30,46 +30,88 @@ def get_emoji_for_val(val, key):
         if val <= 3: return "🟡"
         return "🟢"
 
+def _hero(titulo, sub):
+    st.markdown(f"""
+    <div class="well-hero"><h1>{titulo}</h1><p>{sub}</p></div>
+    """, unsafe_allow_html=True)
+
+
+def _estado_chip(label, val, key, ayuda):
+    emoji = get_emoji_for_val(val, key)
+    return (f'<div class="well-chip"><span class="well-chip-l">{label}</span>'
+            f'<span class="well-chip-v">{emoji} {val}</span>'
+            f'<span class="well-chip-h">{ayuda}</span></div>')
+
+
+WELL_CSS = """
+<style>
+.well-hero { background: linear-gradient(135deg,#000 0%,#212529 100%); border:2px solid rgba(255,255,255,0.1);
+  border-radius:20px; padding:clamp(1rem,4vw,1.6rem); text-align:center; margin-bottom:1rem; box-shadow:0 10px 25px rgba(0,0,0,0.35); }
+.well-hero h1 { color:#fff !important; margin:0; font-size:clamp(1.25rem,6vw,2rem); font-weight:800; letter-spacing:1px; text-transform:uppercase; }
+.well-hero p { color:#E0E0E0; margin:.4rem 0 0 0; font-size:clamp(.85rem,3.5vw,1rem); font-weight:300; }
+.well-card { background: linear-gradient(135deg,#111 0%,#2a2d31 100%); border-radius:16px; padding:.9rem 1.1rem; margin:.4rem 0 .8rem 0;
+  border-left:5px solid #28a745; }
+.well-card h3 { margin:0; color:#fff !important; font-size:1.05rem; text-transform:uppercase; letter-spacing:.5px; }
+.well-card p { margin:.2rem 0 0 0; color:#bbb; font-size:.85rem; }
+.well-chips { display:flex; gap:.5rem; margin:.3rem 0 1rem 0; }
+.well-chip { flex:1; background:#f4f5f7; border-radius:14px; padding:.55rem .3rem; text-align:center; min-width:0; }
+.well-chip-l { display:block; font-size:.68rem; color:#666; text-transform:uppercase; font-weight:700; }
+.well-chip-v { display:block; font-size:1.25rem; font-weight:800; color:#111; }
+.well-chip-h { display:block; font-size:.68rem; color:#888; }
+.well-empty { background:rgba(0,0,0,0.04); border-radius:14px; padding:1rem; text-align:center; color:#666; font-size:.9rem; }
+.well-score { background:linear-gradient(135deg,#000,#212529); color:#fff; border-radius:16px; padding:1rem; text-align:center; margin-top:.6rem; }
+.well-score b { font-size:2rem; display:block; }
+div[data-baseweb="select"] > div { min-height: 48px; }
+.stButton > button { min-height: 52px; font-weight:700; letter-spacing:.5px; border-radius:14px; }
+[data-testid="stSlider"] { padding: .2rem .6rem; }
+[data-testid="stSlider"] [role="slider"] { width: 28px; height: 28px; }
+@media (max-width: 768px) {
+    [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.25rem !important; }
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] { min-width: 100% !important; flex: 1 1 100% !important; }
+}
+</style>
+"""
+
+
 def wellness_module():
-    st.markdown('<div class="main-header"><h1>📝 Wellness del Jugador</h1><p>Monitoreo de carga y recuperación</p></div>', unsafe_allow_html=True)
-    
+    st.markdown(WELL_CSS, unsafe_allow_html=True)
+    _hero("📝 Wellness", "Contanos cómo estás hoy · 30 segundos")
+
     gsm = GoogleSheetsManager()
     if not gsm.sheet_config.get("sheet_id"):
         gsm.sheet_config["sheet_id"] = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
-        
+
     user = st.session_state.user
     is_staff = user.get('rol') in ['Administrador', 'Entrenador', 'Preparador Físico']
-    
+
     # --- PESTAÑAS SEGÚN ROL ---
     if is_staff:
         tab1, tab2 = st.tabs(["📋 Mi Registro / Prueba", "👥 Panel de Equipo (Staff)"])
     else:
         tab1 = st.container() # El jugador solo ve su parte
-        
+
     with tab1:
         # --- FORMULARIO DE ENTRADA ---
         with st.container():
             st.markdown("""
-            <div style='background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 1rem;'>
-                <h3 style='margin-top:0; color:#111;'>Registro Diario</h3>
+            <div class='well-card'>
+                <h3>Registro diario</h3>
+                <p>Deslizá cada barra y enviá.</p>
             </div>
             """, unsafe_allow_html=True)
-            
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                rpe_options = [f"{get_emoji_for_val(i, 'rpe')} {i}" for i in range(1, 11)]
-                rpe_sel = st.selectbox("Esfuerzo (RPE)", options=rpe_options, index=4, key="rpe_sel")
-                rpe = int(rpe_sel.split()[-1])
-            with c2:
-                sueno_options = [f"{get_emoji_for_val(i, 'sueno')} {i}" for i in range(1, 6)]
-                sueno_sel = st.selectbox("Calidad de Sueño", options=sueno_options, index=4, key="sueno_sel")
-                sueno = int(sueno_sel.split()[-1])
-            with c3:
-                doms_options = [f"{get_emoji_for_val(i, 'doms')} {i}" for i in range(1, 6)]
-                doms_sel = st.selectbox("Dolor Muscular (DOMS)", options=doms_options, index=0, key="doms_sel")
-                doms = int(doms_sel.split()[-1])
-                
-            if st.button("🚀 ENVIAR PERCEPCIÓN", use_container_width=True, type="primary"):
+
+            rpe = st.slider("Esfuerzo del día (RPE) · 1 suave, 10 máximo", 1, 10, 5, key="rpe_sel")
+            sueno = st.slider("Calidad de sueño · 1 mala, 5 excelente", 1, 5, 5, key="sueno_sel")
+            doms = st.slider("Dolor muscular (DOMS) · 1 nada, 5 mucho", 1, 5, 1, key="doms_sel")
+
+            st.markdown('<div class="well-chips">'
+                        + _estado_chip("Esfuerzo", rpe, "rpe", "de 10")
+                        + _estado_chip("Sueño", sueno, "sueno", "de 5")
+                        + _estado_chip("Dolor", doms, "doms", "de 5")
+                        + '</div>', unsafe_allow_html=True)
+
+            if st.button("🚀 ENVIAR", use_container_width=True, type="primary"):
                 score = calculate_wellness_score(rpe, sueno, doms)
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 fecha = datetime.now().strftime("%Y-%m-%d")
@@ -78,13 +120,13 @@ def wellness_module():
                     worksheet = spreadsheet.worksheet("Wellness_Jugador")
                     row = [len(worksheet.get_all_values()), timestamp, user.get('email', 'N/A'), user['nombre'], rpe, sueno, doms, score, fecha]
                     worksheet.append_row(row)
-                    st.success(f"✅ ¡Enviado! Score: {score}")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.markdown(f"<div class='well-score'>✅ ¡Enviado!<b style='color:{get_status_color(score)}'>{score}</b>Tu score de hoy (de 5)</div>", unsafe_allow_html=True)
+                except Exception:
+                    st.warning("No pudimos guardar tu registro ahora. Revisá tu conexión e intentá de nuevo en un momento.")
 
         # --- HISTORIAL PERSONAL ---
-        st.markdown("---")
-        st.subheader("📊 Tu Evolución")
+        st.markdown("<div class='well-card' style='border-left-color:#fff'><h3>📊 Tu evolución</h3></div>", unsafe_allow_html=True)
+        shown = False
         try:
             spreadsheet = gsm.client.open_by_key(gsm.sheet_config["sheet_id"])
             ws_wellness = spreadsheet.worksheet("Wellness_Jugador")
@@ -92,16 +134,21 @@ def wellness_module():
             if not df.empty:
                 df_p = df[df['Nombre_Jugador'] == user['nombre']]
                 if not df_p.empty:
+                    df_p = df_p.copy()
                     df_p['Fecha'] = pd.to_datetime(df_p['Fecha'])
                     fig = go.Figure(go.Scatter(x=df_p['Fecha'], y=df_p['Wellness_Score'], mode='lines+markers', line=dict(color='black')))
-                    fig.update_layout(height=250, margin=dict(l=0,r=0,t=10,b=0), yaxis=dict(range=[1,5.2]))
-                    st.plotly_chart(fig, use_container_width=True)
-        except: pass
+                    fig.update_layout(height=240, margin=dict(l=0,r=0,t=10,b=0), yaxis=dict(range=[1,5.2]), xaxis=dict(tickformat='%d/%m', nticks=4))
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    shown = True
+            if not shown:
+                st.markdown("<div class='well-empty'>Todavía no tenés registros. Enviá el primero y vas a ver tu evolución acá.</div>", unsafe_allow_html=True)
+        except Exception:
+            st.markdown("<div class='well-empty'>Tu evolución no está disponible en este momento.</div>", unsafe_allow_html=True)
 
     # --- PANEL PARA ENTRENADORES ---
     if is_staff:
         with tab2:
-            st.subheader("🏁 Semáforo de Bienestar por Categoría")
+            st.markdown("<div class='well-card'><h3>🏁 Semáforo por categoría</h3></div>", unsafe_allow_html=True)
             try:
                 spreadsheet = gsm.client.open_by_key(gsm.sheet_config["sheet_id"])
                 ws_master = spreadsheet.worksheet("Jugadores_Maestro")
@@ -137,10 +184,10 @@ def wellness_module():
                             "Fecha": p_well.iloc[0]['Fecha'] if not p_well.empty else "-"
                         })
                     
-                    st.table(pd.DataFrame(results))
+                    st.dataframe(pd.DataFrame(results), use_container_width=True, hide_index=True)
                     
                     st.info("💡 Consejo: Los jugadores en 🔴 no deberían realizar tareas de máxima intensidad hoy.")
                 else:
                     st.warning("No hay jugadores cargados en la base de datos.")
             except Exception as e:
-                st.error(f"Error cargando el panel: {e}")
+                st.warning("No se pudo cargar el panel del equipo ahora. Probá de nuevo en un momento.")

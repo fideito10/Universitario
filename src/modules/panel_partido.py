@@ -194,7 +194,7 @@ def _player_card_html(nombre, stat_label, stat_value, color, mapa_dni):
     img_html = f'<img src="data:image/jpeg;base64,{foto_b64}" style="width:85px;height:85px;border-radius:50%;object-fit:cover;border:3px solid {color};margin-bottom:10px;box-shadow:0 4px 8px rgba(0,0,0,0.3);"/>' if foto_b64 else f'<div style="width:85px;height:85px;border-radius:50%;background:#1c2030;border:3px solid {color};margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#8b949e;box-shadow:0 4px 8px rgba(0,0,0,0.3)">👤</div>'
     
     return f'''
-    <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:18px 12px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:space-between; height:100%; min-height:240px; border-top:4px solid {color}; box-shadow:0 6px 16px rgba(0,0,0,0.3)">
+    <div class="pc-card" style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:18px 12px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:space-between; height:100%; min-height:240px; border-top:4px solid {color}; box-shadow:0 6px 16px rgba(0,0,0,0.3)">
         <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
             {img_html}
             <div style="font-size:1.15rem; font-weight:800; color:#ffffff; line-height:1.25; margin-top:8px; margin-bottom:5px; text-align:center; word-break:break-word; min-height:46px; display:flex; align-items:center; justify-content:center; width:100%;">{nombre}</div>
@@ -563,6 +563,51 @@ def _get_player_historical_stats(player_name, matches_tuple, mapa_dni_tuple):
             
     return pd.DataFrame(history)
 
+def _sec_header(title, color="#ffffff"):
+    st.markdown(
+        f'<div class="sec-head" style="border-left:5px solid {color};">'
+        f'<h2 style="color:{color};">{title}</h2></div>',
+        unsafe_allow_html=True)
+
+
+def _plot(fig, key=None, use_container_width=True, **_kw):
+    """Plotly pensado para celular: sin barra de herramientas, sin arrastre que bloquee el scroll."""
+    fig.update_layout(dragmode=False, hoverlabel=dict(font_size=13), legend_font_color="#c9d1d9")
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
+    st.plotly_chart(fig, use_container_width=True, key=key,
+                    config={"displayModeBar": False, "scrollZoom": False})
+
+
+def _hbar_height(n, per=34, base=50, minimo=160):
+    return max(minimo, base + per * max(int(n), 1))
+
+
+def _styled_df(df, hdr_color="#58a6ff"):
+    return (df.style
+            .set_properties(**{"background-color": "#161b22", "color": "#ffffff",
+                               "border-bottom": "1px solid #30363d", "font-size": "14px", "padding": "8px"})
+            .set_table_styles([{"selector": "th", "props": [
+                ("background-color", "#161b22"), ("color", hdr_color), ("font-weight", "700"),
+                ("font-size", "13px"), ("text-transform", "uppercase"),
+                ("border-bottom", "2px solid #30363d")]}]))
+
+
+def _show_df(df, key, hdr_color="#58a6ff"):
+    """Tabla con la columna Jugador fija al hacer scroll horizontal."""
+    cfg = {}
+    if "Jugador" in df.columns:
+        cfg["Jugador"] = st.column_config.TextColumn("Jugador", pinned=True, width="medium")
+    st.dataframe(_styled_df(df, hdr_color), use_container_width=True, hide_index=True,
+                 key=key, column_config=cfg)
+
+
+def _empty_state(texto, icono="🏉"):
+    st.markdown(
+        f'<div class="empty-state"><div class="es-ico">{icono}</div><div>{texto}</div></div>',
+        unsafe_allow_html=True)
+
+
 def rugby_analysis_module():
     # ─────────────────────────────────────────────
     # LÓGICA DE PROCESAMIENTO
@@ -606,30 +651,100 @@ def rugby_analysis_module():
         font-size: 1.2rem; font-weight: 800; color: #ffffff;
         padding: 10px 0; margin: 30px 0 15px 0; border-bottom: 2px solid #222;
     }
+    .pc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .tnj-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 15px; }
+    .tnj-grid.seq { grid-template-columns: repeat(4, 1fr); }
+    .tnj-card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:18px 12px; text-align:center; }
+    .team-block { text-align: center; min-width: 0; }
+    .page-title { font-size: 1.5rem; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 1px; margin: 4px 0 2px 0; }
+    .page-sub { font-size: .85rem; color: #8b949e; margin-bottom: 10px; }
+    .sec-head { background: linear-gradient(135deg, #161b22 0%, #0d1117 100%); padding: 14px 16px; border-radius: 10px; margin: 26px 0 16px 0; }
+    .sec-head h2 { font-size: 1.5rem; margin: 0; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; line-height: 1.2; }
+    .sub-head { color: #fff; font-size: 1.05rem; font-weight: 800; margin: 18px 0 10px 0; text-transform: uppercase; letter-spacing: .5px; }
+    .res-badge { display: inline-block; margin-top: 18px; padding: 6px 22px; border-radius: 999px; font-weight: 900; font-size: 1.1rem; letter-spacing: 2px; border: 1px solid; }
+    .empty-state { background: #111; border: 1px dashed #333; border-radius: 14px; padding: 26px 16px; text-align: center; color: #8b949e; font-size: .95rem; margin: 10px 0; }
+    .empty-state .es-ico { font-size: 2rem; margin-bottom: 6px; }
+    .mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 6px 0 18px 0; }
+    .mini-grid.c3 { grid-template-columns: repeat(3, 1fr); }
+    .mini-card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px 8px; text-align:center; }
+    .mini-card .v { font-size: 2rem; font-weight: 900; line-height: 1.1; }
+    .mini-card .l { font-size: .72rem; color: #8b949e; font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+    .mini-card .s { font-size: .8rem; margin-top: 4px; font-weight: 600; }
+    .stTabs [data-baseweb="tab-list"] { gap: 6px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; border-bottom: 1px solid #222; }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+    .stTabs [data-baseweb="tab"] { flex: 0 0 auto; white-space: nowrap; color: #c9d1d9 !important; background: #111; border: 1px solid #2a2a2a; border-radius: 999px; padding: 8px 16px; height: auto; min-height: 44px; }
+    .stTabs [data-baseweb="tab"] p, .stTabs [data-baseweb="tab"] div, .stTabs [data-baseweb="tab"] span { color: inherit !important; }
+    .stTabs [role="tab"] { color: #c9d1d9 !important; }
+    .stTabs [role="tab"][aria-selected="true"] { color: #000 !important; }
+    .stExpander summary, .stExpander summary p, .stExpander summary span { color: #ffffff !important; min-height: 44px; }
+    .stSelectbox label, .stSelectbox label p { color: #ffffff !important; font-weight: 700; }
+    .stTabs [aria-selected="true"] { background: #ffffff !important; color: #000 !important; border-color: #fff; font-weight: 800; }
+    .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display: none; }
+    @media (max-width: 768px) {
+        .mini-grid, .mini-grid.c3 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .mini-grid .mini-card:last-child:nth-child(odd) { grid-column: span 2; }
+        .sec-head { padding: 11px 14px; margin: 20px 0 12px 0; }
+        .sec-head h2 { font-size: 1.05rem; letter-spacing: .5px; }
+        .sub-head { font-size: .95rem; }
+        .page-title { font-size: 1.25rem; }
+        .hero-ico { font-size: 2rem !important; }
+        .res-badge { font-size: 1rem; margin-top: 10px; }
+        .hero { padding: 14px; gap: 12px; margin-bottom: 14px; }
+        .hero-title { font-size: 1.3rem; }
+        .hero-sub { font-size: 0.85rem; }
+        .scoreboard { padding: 16px 8px; border-radius: 14px; }
+        .score-teams { gap: 4px; }
+        .score-teams img { height: 56px !important; max-width: 100%; }
+        .team-name { font-size: 0.7rem; letter-spacing: 0.5px; word-break: break-word; }
+        .team-score { font-size: 2.8rem; margin: 4px 0; }
+        .score-dash { font-size: 1.2rem; }
+        .score-detail { font-size: 0.72rem; }
+        .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; margin-bottom: 18px; flex-direction: row !important; }
+        .kpi-card { padding: 12px 8px; }
+        .kpi-value { font-size: 1.8rem; }
+        .kpi-label { font-size: 0.68rem; }
+        .pc-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .pc-card { min-height: 190px !important; padding: 12px 6px !important; }
+        .pc-card img { width: 64px !important; height: 64px !important; }
+        .tnj-grid, .tnj-grid.seq { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .tnj-grid .tnj-card:last-child:nth-child(odd) { grid-column: span 2; }
+        .stMarkdown div[style*="padding: 15px"] { padding: 10px 12px !important; }
+        .stMarkdown h3[style*="20px"] { font-size: 1rem !important; }
+        .stButton button, .stDownloadButton button { min-height: 48px; font-size: 1rem; }
+        .stSelectbox div[data-baseweb="select"] { min-height: 46px; }
+        .stTabs [data-baseweb="tab"] { padding: 8px 14px; font-size: 0.9rem; }
+        .indiv-profile img, .indiv-profile .ip-avatar { width: 84px !important; height: 84px !important; }
+        .indiv-profile h2 { font-size: 1.25rem !important; }
+    }
     </style>
     """, unsafe_allow_html=True)
 
+    _user = st.session_state.get("user") or {}
+    is_player = str(_user.get("rol", "")).strip().lower() == "jugador"
+
+    st.markdown('<div class="rugby-panel"><div class="page-title">🏉 Análisis de Partido</div>'
+                '<div class="page-sub">Elegí un partido y mirá cómo le fue al equipo y a vos.</div></div>',
+                unsafe_allow_html=True)
     matches = get_all_matches()
-    with st.container():
-        c1, c2 = st.columns([2, 1])
-        with c1: selected_match = st.selectbox("Seleccionar Partido", matches, label_visibility="collapsed") if matches else None
-        with c2:
-            if st.button("🔄 Actualizar", use_container_width=True):
-                st.cache_data.clear()
-                st.rerun()
+    selected_match = st.selectbox("Elegí el partido", matches, key="sb_partido_sel") if matches else None
 
     if not selected_match:
-        st.warning("⚠️ No se encontraron partidos.")
+        _empty_state("Todavía no hay partidos cargados. Volvé a probar en un rato.", "📭")
         return
 
     with st.spinner(f"Sincronizando {selected_match}..."):
         try:
             data = load_match_data(selected_match)
         except Exception as e:
-            st.error(f"No se pudieron sincronizar los datos del partido {selected_match}: {e}")
+            if is_player:
+                _empty_state("No pudimos cargar este partido ahora. Probá de nuevo en unos minutos.", "📡")
+            else:
+                st.error(f"No se pudieron sincronizar los datos del partido {selected_match}: {e}")
             return
     
-    if not data: return
+    if not data:
+        _empty_state("Este partido todavía no tiene datos de análisis cargados.", "📭")
+        return
 
 
     def find_rows(term):
@@ -661,6 +776,7 @@ def rugby_analysis_module():
     s_l, t_l, g_l, p_l, d_l = calc_score(TEAM_LOCAL)
     s_r, t_r, g_r, p_r, d_r = calc_score(TEAM_RIVAL)
     res_txt = "VICTORIA" if s_l > s_r else ("DERROTA" if s_l < s_r else "EMPATE")
+    _res_clr = "#3fb950" if s_l > s_r else ("#f85149" if s_l < s_r else "#e3b341")
 
     # 1) TACKLES (DETALLE)
     # Cada fila = 1 evento de tackle. Player puede tener múltiples jugadores separados por "|"
@@ -924,15 +1040,21 @@ def rugby_analysis_module():
     img_rival = f'<img src="data:image/png;base64,{b64_rival}" style="height:90px;object-fit:contain;"/>' if b64_rival else f'<div class="team-name">{NAME_RIVAL}</div>'
 
     # Renderizado UI
-    tab_equipo, tab_individual = st.tabs(["📊 Reporte de Equipo", "👤 Análisis Individual"])
+    _tab_labels = ["📊 Resumen", "👤 Mi análisis", "⚡ Tackles", "💥 Quiebres y Scrum", "🦵 Kicks",
+                   "🎣 Pesca", "🟡 Penales", "📏 Line Out", "⏱ Tiempo"]
+    if not is_player:
+        _tab_labels.append("📄 Informe")
+    _tabs = st.tabs(_tab_labels)
+    tab_resumen, tab_individual, tab_tackles, tab_quiebres, tab_kicks, tab_pesca, tab_penales, tab_lineout, tab_tiempo = _tabs[:9]
+    tab_informe = _tabs[9] if not is_player else None
 
-    with tab_equipo:
+    with tab_resumen:
         with st.container():
             st.markdown(f"""
             <div class="rugby-panel">
                 <div class="hero">
-                    <div style="font-size:3rem">🏆</div>
-                    <div><div class="hero-title">Resumen de Partido</div><div class="hero-sub">{NAME_LOCAL} vs {NAME_RIVAL}</div></div>
+                    <div class="hero-ico" style="font-size:3rem">🏆</div>
+                    <div style="min-width:0"><div class="hero-title">Resumen de Partido</div><div class="hero-sub">{NAME_LOCAL} vs {NAME_RIVAL}</div></div>
                 </div>
                 <div class="scoreboard">
                     <div class="score-teams">
@@ -950,7 +1072,7 @@ def rugby_analysis_module():
                             <div class="score-detail">{t_r}T · {g_r}G · {p_r}P</div>
                         </div>
                     </div>
-                    <div style="margin-top:25px; font-weight:900; font-size:1.5rem; letter-spacing:2px; text-align:center;">{res_txt}</div>
+                    <div class="res-badge" style="color:{_res_clr}; border-color:{_res_clr}; background:{_res_clr}1f;">{res_txt}</div>
                 </div>
                 <div class="kpi-grid">
                     <div class="kpi-card"><div class="kpi-value">{total_tackles}</div><div class="kpi-label">Tackles</div><div class="kpi-sub">{pct_efectividad}% Éxito</div></div>
@@ -1036,96 +1158,80 @@ def rugby_analysis_module():
             df_psc_sorted = df_psc.sort_values(by=["Recupera", "Total"], ascending=False)
 
         # ── RENDER DE LÍDERES ──
-        st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #fff;"><h2 style="color: #fff; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🏆 LÍDERES DEL PARTIDO</h2></div>', unsafe_allow_html=True)
+        st.markdown('<div style="color:#8b949e;font-size:.85rem;margin:-8px 0 4px 0">👆 Deslizá las pestañas de arriba para ver el detalle por área o <b style="color:#fff">tu análisis</b>.</div>', unsafe_allow_html=True)
+        _sec_header('🏆 LÍDERES DEL PARTIDO', '#ffffff')
         
-        # Fila 1: 4 Columnas (Tackles, Quiebres, Apoyos, Puntos)
-        lideres_cols_1 = st.columns(4)
-        
-        with lideres_cols_1[0]:
-            if not df_tck.empty:
-                lider = df_tck.iloc[0]
-                st.markdown(_player_card_html(lider["Jugador"], "Tackles", lider["Total"], "#e3b341", mapa_dni), unsafe_allow_html=True)
-                
-        with lideres_cols_1[1]:
-            if not df_qbr.empty:
-                lider = df_qbr.iloc[0]
-                st.markdown(_player_card_html(lider["Jugador"], "Quiebres", lider["Quiebres"], "#3fb950", mapa_dni), unsafe_allow_html=True)
-                
-        with lideres_cols_1[2]:
-            if not df_apoyos.empty:
-                lider = df_apoyos.iloc[0]
-                st.markdown(_player_card_html(lider["Jugador"], "Apoyos (Ruck)", lider["Apoyos"], "#58a6ff", mapa_dni), unsafe_allow_html=True)
-                
-        with lideres_cols_1[3]:
-            if not df_puntos_jug.empty:
-                lider = df_puntos_jug.iloc[0]
-                st.markdown(_player_card_html(lider["Jugador"], "Puntos Marcados", lider["Puntos"], "#a371f7", mapa_dni), unsafe_allow_html=True)
-                
-        st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
-        
-        # Fila 2: 3 Columnas (Pesca, Primero Ruck, Segundo Ruck)
-        lideres_cols_2 = st.columns(3)
-        
-        with lideres_cols_2[0]:
-            if not df_psc_sorted.empty:
-                lider = df_psc_sorted.iloc[0]
-                st.markdown(_player_card_html(lider["Jugador"], "Pescas", lider["Recupera"], "#1f6feb", mapa_dni), unsafe_allow_html=True)
-                
-        with lideres_cols_2[1]:
-            if not df_primero.empty:
-                lider = df_primero.iloc[0]
-                st.markdown(_player_card_html(lider["Jugador"], "Primero en Ruck", lider["Primero"], "#ff7b72", mapa_dni), unsafe_allow_html=True)
-                
-        with lideres_cols_2[2]:
-            if not df_segundo.empty:
-                lider = df_segundo.iloc[0]
-                st.markdown(_player_card_html(lider["Jugador"], "Segundo en Ruck", lider["Segundo"], "#f2e05a", mapa_dni), unsafe_allow_html=True)
-                
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-            # ── TACKLES ──
-        st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #e3b341;"><h2 style="color: #e3b341; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">⚡ TACKLES POR JUGADOR</h2></div>', unsafe_allow_html=True)
-        col1, col2 = st.columns([3, 2])
-        with col1:
-            fig_tck = px.bar(df_tck.head(12), x="Total", y="Jugador", orientation="h", color="% Efectividad",
+        # Tarjetas de líderes en una grilla CSS (4 col escritorio / 2 col celular)
+        _lid_cards = []
+        if not df_tck.empty:
+            _lid_cards.append(_player_card_html(df_tck.iloc[0]["Jugador"], "Tackles", df_tck.iloc[0]["Total"], "#e3b341", mapa_dni))
+        if not df_qbr.empty:
+            _lid_cards.append(_player_card_html(df_qbr.iloc[0]["Jugador"], "Quiebres", df_qbr.iloc[0]["Quiebres"], "#3fb950", mapa_dni))
+        if not df_apoyos.empty:
+            _lid_cards.append(_player_card_html(df_apoyos.iloc[0]["Jugador"], "Apoyos (Ruck)", df_apoyos.iloc[0]["Apoyos"], "#58a6ff", mapa_dni))
+        if not df_puntos_jug.empty:
+            _lid_cards.append(_player_card_html(df_puntos_jug.iloc[0]["Jugador"], "Puntos Marcados", df_puntos_jug.iloc[0]["Puntos"], "#a371f7", mapa_dni))
+        if not df_psc_sorted.empty:
+            _lid_cards.append(_player_card_html(df_psc_sorted.iloc[0]["Jugador"], "Pescas", df_psc_sorted.iloc[0]["Recupera"], "#1f6feb", mapa_dni))
+        if not df_primero.empty:
+            _lid_cards.append(_player_card_html(df_primero.iloc[0]["Jugador"], "Primero en Ruck", df_primero.iloc[0]["Primero"], "#ff7b72", mapa_dni))
+        if not df_segundo.empty:
+            _lid_cards.append(_player_card_html(df_segundo.iloc[0]["Jugador"], "Segundo en Ruck", df_segundo.iloc[0]["Segundo"], "#f2e05a", mapa_dni))
+        if _lid_cards:
+            st.markdown('<div class="pc-grid">' + "".join(c.strip() for c in _lid_cards) + '</div>', unsafe_allow_html=True)
+
+        if st.button("🔄 Actualizar datos", use_container_width=True, key="btn_refresh_partido"):
+            st.cache_data.clear()
+            st.rerun()
+        st.markdown("""<div style="text-align:center; color:#484f58; font-size:0.8rem; margin-top:24px; padding:14px; border-top:1px solid #21262d">Club Universitario de La Plata · Sistema de Rendimiento</div>""", unsafe_allow_html=True)
+
+    with tab_tackles:
+        _sec_header('⚡ TACKLES POR JUGADOR', '#e3b341')
+        if df_tck.empty:
+            _empty_state("No hay tackles registrados en este partido.", "⚡")
+        else:
+            _tck_top = df_tck.head(12)
+            fig_tck = px.bar(_tck_top, x="Total", y="Jugador", orientation="h", color="% Efectividad",
                              color_continuous_scale=["#f85149", "#e3b341", "#3fb950"], range_color=[40, 100],
                              labels={"Total": "N° Tackles", "Jugador": ""}, text="Total")
-            fig_tck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=600,
-                                  margin=dict(l=220, r=40, t=10, b=10), yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=18, color="#ffffff")), font=dict(family="Arial Black", size=18))
-            st.plotly_chart(fig_tck, use_container_width=True, key="chart_tackles_bar")
-        with col2:
-            fig_donut = go.Figure(go.Pie(labels=["Efectivos", "Fallados"], values=[total_buenos, total_tackles-total_buenos],
-                                         hole=0.65, marker_colors=["#3fb950", "#f85149"], textinfo="label+percent"))
-            fig_donut.add_annotation(text=f"<span style='font-size:38px;font-weight:900;color:#3fb950'>{pct_efectividad}%</span><br><span style='font-size:12px;color:#8b949e;font-weight:bold'>EFECTIVIDAD</span>", font=dict(size=38, color="#3fb950", weight=900), showarrow=False)
-            fig_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280,
-                                    margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-            st.plotly_chart(fig_donut, use_container_width=True, key="chart_tackles_donut")
-            _df = df_tck[["Jugador","Total","Efectivos","Fallados","Dobles","% Efectividad"]].head(8)
-            st.dataframe(
-                _df.style
-                    .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "18px", "padding": "12px"})
-                    .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
-                                        ("color", "#58a6ff"), ("font-weight", "700"),
-                                        ("font-size", "16px"), ("text-transform", "uppercase"),
-                                        ("border-bottom", "2px solid #30363d")]}]),
-                use_container_width=True, hide_index=True, key="df_tackles"
-            )
+            fig_tck.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9",
+                                  height=_hbar_height(len(_tck_top), 38),
+                                  margin=dict(l=4, r=24, t=8, b=8), coloraxis_showscale=False,
+                                  yaxis=dict(autorange="reversed", automargin=True, title=None, tickfont=dict(size=12, color="#ffffff")),
+                                  xaxis=dict(title=None, gridcolor="#21262d"), font=dict(family="Arial", size=12))
+            fig_tck.update_traces(textposition="outside", cliponaxis=False)
+            st.markdown('<div class="sub-head">Quién más tackleó <span style="color:#8b949e;font-weight:600;font-size:.75rem;text-transform:none">· color = efectividad</span></div>', unsafe_allow_html=True)
+            _plot(fig_tck, key="chart_tackles_bar")
 
-        # ── QUIEBRES + SCRUMS ──
+            st.markdown('<div class="sub-head">Efectividad del equipo</div>', unsafe_allow_html=True)
+            fig_donut = go.Figure(go.Pie(labels=["Efectivos", "Fallados"], values=[total_buenos, total_tackles-total_buenos],
+                                         hole=0.65, marker_colors=["#3fb950", "#f85149"], textinfo="percent"))
+            fig_donut.add_annotation(text=f"<span style='font-size:34px;font-weight:900;color:#3fb950'>{pct_efectividad}%</span><br><span style='font-size:11px;color:#8b949e;font-weight:bold'>EFECTIVIDAD</span>", font=dict(size=34, color="#3fb950"), showarrow=False)
+            fig_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=270,
+                                    margin=dict(l=0, r=0, t=8, b=0), showlegend=True, legend=dict(orientation="h", y=-0.05, x=0.5, xanchor="center"))
+            _plot(fig_donut, key="chart_tackles_donut")
+
+            st.markdown('<div class="sub-head">Detalle</div>', unsafe_allow_html=True)
+            _show_df(df_tck[["Jugador", "Total", "Efectivos", "Fallados", "Dobles", "% Efectividad"]].head(15), "df_tackles")
+
+    with tab_quiebres:
         df_qbr = df_qbr[~df_qbr["Jugador"].str.contains("Rival", case=False, na=False)]
         col_qbr, col_scr = st.columns([1, 1])
         with col_qbr:
-            st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #3fb950;"><h2 style="color: #3fb950; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">💥 QUIEBRES DE LÍNEA</h2></div>', unsafe_allow_html=True)
+            _sec_header('💥 QUIEBRES DE LÍNEA', '#3fb950')
             if not df_qbr.empty:
                 fig_qbr = px.bar(df_qbr, x="Quiebres", y="Jugador", orientation="h", color="Quiebres",
                                  color_continuous_scale=["#1f6feb", "#58a6ff"], text="Quiebres")
-                fig_qbr.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 450,
-                                      margin=dict(l=220, r=20, t=10, b=10), showlegend=False, yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=16, color="#ffffff")), font=dict(family="Arial Black", size=16))
-                st.plotly_chart(fig_qbr, use_container_width=True, key="chart_quiebres")
+                fig_qbr.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=_hbar_height(len(df_qbr), 38),
+                                      margin=dict(l=4, r=24, t=8, b=8), showlegend=False, coloraxis_showscale=False,
+                                      yaxis=dict(autorange="reversed", automargin=True, title=None, tickfont=dict(size=12, color="#ffffff")),
+                                      xaxis=dict(title=None, gridcolor="#21262d"), font=dict(family="Arial", size=12))
+                fig_qbr.update_traces(textposition="outside", cliponaxis=False)
+                _plot(fig_qbr, use_container_width=True, key="chart_quiebres")
             else:
-                st.info("Sin datos de quiebres")
+                _empty_state("No hubo quiebres de línea registrados.", "💥")
         with col_scr:
-            st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #58a6ff;"><h2 style="color: #58a6ff; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🏟️ SCRUMS</h2></div>', unsafe_allow_html=True)
+            _sec_header('🏟️ SCRUMS', '#58a6ff')
             total_scrums = scrum_nuestros + scrum_rival
             if total_scrums > 0:
                 fig_scr = go.Figure(go.Pie(
@@ -1133,8 +1239,8 @@ def rugby_analysis_module():
                     values=[scrum_nuestros, scrum_rival],
                     hole=0.55,
                     marker_colors=["#58a6ff", "#f85149"],
-                    textinfo="label+percent",
-                    textfont=dict(family="Arial Black", size=14, color="white"),
+                    textinfo="percent",
+                    textfont=dict(family="Arial", size=13, color="white"),
                 ))
                 fig_scr.add_annotation(
                     text=f"<span style='font-size:38px;font-weight:900;color:#58a6ff'>{total_scrums}</span><br><span style='font-size:12px;color:#8b949e;font-weight:bold'>TOTAL SCRUMS</span>",
@@ -1143,17 +1249,17 @@ def rugby_analysis_module():
                 )
                 fig_scr.update_layout(
                     paper_bgcolor="#161b22", plot_bgcolor="#161b22",
-                    font_color="#c9d1d9", height= 450,
+                    font_color="#c9d1d9", height=320,
                     margin=dict(l=0, r=0, t=10, b=0),
-                    showlegend=False,
-                    legend=dict(orientation="h", y=-0.1, font=dict(color="#8b949e"))
+                    showlegend=True,
+                    legend=dict(orientation="h", y=-0.05, x=0.5, xanchor="center", font=dict(color="#8b949e"))
                 )
-                st.plotly_chart(fig_scr, use_container_width=True, key="chart_scrums")
+                _plot(fig_scr, use_container_width=True, key="chart_scrums")
             else:
-                st.info("Sin datos de scrums")
+                _empty_state("No hay scrums registrados.", "🏟️")
 
-        # ── KICKS ──
-        st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #a371f7;"><h2 style="color: #a371f7; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🦵 ANÁLISIS DE KICKS (PATADAS)</h2></div>', unsafe_allow_html=True)
+    with tab_kicks:
+        _sec_header('🦵 ANÁLISIS DE KICKS (PATADAS)', '#a371f7')
         
         kicks_total_team = len(kck_rows)
         kicks_gana_team = team_kicks_stats["gana"]
@@ -1189,18 +1295,22 @@ def rugby_analysis_module():
         
         col_kck1, col_kck2 = st.columns([1, 1])
         with col_kck1:
-            st.markdown('<h3 style="color: #a371f7; font-size: 20px; font-weight: 700; margin-bottom: 10px;">📊 TIPOS DE KICKS POR JUGADOR</h3>', unsafe_allow_html=True)
+            st.markdown('<div class="sub-head" style="color:#a371f7">📊 Tipos de kick por jugador</div>', unsafe_allow_html=True)
             if not df_kck.empty:
-                fig_types = px.bar(df_kck, x="Jugador", y=["Territorial", "Bajo Presión", "A Disputar / Cajón", "Otros Tipos"],
-                                   barmode="stack", color_discrete_sequence=["#1f6feb", "#58a6ff", "#3fb950", "#e3b341"])
-                fig_types.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=400,
-                                        margin=dict(l=40, r=20, t=10, b=140), legend=dict(orientation="h", y=1.15, font=dict(size=12)), xaxis=dict(tickfont=dict(family="Arial Black", size=15, color="#ffffff")), font=dict(family="Arial Black", size=14))
-                st.plotly_chart(fig_types, use_container_width=True, key="chart_kicks_types")
+                fig_types = px.bar(df_kck, y="Jugador", x=["Territorial", "Bajo Presión", "A Disputar / Cajón", "Otros Tipos"],
+                                   orientation="h", barmode="stack", color_discrete_sequence=["#1f6feb", "#58a6ff", "#3fb950", "#e3b341"])
+                fig_types.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9",
+                                        height=_hbar_height(len(df_kck), 34, 110),
+                                        margin=dict(l=4, r=10, t=8, b=8),
+                                        legend=dict(orientation="h", y=-0.02, yanchor="top", x=0, title_text="", font=dict(size=11)),
+                                        yaxis=dict(autorange="reversed", automargin=True, title=None, tickfont=dict(size=12, color="#ffffff")),
+                                        xaxis=dict(title=None, gridcolor="#21262d"), font=dict(family="Arial", size=12))
+                _plot(fig_types, use_container_width=True, key="chart_kicks_types")
             else:
-                st.info("Sin datos de kicks")
+                _empty_state("No hay kicks registrados.", "🦵")
                 
         with col_kck2:
-            st.markdown('<h3 style="color: #a371f7; font-size: 20px; font-weight: 700; margin-bottom: 10px;">🎯 DISTRIBUCIÓN DE KICKS DEL EQUIPO</h3>', unsafe_allow_html=True)
+            st.markdown('<div class="sub-head" style="color:#a371f7">🎯 Distribución del equipo</div>', unsafe_allow_html=True)
             t_types_vals = [
                 team_kicks_stats["territorial"],
                 team_kicks_stats["bajo_presion"],
@@ -1215,8 +1325,8 @@ def rugby_analysis_module():
                     values=t_types_vals,
                     hole=0.6,
                     marker_colors=["#1f6feb", "#58a6ff", "#3fb950", "#e3b341"],
-                    textinfo="label+percent",
-                    textfont=dict(family="Arial Black", size=12, color="white")
+                    textinfo="percent",
+                    textfont=dict(family="Arial", size=12, color="white")
                 ))
                 fig_donut_kck.add_annotation(
                     text=f"<span style='font-size:32px;font-weight:900;color:#a371f7'>{kicks_total_team}</span><br><span style='font-size:10px;color:#8b949e;font-weight:bold'>TOTAL KICKS</span>",
@@ -1224,72 +1334,67 @@ def rugby_analysis_module():
                 )
                 fig_donut_kck.update_layout(
                     paper_bgcolor="#161b22", plot_bgcolor="#161b22",
-                    font_color="#c9d1d9", height=400,
+                    font_color="#c9d1d9", height=330,
                     margin=dict(l=0, r=0, t=10, b=0),
-                    showlegend=False
+                    showlegend=True, legend=dict(orientation="h", y=-0.05, x=0.5, xanchor="center", font=dict(size=11))
                 )
-                st.plotly_chart(fig_donut_kck, use_container_width=True, key="chart_kicks_donut")
+                _plot(fig_donut_kck, use_container_width=True, key="chart_kicks_donut")
             else:
-                st.info("Sin datos de tipos de kicks")
+                _empty_state("Sin datos de tipos de kicks.", "🦵")
                 
-        st.markdown('<h3 style="color: #a371f7; font-size: 20px; font-weight: 700; margin-top: 20px; margin-bottom: 10px;">📋 DETALLE DE KICKS POR JUGADOR</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-head" style="color:#a371f7">📋 Detalle por jugador</div>', unsafe_allow_html=True)
         if not df_kck.empty:
-            st.dataframe(
-                df_kck.style
-                    .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "18px", "padding": "12px"})
-                    .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
-                                        ("color", "#a371f7"), ("font-weight", "700"),
-                                        ("font-size", "16px"), ("text-transform", "uppercase"),
-                                        ("border-bottom", "2px solid #30363d")]}]),
-                use_container_width=True, hide_index=True, key="df_kicks_detailed"
-            )
+            _show_df(df_kck[["Jugador", "Total Kicks", "Gana Terreno", "Errores", "% Efectividad"]], "df_kicks_detailed", "#a371f7")
+            with st.expander("Ver todas las columnas"):
+                _show_df(df_kck, "df_kicks_full", "#a371f7")
 
-        # ── PESCA ──
-        st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #1f6feb;"><h2 style="color: #1f6feb; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🎣 PESCA (RESTART CONTEST)</h2></div>', unsafe_allow_html=True)
-        col7, col8, col9 = st.columns([1, 2, 2])
-        with col7:
-            st.markdown(f"""
-            <div class="kpi-grid" style="flex-direction:column; gap:12px">
-                <div class="kpi-card"><div class="kpi-value">{pesca_nosotros}</div><div class="kpi-label">Pesquemos</div><div class="kpi-sub">{pesca_recupera} recuperadas</div></div>
-                <div class="kpi-card"><div class="kpi-value" style="color:#f85149">{pesca_rival}</div><div class="kpi-label">Pesca Rival</div></div>
-                <div class="kpi-card"><div class="kpi-value" style="color:#e3b341">{pesca_penal_u}</div><div class="kpi-label">Penales a favor</div></div>
-            </div>
-            """, unsafe_allow_html=True)
-        with col8:
-            if not df_psc.empty:
-                fig_psc = px.bar(df_psc, x="Total", y="Jugador", orientation="h", color="Recupera",
-                                 color_continuous_scale=["#1f6feb", "#3fb950"], text="Total")
-                fig_psc.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350,
-                                      margin=dict(l=220, r=20, t=10, b=10), yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=16, color="#ffffff")), font=dict(family="Arial Black", size=16))
-                st.plotly_chart(fig_psc, use_container_width=True, key="chart_pesca")
-        with col9:
-            st.dataframe(
-                df_psc.style
-                    .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "18px", "padding": "12px"})
-                    .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
-                                        ("color", "#58a6ff"), ("font-weight", "700"),
-                                        ("font-size", "16px"), ("text-transform", "uppercase"),
-                                        ("border-bottom", "2px solid #30363d")]}]),
-                use_container_width=True, hide_index=True, key="df_pesca"
-            )
+    with tab_pesca:
+        _sec_header('🎣 PESCA (RESTART CONTEST)', '#1f6feb')
+        st.markdown(f"""
+        <div class="mini-grid c3">
+            <div class="mini-card"><div class="v" style="color:#fff">{pesca_nosotros}</div><div class="l">Pesquemos</div><div class="s" style="color:#3fb950">{pesca_recupera} recuperadas</div></div>
+            <div class="mini-card"><div class="v" style="color:#f85149">{pesca_rival}</div><div class="l">Pesca rival</div></div>
+            <div class="mini-card"><div class="v" style="color:#e3b341">{pesca_penal_u}</div><div class="l">Penales a favor</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+        if not df_psc.empty:
+            st.markdown('<div class="sub-head">Quién pescó</div>', unsafe_allow_html=True)
+            fig_psc = px.bar(df_psc, x="Total", y="Jugador", orientation="h", color="Recupera",
+                             color_continuous_scale=["#1f6feb", "#3fb950"], text="Total")
+            fig_psc.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9",
+                                  height=_hbar_height(len(df_psc), 38), margin=dict(l=4, r=24, t=8, b=8),
+                                  coloraxis_showscale=False,
+                                  yaxis=dict(autorange="reversed", automargin=True, title=None, tickfont=dict(size=12, color="#ffffff")),
+                                  xaxis=dict(title=None, gridcolor="#21262d"), font=dict(family="Arial", size=12))
+            fig_psc.update_traces(textposition="outside", cliponaxis=False)
+            _plot(fig_psc, use_container_width=True, key="chart_pesca")
+            _show_df(df_psc, "df_pesca")
+        else:
+            _empty_state("No hay pescas registradas por jugador.", "🎣")
 
-        # ── PENALES ──
-        st.markdown('<div style="background-color: #161b22; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #e3b341;"><h2 style="color: #e3b341; font-size: 28px; margin: 0; font-weight: 900; letter-spacing: 1px;">🟡 PENALES Y FREE KICKS</h2></div>', unsafe_allow_html=True)
-        c10, c11 = st.columns([2, 3])
-        with c10:
+    with tab_penales:
+        _sec_header('🟡 PENALES Y FREE KICKS', '#e3b341')
+        if pnl_total == 0 and df_pnl_jug.empty:
+            _empty_state("No se registraron penales en este partido.", "🟡")
+        else:
             fig_pnl_donut = go.Figure(go.Pie(labels=["A favor", "En contra"], values=[pnl_u, pnl_rival], hole=0.6,
-                                             marker_colors=["#3fb950", "#f85149"], textinfo="label+value"))
-            fig_pnl_donut.add_annotation(text=f"<span style=\'font-size:38px;font-weight:900;color:#e3b341\'>{pnl_total}</span><br><span style=\'font-size:12px;color:#8b949e;font-weight:bold\'>TOTAL</span>", showarrow=False)
-            fig_pnl_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350, font=dict(family="Arial Black", size=14), margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
-            st.plotly_chart(fig_pnl_donut, use_container_width=True, key="chart_penales_donut")
-        with c11:
+                                             marker_colors=["#3fb950", "#f85149"], textinfo="value"))
+            fig_pnl_donut.add_annotation(text=f"<span style='font-size:34px;font-weight:900;color:#e3b341'>{pnl_total}</span><br><span style='font-size:12px;color:#8b949e;font-weight:bold'>TOTAL</span>", showarrow=False)
+            fig_pnl_donut.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height=280, font=dict(family="Arial", size=14), margin=dict(l=0, r=0, t=20, b=0), showlegend=True, legend=dict(orientation="h", y=-0.05, x=0.5, xanchor="center"))
+            _plot(fig_pnl_donut, use_container_width=True, key="chart_penales_donut")
             if not df_pnl_jug.empty:
+                st.markdown('<div class="sub-head">Penales por jugador</div>', unsafe_allow_html=True)
                 fig_pnl_jug = px.bar(df_pnl_jug, x="Penales Cometidos", y="Jugador", orientation="h", text="Penales Cometidos", color_discrete_sequence=["#e3b341"])
-                fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9", height= 350, font=dict(family="Arial Black", size=16), margin=dict(l=220, r=20, t=10, b=10), yaxis=dict(autorange="reversed", tickfont=dict(family="Arial Black", size=16, color="#ffffff")))
-                st.plotly_chart(fig_pnl_jug, use_container_width=True, key="chart_penales_jug")
+                fig_pnl_jug.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9",
+                                          height=_hbar_height(len(df_pnl_jug), 38), font=dict(family="Arial", size=12),
+                                          margin=dict(l=4, r=24, t=8, b=8),
+                                          xaxis=dict(title=None, gridcolor="#21262d"),
+                                          yaxis=dict(autorange="reversed", automargin=True, title=None, tickfont=dict(size=12, color="#ffffff")))
+                fig_pnl_jug.update_traces(textposition="outside", cliponaxis=False)
+                _plot(fig_pnl_jug, use_container_width=True, key="chart_penales_jug")
 
-        # ── LINE OUT ──
-        st.markdown('<div class="section-header">📏 Line Out</div>', unsafe_allow_html=True)
+    with tab_lineout:
+        _sec_header('📏 LINE OUT', '#58a6ff')
 
         # KPIs superiores
         pct_limpia_prop = round(lin_limpia / lin_total_prop * 100) if lin_total_prop else 0
@@ -1326,6 +1431,8 @@ def rugby_analysis_module():
         """, unsafe_allow_html=True)
 
         # Desglose completo nuestros lines
+        if lin_total == 0:
+            _empty_state("No hay line outs registrados en este partido.", "📏")
         lin_col1, lin_col2 = st.columns(2)
         with lin_col1:
             st.markdown(f"""
@@ -1357,14 +1464,15 @@ def rugby_analysis_module():
             if not df_lin_res.empty:
                 color_map = {"Limpia": "#3fb950", "Sucia": "#e3b341", "Robada": "#f85149",
                              "Perdida": "#f85149", "Torcida": "#8b949e", "Pasada": "#58a6ff", "T. Rápido": "#a371f7"}
-                fig_lin = px.bar(df_lin_res, x="Resultado", y="N°", text="N°",
+                fig_lin = px.bar(df_lin_res, y="Resultado", x="N°", text="N°", orientation="h",
                                  color="Resultado", color_discrete_map=color_map)
                 fig_lin.update_layout(paper_bgcolor="#161b22", plot_bgcolor="#161b22",
-                                      font_color="#c9d1d9", height=280, showlegend=False,
-                                      margin=dict(l=0, r=0, t=10, b=10),
-                                      yaxis=dict(gridcolor="#21262d"))
-                fig_lin.update_traces(textfont_color="#fff", textposition="outside")
-                st.plotly_chart(fig_lin, use_container_width=True, key="chart_lineout")
+                                      font_color="#c9d1d9", height=_hbar_height(len(df_lin_res), 34), showlegend=False,
+                                      margin=dict(l=4, r=24, t=8, b=8), font=dict(family="Arial", size=12),
+                                      yaxis=dict(autorange="reversed", automargin=True, title=None, tickfont=dict(size=12, color="#ffffff")),
+                                      xaxis=dict(title=None, gridcolor="#21262d"))
+                fig_lin.update_traces(textfont_color="#fff", textposition="outside", cliponaxis=False)
+                _plot(fig_lin, use_container_width=True, key="chart_lineout")
             # Posicion de lanzamiento
             if lin_2m + lin_4m + lin_6m > 0:
                 st.markdown(f"""
@@ -1378,9 +1486,7 @@ def rugby_analysis_module():
                 </div>
                 """, unsafe_allow_html=True)
 
-        # ─────────────────────────────────────────────────────────
-        # ⏱ TIEMPO NETO DE JUEGO
-        # ─────────────────────────────────────────────────────────
+    with tab_tiempo:
         CATS_EXCLUIR = {"sustituciones", "personal (*)"}
         _intervals = []
         for cat_name, cat_content in data.items():
@@ -1415,9 +1521,8 @@ def rugby_analysis_module():
                 tnj_dead_sin_et = max(0, tnj_dead - tnj_et)
                 tnj_paradas = len(_gaps) - 1
 
-        st.markdown('<div style="background-color:#161b22;padding:15px;border-radius:10px;margin-bottom:20px;border-left:5px solid #58a6ff;"><h2 style="color:#58a6ff;font-size:28px;margin:0;font-weight:900;letter-spacing:1px;">⏱ TIEMPO NETO DE JUEGO</h2></div>', unsafe_allow_html=True)
+        _sec_header('⏱ TIEMPO NETO DE JUEGO', '#58a6ff')
 
-        tnj_cols = st.columns(5)
         _tnj_data = [
             ("⚽ Tiempo Neto",          _seconds_to_clock(tnj_net),           f"{tnj_net/60:.1f} min",          "#3fb950"),
             ("💀 Tiempo Muerto",         _seconds_to_clock(tnj_dead),          f"{tnj_dead/60:.1f} min",         "#f85149"),
@@ -1425,16 +1530,12 @@ def rugby_analysis_module():
             ("⏸ T. Muerto (sin ET)",     _seconds_to_clock(tnj_dead_sin_et),   f"{tnj_dead_sin_et/60:.1f} min",  "#8b949e"),
             ("🛑 Paradas",               str(tnj_paradas),                     "(excl. entretiempo)",            "#a371f7"),
         ]
-        for col_tnj, (lbl, val, sub, clr) in zip(tnj_cols, _tnj_data):
-            with col_tnj:
-                st.markdown(f"""
-                <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
-                            padding:18px 12px;text-align:center;border-top:4px solid {clr}">
-                    <div style="font-size:1.8rem;font-weight:900;color:{clr};line-height:1">{val}</div>
-                    <div style="font-size:0.72rem;color:#8b949e;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">{lbl}</div>
-                    <div style="font-size:0.8rem;color:#58a6ff;margin-top:4px;font-weight:600">{sub}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        st.markdown('<div class="tnj-grid">' + "".join(
+            f'<div class="tnj-card" style="border-top:4px solid {clr}">'
+            f'<div style="font-size:1.8rem;font-weight:900;color:{clr};line-height:1">{val}</div>'
+            f'<div style="font-size:0.72rem;color:#8b949e;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">{lbl}</div>'
+            f'<div style="font-size:0.8rem;color:#58a6ff;margin-top:4px;font-weight:600">{sub}</div></div>'
+            for (lbl, val, sub, clr) in _tnj_data) + '</div>', unsafe_allow_html=True)
 
         if tnj_net > 0 and tnj_dead > 0:
             _tnj_donut = go.Figure(go.Pie(
@@ -1453,13 +1554,11 @@ def rugby_analysis_module():
             )
             _tnj_donut.update_layout(
                 paper_bgcolor="#161b22", plot_bgcolor="#161b22",
-                font_color="#c9d1d9", height=280,
+                font_color="#c9d1d9", height=300,
                 margin=dict(l=0, r=0, t=20, b=0),
-                legend=dict(orientation="h", y=-0.15, font=dict(color="#8b949e", size=12)),
+                legend=dict(orientation="h", y=-0.05, x=0.5, xanchor="center", font=dict(color="#8b949e", size=11)),
             )
-            _col_d1, _col_d2, _col_d3 = st.columns([1, 2, 1])
-            with _col_d2:
-                st.plotly_chart(_tnj_donut, use_container_width=True, key="chart_tiempo_neto_donut")
+            _plot(_tnj_donut, use_container_width=True, key="chart_tiempo_neto_donut")
 
         # ─────────────────────────────────────────────────────────
         # 📊 SECUENCIAS DE POSESIÓN (solo CULP — 03 POSESION)
@@ -1479,7 +1578,7 @@ def rugby_analysis_module():
             if dur > 0:
                 _secuencias.append(dur)
 
-        st.markdown('<div style="background-color:#161b22;padding:15px;border-radius:10px;margin:30px 0 20px 0;border-left:5px solid #a371f7;"><h2 style="color:#a371f7;font-size:28px;margin:0;font-weight:900;letter-spacing:1px;">📊 SECUENCIAS DE POSESIÓN</h2></div>', unsafe_allow_html=True)
+        _sec_header('📊 SECUENCIAS DE POSESIÓN', '#a371f7')
 
         if _secuencias:
             _cortas  = [d for d in _secuencias if d <= 35]
@@ -1488,7 +1587,6 @@ def rugby_analysis_module():
             _total_s = len(_secuencias)
 
             # KPI cards
-            _seq_kpi_cols = st.columns(4)
             _seq_kpi_data = [
                 ("🟢 Cortas (0–35\")",        len(_cortas),  f"Prom: {sum(_cortas)/len(_cortas):.0f}s" if _cortas else "",   "#3fb950"),
                 ("🟡 Medias (35\"–1:30)",      len(_medias),  f"Prom: {sum(_medias)/len(_medias):.0f}s" if _medias else "",   "#e3b341"),
@@ -1496,44 +1594,40 @@ def rugby_analysis_module():
                 ("⏱ Duración Promedio",        f"{sum(_secuencias)/_total_s:.0f}s",
                                                f"Máx: {max(_secuencias):.0f}s · Total: {_total_s}",                           "#58a6ff"),
             ]
-            for _sc, (_lbl, _val, _sub, _clr) in zip(_seq_kpi_cols, _seq_kpi_data):
-                with _sc:
-                    st.markdown(f"""
-                    <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
-                                padding:18px 12px;text-align:center;border-top:4px solid {_clr}">
-                        <div style="font-size:2rem;font-weight:900;color:{_clr};line-height:1">{_val}</div>
-                        <div style="font-size:0.72rem;color:#8b949e;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">{_lbl}</div>
-                        <div style="font-size:0.8rem;color:#ffffff;margin-top:4px;font-weight:600;opacity:0.8">{_sub}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            st.markdown('<div class="tnj-grid seq">' + "".join(
+                f'<div class="tnj-card" style="border-top:4px solid {_clr}">'
+                f'<div style="font-size:1.8rem;font-weight:900;color:{_clr};line-height:1">{_val}</div>'
+                f'<div style="font-size:0.72rem;color:#8b949e;margin-top:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">{_lbl}</div>'
+                f'<div style="font-size:0.8rem;color:#ffffff;margin-top:4px;font-weight:600;opacity:0.8">{_sub}</div></div>'
+                for (_lbl, _val, _sub, _clr) in _seq_kpi_data) + '</div>', unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
 
             # Gráfico: barras de distribución por rango
             _df_seq_dist = pd.DataFrame([
-                {"Rango": "🟢 Cortas (0–35s)",    "Cantidad": len(_cortas),  "color": "#3fb950"},
-                {"Rango": "🟡 Medias (35s–1:30)",  "Cantidad": len(_medias),  "color": "#e3b341"},
-                {"Rango": "🔴 Largas (>1:30)",     "Cantidad": len(_largas),  "color": "#f85149"},
+                {"Rango": "Cortas (≤35s)",   "Cantidad": len(_cortas)},
+                {"Rango": "Medias (35s–1:30)", "Cantidad": len(_medias)},
+                {"Rango": "Largas (>1:30)",   "Cantidad": len(_largas)},
             ])
             _fig_seq = px.bar(
-                _df_seq_dist, x="Rango", y="Cantidad",
+                _df_seq_dist, y="Rango", x="Cantidad", orientation="h",
                 color="Rango",
                 color_discrete_map={
-                    "🟢 Cortas (0–35s)":   "#3fb950",
-                    "🟡 Medias (35s–1:30)": "#e3b341",
-                    "🔴 Largas (>1:30)":    "#f85149",
+                    "Cortas (≤35s)":      "#3fb950",
+                    "Medias (35s–1:30)":  "#e3b341",
+                    "Largas (>1:30)":     "#f85149",
                 },
                 text="Cantidad",
             )
             _fig_seq.update_layout(
                 paper_bgcolor="#161b22", plot_bgcolor="#161b22",
-                font_color="#c9d1d9", height=300, showlegend=False,
-                margin=dict(l=20, r=20, t=10, b=10),
-                yaxis=dict(gridcolor="#21262d", title="N° Secuencias"),
-                xaxis=dict(title=""),
-                font=dict(family="Arial Black", size=15),
+                font_color="#c9d1d9", height=210, showlegend=False,
+                margin=dict(l=4, r=24, t=8, b=8),
+                xaxis=dict(gridcolor="#21262d", title=None),
+                yaxis=dict(title="", automargin=True, autorange="reversed", tickfont=dict(size=12, color="#ffffff")),
+                font=dict(family="Arial", size=12),
             )
-            _fig_seq.update_traces(textfont_color="#fff", textposition="outside")
+            _fig_seq.update_traces(textfont_color="#fff", textposition="outside", cliponaxis=False)
 
             # Histograma de duraciones individuales
             _fig_hist = px.histogram(
@@ -1557,13 +1651,10 @@ def rugby_analysis_module():
                                     annotation_text=_lbl_cut,
                                     annotation_font_color=_col_cut)
 
-            _col_bar_seq, _col_hist_seq = st.columns(2)
-            with _col_bar_seq:
-                st.markdown('<h4 style="color:#ffffff;font-size:15px;font-weight:700;margin-bottom:8px">📊 DISTRIBUCIÓN POR RANGO</h4>', unsafe_allow_html=True)
-                st.plotly_chart(_fig_seq, use_container_width=True, key="chart_seq_dist")
-            with _col_hist_seq:
-                st.markdown('<h4 style="color:#ffffff;font-size:15px;font-weight:700;margin-bottom:8px">📈 HISTOGRAMA DE DURACIONES</h4>', unsafe_allow_html=True)
-                st.plotly_chart(_fig_hist, use_container_width=True, key="chart_seq_hist")
+            st.markdown('<div class="sub-head">📊 Distribución por rango</div>', unsafe_allow_html=True)
+            _plot(_fig_seq, use_container_width=True, key="chart_seq_dist")
+            with st.expander("📈 Histograma de duraciones", expanded=False):
+                _plot(_fig_hist, use_container_width=True, key="chart_seq_hist")
 
             # Tabla detallada de secuencias
             _df_seq_tabla = pd.DataFrame([
@@ -1575,90 +1666,79 @@ def rugby_analysis_module():
                 }
                 for i, d in enumerate(_secuencias)
             ])
-            st.markdown('<h4 style="color:#ffffff;font-size:15px;font-weight:700;margin-top:15px;margin-bottom:8px">📋 DETALLE DE SECUENCIAS</h4>', unsafe_allow_html=True)
-            st.dataframe(
-                _df_seq_tabla[["#", "Duración", "Rango"]].style
-                    .set_properties(**{"background-color": "#161b22", "color": "#ffffff",
-                                       "border-bottom": "1px solid #30363d", "font-size": "14px", "padding": "8px"})
-                    .set_table_styles([{"selector": "th", "props": [
-                        ("background-color", "#161b22"), ("color", "#a371f7"),
-                        ("font-weight", "700"), ("font-size", "13px"),
-                        ("text-transform", "uppercase"), ("border-bottom", "2px solid #30363d")
-                    ]}]),
-                use_container_width=True, hide_index=True, key="df_secuencias"
-            )
+            with st.expander("📋 Detalle de secuencias", expanded=False):
+                _show_df(_df_seq_tabla[["#", "Duración", "Rango"]], "df_secuencias", "#a371f7")
         else:
-            st.info("Sin datos de posesión (categoría '03 POSESION') en este partido.")
+            _empty_state("Este partido no tiene datos de posesión cargados.", "📊")
 
-        st.markdown("""<div style="text-align:center; color:#484f58; font-size:0.8rem; margin-top:50px; padding:20px; border-top:1px solid #21262d">Club Universitario de La Plata · Sistema de Rendimiento</div>""", unsafe_allow_html=True)
+    if tab_informe is not None:
+        with tab_informe:
+            _sec_header('📄 INFORME PDF', '#ffffff')
+            # ── BOTÓN EXPORTAR PDF ──
 
-        # ── BOTÓN EXPORTAR PDF ──
-        st.markdown("---")
+            # Guardamos el PDF en session_state para que sobreviva al rerun de Streamlit
+            pdf_key = f"pdf_bytes_{selected_match}"
 
-        # Guardamos el PDF en session_state para que sobreviva al rerun de Streamlit
-        pdf_key = f"pdf_bytes_{selected_match}"
-
-        if st.session_state.get(pdf_key):
-            # Si ya se generó, mostramos ambos botones lado a lado ocupando bien la pantalla
-            col_gen, col_dl = st.columns(2)
-            with col_gen:
-                if st.button("📄 Generar de nuevo", use_container_width=True, type="secondary", key="btn_gen_pdf_again"):
-                    with st.spinner("Generando informe PDF..."):
-                        st.session_state[pdf_key] = _generar_pdf(
-                            selected_match=selected_match,
-                            name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
-                            s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
-                            t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
-                            total_tackles=total_tackles, total_buenos=total_buenos,
-                            pct_efectividad=pct_efectividad, df_tck=df_tck,
-                            df_qbr=df_qbr,
-                            scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
-                            df_kck=df_kck,
-                            pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
-                            pesca_rival=pesca_rival,
-                            pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
-                            lin_total=lin_total, lin_total_prop=lin_total_prop,
-                            lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
-                            lin_robada=lin_robada, lin_perdida=lin_perdida,
-                            lin_sucia=lin_sucia, lin_torcida=lin_torcida,
-                            lin_rapido=lin_rapido,
-                        )
-                        st.rerun()
-            with col_dl:
-                st.download_button(
-                    label="⬇️ Descargar PDF",
-                    data=st.session_state[pdf_key],
-                    file_name=f"informe_{selected_match.replace(' ', '_')}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                    key="btn_dl_pdf",
-                )
-        else:
-            # Si no se ha generado, mostramos el botón centrado y con ancho responsivo
-            col_pdf_l, col_pdf_c, col_pdf_r = st.columns([1, 2, 1])
-            with col_pdf_c:
-                if st.button("📄 Generar PDF", use_container_width=True, type="primary", key="btn_gen_pdf"):
-                    with st.spinner("Generando informe PDF..."):
-                        st.session_state[pdf_key] = _generar_pdf(
-                            selected_match=selected_match,
-                            name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
-                            s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
-                            t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
-                            total_tackles=total_tackles, total_buenos=total_buenos,
-                            pct_efectividad=pct_efectividad, df_tck=df_tck,
-                            df_qbr=df_qbr,
-                            scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
-                            df_kck=df_kck,
-                            pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
-                            pesca_rival=pesca_rival,
-                            pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
-                            lin_total=lin_total, lin_total_prop=lin_total_prop,
-                            lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
-                            lin_robada=lin_robada, lin_perdida=lin_perdida,
-                            lin_sucia=lin_sucia, lin_torcida=lin_torcida,
-                            lin_rapido=lin_rapido,
-                        )
-                        st.rerun()
+            if st.session_state.get(pdf_key):
+                # Si ya se generó, mostramos ambos botones lado a lado ocupando bien la pantalla
+                col_gen, col_dl = st.columns(2)
+                with col_gen:
+                    if st.button("📄 Generar de nuevo", use_container_width=True, type="secondary", key="btn_gen_pdf_again"):
+                        with st.spinner("Generando informe PDF..."):
+                            st.session_state[pdf_key] = _generar_pdf(
+                                selected_match=selected_match,
+                                name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
+                                s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
+                                t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
+                                total_tackles=total_tackles, total_buenos=total_buenos,
+                                pct_efectividad=pct_efectividad, df_tck=df_tck,
+                                df_qbr=df_qbr,
+                                scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
+                                df_kck=df_kck,
+                                pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
+                                pesca_rival=pesca_rival,
+                                pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
+                                lin_total=lin_total, lin_total_prop=lin_total_prop,
+                                lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
+                                lin_robada=lin_robada, lin_perdida=lin_perdida,
+                                lin_sucia=lin_sucia, lin_torcida=lin_torcida,
+                                lin_rapido=lin_rapido,
+                            )
+                            st.rerun()
+                with col_dl:
+                    st.download_button(
+                        label="⬇️ Descargar PDF",
+                        data=st.session_state[pdf_key],
+                        file_name=f"informe_{selected_match.replace(' ', '_')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key="btn_dl_pdf",
+                    )
+            else:
+                # Si no se ha generado, mostramos el botón centrado y con ancho responsivo
+                if True:
+                    if st.button("📄 Generar PDF", use_container_width=True, type="primary", key="btn_gen_pdf"):
+                        with st.spinner("Generando informe PDF..."):
+                            st.session_state[pdf_key] = _generar_pdf(
+                                selected_match=selected_match,
+                                name_local=NAME_LOCAL, name_rival=NAME_RIVAL,
+                                s_l=s_l, s_r=s_r, t_l=t_l, g_l=g_l, p_l=p_l,
+                                t_r=t_r, g_r=g_r, p_r=p_r, res_txt=res_txt,
+                                total_tackles=total_tackles, total_buenos=total_buenos,
+                                pct_efectividad=pct_efectividad, df_tck=df_tck,
+                                df_qbr=df_qbr,
+                                scrum_nuestros=scrum_nuestros, scrum_rival=scrum_rival,
+                                df_kck=df_kck,
+                                pesca_nosotros=pesca_nosotros, pesca_recupera=pesca_recupera,
+                                pesca_rival=pesca_rival,
+                                pnl_u=pnl_u, pnl_rival=pnl_rival, df_causas=df_causas,
+                                lin_total=lin_total, lin_total_prop=lin_total_prop,
+                                lin_total_riv=lin_total_riv, lin_limpia=lin_limpia,
+                                lin_robada=lin_robada, lin_perdida=lin_perdida,
+                                lin_sucia=lin_sucia, lin_torcida=lin_torcida,
+                                lin_rapido=lin_rapido,
+                            )
+                            st.rerun()
 
     with tab_individual:
         # Obtener jugadores participantes en el partido actual
@@ -1681,14 +1761,28 @@ def rugby_analysis_module():
         participantes_lista = sorted(list(participantes))
         
         if not participantes_lista:
-            st.info("ℹ️ No se encontraron registros individuales de jugadores para este partido.")
+            _empty_state("Todavía no hay registros individuales de jugadores para este partido.", "👤")
         else:
-            col_sel_p, _ = st.columns([2, 2])
-            with col_sel_p:
-                jugador_sel = st.selectbox("Seleccionar Jugador para Análisis", participantes_lista, key="sb_jugador_sel")
-            
             # Cargar mapas y obtener detalles
             mapa_dni = _cargar_mapa_dni_nombres()
+            # Jugador: por defecto se muestra su propio análisis (si jugó este partido)
+            _own_idx = 0
+            _own_found = False
+            _my_dni = re.sub(r"\D", "", str(_user.get("dni", "")))
+            if is_player and _my_dni:
+                for _i, _nm in enumerate(participantes_lista):
+                    _d = re.sub(r"\D", "", str(_buscar_dni_por_nombre(_nm, mapa_dni) or ""))
+                    if _d and _d == _my_dni:
+                        _own_idx, _own_found = _i, True
+                        break
+            if is_player and not _own_found:
+                st.markdown('<div class="empty-state"><div class="es-ico">🏉</div>No encontramos registros tuyos en este partido. '
+                            'Podés ver el análisis de un compañero o volver al resumen.</div>', unsafe_allow_html=True)
+            if is_player and _own_found:
+                with st.expander("Ver el análisis de otro compañero"):
+                    jugador_sel = st.selectbox("Jugador", participantes_lista, index=_own_idx, key="sb_jugador_sel")
+            else:
+                jugador_sel = st.selectbox("Jugador a analizar", participantes_lista, index=_own_idx, key="sb_jugador_sel")
             detalles_map = _cargar_detalles_jugadores()
             
             # Buscar DNI
@@ -1702,24 +1796,26 @@ def rugby_analysis_module():
             
             # Obtener foto en base64
             foto_b64 = _get_foto_b64(jugador_sel, mapa_dni)
-            avatar_html = f'<img src="data:image/jpeg;base64,{foto_b64}" style="width:120px;height:120px;border-radius:15px;object-fit:cover;border:3px solid #ffffff;box-shadow:0 4px 12px rgba(0,0,0,0.5);"/>' if foto_b64 else f'<div style="width:120px;height:120px;border-radius:15px;background:#1c2030;border:3px solid #ffffff;display:flex;align-items:center;justify-content:center;font-size:48px;color:#8b949e;box-shadow:0 4px 12px rgba(0,0,0,0.5)">👤</div>'
+            avatar_html = f'<img src="data:image/jpeg;base64,{foto_b64}" style="width:96px;height:96px;border-radius:15px;object-fit:cover;border:3px solid #ffffff;box-shadow:0 4px 12px rgba(0,0,0,0.5);"/>' if foto_b64 else f'<div class="ip-avatar" style="width:96px;height:96px;border-radius:15px;background:#1c2030;border:3px solid #ffffff;display:flex;align-items:center;justify-content:center;font-size:48px;color:#8b949e;box-shadow:0 4px 12px rgba(0,0,0,0.5)">👤</div>'
             
+            _dni_chip = "" if is_player else f'<span style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; padding:4px 12px; border-radius:20px; font-size:0.85rem; font-weight:600;">📋 DNI: {p_details["dni"]}</span>'
             # Tarjeta de Perfil Estilo Universitario
-            st.markdown(f"""
-            <div style="background:#161b22; border:1px solid #30363d; border-radius:16px; padding:20px; margin-top: 15px; margin-bottom:25px; box-shadow:0 8px 24px rgba(0,0,0,0.3); border-left:6px solid #ffffff;">
-                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:20px;">
+            _prof_html = f"""
+            <div class="indiv-profile" style="background:#161b22; border:1px solid #30363d; border-radius:16px; padding:16px; margin-top: 15px; margin-bottom:25px; box-shadow:0 8px 24px rgba(0,0,0,0.3); border-left:6px solid #ffffff;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:16px;">
                     <div>{avatar_html}</div>
-                    <div style="flex-grow:1;">
-                        <h2 style="margin:0; font-size:1.8rem; font-weight:900; color:#ffffff; text-transform:uppercase; letter-spacing:1px;">{p_details['nombre']}</h2>
+                    <div style="flex-grow:1; min-width:0;">
+                        <h2 style="margin:0; font-size:1.6rem; font-weight:900; color:#ffffff; text-transform:uppercase; letter-spacing:1px; word-break:break-word;">{p_details['nombre']}</h2>
                         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:10px;">
-                            <span style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; padding:4px 12px; border-radius:20px; font-size:0.85rem; font-weight:600;">📋 DNI: {p_details['dni']}</span>
+                            {_dni_chip}
                             <span style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; padding:4px 12px; border-radius:20px; font-size:0.85rem; font-weight:600;">🏉 Puesto: {p_details['posicion']}</span>
                             <span style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; padding:4px 12px; border-radius:20px; font-size:0.85rem; font-weight:600;">🏷️ Categoría: {p_details['categoria']}</span>
                         </div>
                     </div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """
+            st.markdown("".join(l.strip() for l in _prof_html.splitlines()), unsafe_allow_html=True)
             
             # Calcular estadísticas en este partido para el jugador seleccionado
             # A. Tackles
@@ -1767,42 +1863,16 @@ def rugby_analysis_module():
             p_pnl = df_pnl_jug[df_pnl_jug['Jugador'] == jugador_sel].iloc[0] if not df_pnl_jug.empty and jugador_sel in df_pnl_jug['Jugador'].values else None
             pnl_val = int(p_pnl['Penales Cometidos']) if p_pnl is not None else 0
             
-            st.markdown('<h3 style="color: #ffffff; font-size: 20px; font-weight: 800; margin-bottom: 15px; border-bottom: 2px solid #222; padding-bottom: 8px;">📊 RENDIMIENTO EN ESTE PARTIDO</h3>', unsafe_allow_html=True)
-            
-            kpi_cols = st.columns(4)
-            with kpi_cols[0]:
-                st.markdown(f"""
-                <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:15px; text-align:center; min-height:120px;">
-                    <div style="font-size:2rem; font-weight:900; color:#e3b341;">{t_total}</div>
-                    <div style="font-size:0.75rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Tackles Realizados</div>
-                    <div style="font-size:0.8rem; color:#3fb950; font-weight:bold; margin-top:5px;">{t_pct}% Éxito</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with kpi_cols[1]:
-                st.markdown(f"""
-                <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:15px; text-align:center; min-height:120px;">
-                    <div style="font-size:2rem; font-weight:900; color:#58a6ff;">{ap_val}</div>
-                    <div style="font-size:0.75rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Apoyos en Ruck</div>
-                    <div style="font-size:0.8rem; color:#8b949e; margin-top:5px;">1°: {prim_val} | 2°: {seg_val}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with kpi_cols[2]:
-                st.markdown(f"""
-                <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:15px; text-align:center; min-height:120px;">
-                    <div style="font-size:2rem; font-weight:900; color:#3fb950;">{qbr_val}</div>
-                    <div style="font-size:0.75rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Quiebres de Línea</div>
-                    <div style="font-size:0.8rem; color:#a371f7; font-weight:bold; margin-top:5px;">{pts_val} Pts ({tries_val} Tries)</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with kpi_cols[3]:
-                st.markdown(f"""
-                <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:15px; text-align:center; min-height:120px;">
-                    <div style="font-size:2rem; font-weight:900; color:#f85149;">{pnl_val}</div>
-                    <div style="font-size:0.75rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Penales Cometidos</div>
-                    <div style="font-size:0.8rem; color:#1f6feb; font-weight:bold; margin-top:5px;">Pescas: {psc_rec}/{psc_total}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
+            _sec_header('📊 TU RENDIMIENTO EN ESTE PARTIDO', '#ffffff')
+            st.markdown(f"""
+            <div class="mini-grid">
+                <div class="mini-card" style="border-top:3px solid #e3b341"><div class="v" style="color:#e3b341">{t_total}</div><div class="l">Tackles</div><div class="s" style="color:#3fb950">{t_pct}% éxito</div></div>
+                <div class="mini-card" style="border-top:3px solid #58a6ff"><div class="v" style="color:#58a6ff">{ap_val}</div><div class="l">Apoyos en ruck</div><div class="s" style="color:#8b949e">1°: {prim_val} | 2°: {seg_val}</div></div>
+                <div class="mini-card" style="border-top:3px solid #3fb950"><div class="v" style="color:#3fb950">{qbr_val}</div><div class="l">Quiebres</div><div class="s" style="color:#a371f7">{pts_val} pts ({tries_val} tries)</div></div>
+                <div class="mini-card" style="border-top:3px solid #f85149"><div class="v" style="color:#f85149">{pnl_val}</div><div class="l">Penales cometidos</div><div class="s" style="color:#58a6ff">Pescas: {psc_rec}/{psc_total}</div></div>
+            </div>
+            """, unsafe_allow_html=True)
+
             # Comparar con promedios del equipo
             avg_tackles = df_tck['Total'].mean() if not df_tck.empty else 0
             avg_apoyos = df_apoyos['Apoyos'].mean() if not df_apoyos.empty else 0
@@ -1822,20 +1892,22 @@ def rugby_analysis_module():
             
             fig_comp = go.Figure()
             fig_comp.add_trace(go.Bar(
-                x=comp_data["Métrica"],
-                y=comp_data["Jugador"],
-                name=jugador_sel,
+                y=comp_data["Métrica"],
+                x=comp_data["Jugador"],
+                orientation="h",
+                name="Vos" if (is_player and _own_found and jugador_sel == participantes_lista[_own_idx]) else jugador_sel,
                 marker_color="#ffffff",
                 text=comp_data["Jugador"],
-                textposition="auto"
+                textposition="outside", cliponaxis=False
             ))
             fig_comp.add_trace(go.Bar(
-                x=comp_data["Métrica"],
-                y=comp_data["Promedio Equipo"],
-                name="Promedio Equipo",
+                y=comp_data["Métrica"],
+                x=comp_data["Promedio Equipo"],
+                orientation="h",
+                name="Promedio equipo",
                 marker_color="#444444",
                 text=comp_data["Promedio Equipo"],
-                textposition="auto"
+                textposition="outside", cliponaxis=False
             ))
             
             fig_comp.update_layout(
@@ -1843,20 +1915,22 @@ def rugby_analysis_module():
                 paper_bgcolor="#161b22",
                 plot_bgcolor="#161b22",
                 font_color="#c9d1d9",
-                height=350,
-                margin=dict(l=40, r=40, t=30, b=30),
-                legend=dict(orientation="h", y=1.1, font=dict(color="#8b949e")),
-                yaxis=dict(gridcolor="#21262d", title="Cantidad")
+                height=400,
+                margin=dict(l=4, r=30, t=30, b=8),
+                font=dict(family="Arial", size=12),
+                legend=dict(orientation="h", y=1.08, x=0, font=dict(color="#c9d1d9", size=12)),
+                xaxis=dict(gridcolor="#21262d", title=None),
+                yaxis=dict(autorange="reversed", automargin=True, title=None, tickfont=dict(size=12, color="#ffffff"))
             )
             
             st.markdown('<br>', unsafe_allow_html=True)
             col_chart_comp, col_table_comp = st.columns([3, 2])
             with col_chart_comp:
-                st.markdown('<h4 style="color: #ffffff; font-size: 16px; font-weight: 700; margin-bottom: 10px;">📊 COMPARATIVA CON EL EQUIPO</h4>', unsafe_allow_html=True)
-                st.plotly_chart(fig_comp, use_container_width=True, key="chart_indiv_comp")
+                st.markdown('<div class="sub-head">📊 Comparativa con el equipo</div>', unsafe_allow_html=True)
+                _plot(fig_comp, use_container_width=True, key="chart_indiv_comp")
                 
             with col_table_comp:
-                st.markdown('<h4 style="color: #ffffff; font-size: 16px; font-weight: 700; margin-bottom: 10px;">📋 DETALLE DE METRICAS DEL PARTIDO</h4>', unsafe_allow_html=True)
+                st.markdown('<div class="sub-head">📋 Detalle del partido</div>', unsafe_allow_html=True)
                 
                 tck_details_txt = f"{t_ok} de {t_total} ({t_pct}% éxito) · {t_doble} dobles"
                 kck_details_txt = f"{kck_total} ({kck_gana} gana terr., {kck_err} err.)" if kck_total else "Sin kicks"
@@ -1865,23 +1939,23 @@ def rugby_analysis_module():
                 
                 st.markdown(f"""
                 <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:15px; height:100%; color:#c9d1d9; font-size:0.9rem;">
-                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; justify-content:space-between; gap:10px;">
+                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px;">
                         <span style="font-weight:600;">Desempeño de Tackle:</span>
                         <span style="color:#ffffff; font-weight:700; text-align:right;">{tck_details_txt}</span>
                     </div>
-                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; justify-content:space-between; gap:10px;">
+                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px;">
                         <span style="font-weight:600;">Participación en Rucks:</span>
                         <span style="color:#ffffff; font-weight:700; text-align:right;">{ruck_details_txt}</span>
                     </div>
-                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; justify-content:space-between; gap:10px;">
+                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px;">
                         <span style="font-weight:600;">Juego con el pie (Kicks):</span>
                         <span style="color:#ffffff; font-weight:700; text-align:right;">{kck_details_txt}</span>
                     </div>
-                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; justify-content:space-between; gap:10px;">
+                    <div style="border-bottom:1px solid #21262d; padding:8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px;">
                         <span style="font-weight:600;">Restart Contest (Pescas):</span>
                         <span style="color:#ffffff; font-weight:700; text-align:right;">{psc_details_txt}</span>
                     </div>
-                    <div style="padding:8px 0; display:flex; justify-content:space-between; gap:10px;">
+                    <div style="padding:8px 0; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 10px;">
                         <span style="font-weight:600;">Puntos anotados:</span>
                         <span style="color:#3fb950; font-weight:700; text-align:right;">{pts_val} pts ({tries_val} tries)</span>
                     </div>
@@ -1889,7 +1963,7 @@ def rugby_analysis_module():
                 """, unsafe_allow_html=True)
                 
             # Historial y tendencias
-            st.markdown('<br><h3 style="color: #ffffff; font-size: 20px; font-weight: 800; margin-bottom: 15px; border-bottom: 2px solid #222; padding-bottom: 8px;">📈 HISTORIAL Y TENDENCIAS EN EL TORNEO</h3>', unsafe_allow_html=True)
+            _sec_header('📈 TU TEMPORADA', '#58a6ff')
             
             with st.spinner("Cargando historial del jugador..."):
                 matches_tuple = tuple(matches)
@@ -1897,7 +1971,7 @@ def rugby_analysis_module():
                 df_hist = _get_player_historical_stats(jugador_sel, matches_tuple, mapa_dni_tuple)
                 
             if df_hist.empty:
-                st.info("ℹ️ No hay suficiente historial para este jugador en otros partidos.")
+                _empty_state("Todavía no hay suficiente historial en otros partidos para mostrar tendencias.", "📈")
             else:
                 partidos_jugados = len(df_hist)
                 tot_puntos = df_hist['Puntos'].sum()
@@ -1908,48 +1982,20 @@ def rugby_analysis_module():
                 tot_penales = df_hist['Penales Cometidos'].sum()
                 pct_tackles_carrera = round(tot_tackles_ok / tot_tackles * 100) if tot_tackles else 0
                 
-                carr_cols = st.columns(5)
-                with carr_cols[0]:
-                    st.markdown(f"""
-                    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:900; color:#58a6ff;">{partidos_jugados}</div>
-                        <div style="font-size:0.7rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Partidos</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with carr_cols[1]:
-                    st.markdown(f"""
-                    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:900; color:#e3b341;">{tot_tackles}</div>
-                        <div style="font-size:0.7rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Tackles ({pct_tackles_carrera}%)</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with carr_cols[2]:
-                    st.markdown(f"""
-                    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:900; color:#3fb950;">{tot_tries}</div>
-                        <div style="font-size:0.7rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Tries ({tot_puntos} Pts)</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with carr_cols[3]:
-                    st.markdown(f"""
-                    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:900; color:#a371f7;">{tot_apoyos}</div>
-                        <div style="font-size:0.7rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Apoyos Ruck</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with carr_cols[4]:
-                    st.markdown(f"""
-                    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:900; color:#f85149;">{tot_penales}</div>
-                        <div style="font-size:0.7rem; color:#8b949e; font-weight:700; text-transform:uppercase;">Penales Com.</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="tnj-grid">
+                    <div class="tnj-card"><div style="font-size:1.6rem;font-weight:900;color:#58a6ff;line-height:1">{partidos_jugados}</div><div style="font-size:0.7rem;color:#8b949e;font-weight:700;text-transform:uppercase;margin-top:6px">Partidos</div></div>
+                    <div class="tnj-card"><div style="font-size:1.6rem;font-weight:900;color:#e3b341;line-height:1">{tot_tackles}</div><div style="font-size:0.7rem;color:#8b949e;font-weight:700;text-transform:uppercase;margin-top:6px">Tackles ({pct_tackles_carrera}%)</div></div>
+                    <div class="tnj-card"><div style="font-size:1.6rem;font-weight:900;color:#3fb950;line-height:1">{tot_tries}</div><div style="font-size:0.7rem;color:#8b949e;font-weight:700;text-transform:uppercase;margin-top:6px">Tries ({tot_puntos} pts)</div></div>
+                    <div class="tnj-card"><div style="font-size:1.6rem;font-weight:900;color:#a371f7;line-height:1">{tot_apoyos}</div><div style="font-size:0.7rem;color:#8b949e;font-weight:700;text-transform:uppercase;margin-top:6px">Apoyos ruck</div></div>
+                    <div class="tnj-card"><div style="font-size:1.6rem;font-weight:900;color:#f85149;line-height:1">{tot_penales}</div><div style="font-size:0.7rem;color:#8b949e;font-weight:700;text-transform:uppercase;margin-top:6px">Penales com.</div></div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                st.markdown('<br>', unsafe_allow_html=True)
                 col_trend1, col_trend2 = st.columns(2)
                 
                 with col_trend1:
-                    st.markdown('<h4 style="color: #ffffff; font-size: 15px; font-weight: 700; margin-bottom: 10px;">📉 EVOLUCIÓN DE TACKLES (CANTIDAD Y EFECTIVIDAD)</h4>', unsafe_allow_html=True)
+                    st.markdown('<div class="sub-head">📉 Tackles: cantidad y efectividad</div>', unsafe_allow_html=True)
                     fig_trend_tck = make_subplots(specs=[[{"secondary_y": True}]])
                     fig_trend_tck.add_trace(
                         go.Scatter(x=df_hist["Partido"], y=df_hist["Tackles"], name="Tackles Totales", marker_color="#ffffff", line=dict(width=3)),
@@ -1961,16 +2007,16 @@ def rugby_analysis_module():
                     )
                     fig_trend_tck.update_layout(
                         paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9",
-                        height=300, margin=dict(l=40, r=40, t=10, b=10),
-                        legend=dict(orientation="h", y=1.2, font=dict(color="#8b949e")),
+                        height=330, margin=dict(l=8, r=8, t=10, b=8), font=dict(family="Arial", size=11),
+                        legend=dict(orientation="h", y=-0.35, x=0, font=dict(color="#c9d1d9", size=11)),
                     )
-                    fig_trend_tck.update_xaxes(gridcolor="#21262d")
-                    fig_trend_tck.update_yaxes(title_text="N° Tackles", secondary_y=False, gridcolor="#21262d")
-                    fig_trend_tck.update_yaxes(title_text="% Efectividad", secondary_y=True, range=[0, 105], showgrid=False)
-                    st.plotly_chart(fig_trend_tck, use_container_width=True, key="chart_trend_tackles")
+                    fig_trend_tck.update_xaxes(gridcolor="#21262d", tickangle=-45, automargin=True, tickfont=dict(size=10))
+                    fig_trend_tck.update_yaxes(title_text=None, secondary_y=False, gridcolor="#21262d", automargin=True)
+                    fig_trend_tck.update_yaxes(title_text=None, secondary_y=True, range=[0, 105], showgrid=False, automargin=True)
+                    _plot(fig_trend_tck, use_container_width=True, key="chart_trend_tackles")
                     
                 with col_trend2:
-                    st.markdown('<h4 style="color: #ffffff; font-size: 15px; font-weight: 700; margin-bottom: 10px;">📈 EVOLUCIÓN DE APOYOS EN RUCK Y QUIEBRES</h4>', unsafe_allow_html=True)
+                    st.markdown('<div class="sub-head">📈 Apoyos en ruck y quiebres</div>', unsafe_allow_html=True)
                     fig_trend_ruck = go.Figure()
                     fig_trend_ruck.add_trace(
                         go.Scatter(x=df_hist["Partido"], y=df_hist["Apoyos Ruck"], name="Apoyos Ruck", marker_color="#58a6ff", line=dict(width=3))
@@ -1980,22 +2026,18 @@ def rugby_analysis_module():
                     )
                     fig_trend_ruck.update_layout(
                         paper_bgcolor="#161b22", plot_bgcolor="#161b22", font_color="#c9d1d9",
-                        height=300, margin=dict(l=40, r=40, t=10, b=10),
-                        legend=dict(orientation="h", y=1.2, font=dict(color="#8b949e")),
-                        yaxis=dict(gridcolor="#21262d", title="Cantidad")
+                        height=330, margin=dict(l=8, r=8, t=10, b=8), font=dict(family="Arial", size=11),
+                        legend=dict(orientation="h", y=-0.35, x=0, font=dict(color="#c9d1d9", size=11)),
+                        yaxis=dict(gridcolor="#21262d", title=None, automargin=True)
                     )
-                    fig_trend_ruck.update_xaxes(gridcolor="#21262d")
-                    st.plotly_chart(fig_trend_ruck, use_container_width=True, key="chart_trend_rucks")
+                    fig_trend_ruck.update_xaxes(gridcolor="#21262d", tickangle=-45, automargin=True, tickfont=dict(size=10))
+                    _plot(fig_trend_ruck, use_container_width=True, key="chart_trend_rucks")
                     
-                st.markdown('<h4 style="color: #ffffff; font-size: 15px; font-weight: 700; margin-top: 15px; margin-bottom: 10px;">📋 TABLA HISTÓRICA DEL TORNEO</h4>', unsafe_allow_html=True)
+                st.markdown('<div class="sub-head">📋 Tus partidos</div>', unsafe_allow_html=True)
+                _hist_cfg = {"Partido": st.column_config.TextColumn("Partido", pinned=True, width="medium")}
                 st.dataframe(
-                    df_hist[["Partido", "Puntos", "Tries", "Tackles", "% Tackles", "Quiebres", "Apoyos Ruck", "Penales Cometidos"]].style
-                        .set_properties(**{"background-color": "#161b22", "color": "#ffffff", "border-bottom": "1px solid #30363d", "font-size": "14px", "padding": "8px"})
-                        .set_table_styles([{"selector": "th", "props": [("background-color", "#161b22"),
-                                            ("color", "#58a6ff"), ("font-weight", "700"),
-                                            ("font-size", "13px"), ("text-transform", "uppercase"),
-                                            ("border-bottom", "2px solid #30363d")]}]),
-                    use_container_width=True, hide_index=True, key="df_indiv_hist"
+                    _styled_df(df_hist[["Partido", "Puntos", "Tries", "Tackles", "% Tackles", "Quiebres", "Apoyos Ruck", "Penales Cometidos"]]),
+                    use_container_width=True, hide_index=True, key="df_indiv_hist", column_config=_hist_cfg
                 )
 
 

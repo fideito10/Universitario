@@ -284,7 +284,7 @@ def mostrar_filtros_jugador_categoria(df):
                         st.metric("📅 Última Lesión", "N/A")
         
         # Mostrar tabla de datos
-        st.dataframe(df_filtrado, use_container_width=True, height=400)
+        st.dataframe(df_filtrado, use_container_width=True, height=320)
         
         # Botón para descargar datos filtrados
         if len(df_filtrado) > 0:
@@ -368,7 +368,8 @@ def mostrar_graficos_interactivos(df):
                 showlegend=False,
                 xaxis_title="División",
                 yaxis_title="Cantidad",
-                height=400
+                height=320,
+                margin=dict(l=10, r=10, t=30, b=10)
             )
             
             st.plotly_chart(fig, use_container_width=True)
@@ -384,7 +385,7 @@ def mostrar_graficos_interactivos(df):
                     color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626']
                 )
                 
-                fig_pie.update_layout(height=400)
+                fig_pie.update_layout(height=320, margin=dict(l=10, r=10, t=40, b=10), legend=dict(orientation="h", y=-0.15))
                 st.plotly_chart(fig_pie, use_container_width=True)
 
 
@@ -438,7 +439,7 @@ def mostrar_timeline_lesiones(df):
                 markers=True
             )
             
-            fig.update_layout(height=400)
+            fig.update_layout(height=320, margin=dict(l=10, r=10, t=40, b=10), legend=dict(orientation="h", y=-0.15))
             st.plotly_chart(fig, use_container_width=True)
 
 def mostrar_estadisticas_avanzadas(df):
@@ -480,7 +481,15 @@ def main_streamlit():
     """
     # Header
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem;">
+    <style>
+    @media (max-width: 768px) {
+        .am-header { padding: 1rem !important; margin-bottom: 1rem !important; }
+        .am-header h1 { font-size: 1.4rem !important; }
+        .am-header p { font-size: 0.85rem !important; }
+        .stButton > button, .stDownloadButton > button { width: 100%; min-height: 44px; }
+    }
+    </style>
+    <div class="am-header" style="background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem;">
         <h1 style="color: white; text-align: center; margin: 0;">🏥 Área Médica - Universitario</h1>
         <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0.5rem 0 0 0;">Sistema Integral de Gestión Médica</p>
     </div>
@@ -565,7 +574,8 @@ def main_streamlit():
                             showlegend=False,
                             xaxis_title="División",
                             yaxis_title="Cantidad",
-                            height=400
+                            height=320,
+                            margin=dict(l=10, r=10, t=30, b=10)
                         )
                         
                         st.plotly_chart(fig_bar, use_container_width=True)
@@ -584,7 +594,7 @@ def main_streamlit():
                             color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626']
                         )
                         
-                        fig_pie.update_layout(height=400)
+                        fig_pie.update_layout(height=320, margin=dict(l=10, r=10, t=40, b=10), legend=dict(orientation="h", y=-0.15))
                         st.plotly_chart(fig_pie, use_container_width=True)
                     else:
                         st.info("No hay datos para mostrar")
@@ -621,7 +631,7 @@ def main_streamlit():
                             st.metric("🔴 Graves", "N/A")
                     
                     # Tabla de datos
-                    st.dataframe(df_filtrado, use_container_width=True, height=400)
+                    st.dataframe(df_filtrado, use_container_width=True, height=320)
                     
                     # Botón para descargar
                     csv = df_filtrado.to_csv(index=False)

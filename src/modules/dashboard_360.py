@@ -55,6 +55,25 @@ try:
 except ImportError:
     JugadoresMaestroManager = None
 
+def _es_jugador():
+    """True si la sesion actual tiene rol Jugador (solo presentacion)."""
+    try:
+        from src.security.auth import AuthManager
+        return bool(AuthManager().is_role("Jugador"))
+    except Exception:
+        return False
+
+
+def aviso_jugador(icono, titulo, texto):
+    """Tarjeta oscura amable para mensajes que ve un jugador."""
+    st.markdown(
+        '<div class="u360-card" style="--acc:#ffffff;text-align:center;padding:1.4rem 1.1rem">'
+        f'<div style="font-size:2.2rem;line-height:1">{icono}</div>'
+        f'<div class="u360-card-t" style="justify-content:center;margin:.6rem 0 .3rem 0;color:#fff">{_esc(titulo)}</div>'
+        f'<div class="u360-empty">{_esc(texto)}</div></div>',
+        unsafe_allow_html=True)
+
+
 def obtener_df_central():
     """Obtiene el DataFrame de la Base Central (Jugadores Maestro) de Universitario"""
     try:
@@ -194,7 +213,11 @@ def crear_dataframe_integrado():
     """Combina los datos usando la Base Central de Universitario como fuente de verdad"""
     df_central = obtener_df_central()
     if df_central.empty:
-        st.warning("⚠️ La Base Central de Universitario está vacía. Registre jugadores primero.")
+        if _es_jugador():
+            st.session_state['_u360_aviso_mostrado'] = True
+            aviso_jugador("📋", "Todavía no tenemos tus datos", "Todavía no tenemos tus datos cargados. Consultá con el cuerpo técnico.")
+        else:
+            st.warning("⚠️ La Base Central de Universitario está vacía. Registre jugadores primero.")
         return pd.DataFrame()
 
     df_medica = obtener_df_medica()
@@ -364,7 +387,8 @@ def mostrar_foto_jugador(nombre_jugador, dni_jugador):
     <div style="text-align: center; margin-bottom: 1rem;">
         <div style="
             width: 200px; 
-            height: 200px; 
+            max-width: 60vw;
+            aspect-ratio: 1 / 1; 
             border-radius: 15px; 
             border: 4px solid #000000;
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -568,9 +592,96 @@ def cargar_estilos_profesionales():
             margin: 0 auto 1rem auto;
             display: block;
         }
+        /* --- Ajustes mobile (360-430px) --- */
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.6rem !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto;
+            gap: 4px;
+            flex-wrap: nowrap;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 44px;
+            min-width: max-content;
+            padding: 0 0.8rem;
+            font-size: 0.85rem;
+        }
+        .stButton > button, .stDownloadButton > button {
+            min-height: 44px;
+            width: 100%;
+        }
+        div[data-testid="stMetricValue"] {
+            font-size: 1.5rem;
+            overflow-wrap: anywhere;
+        }
+        div[data-testid="stDataFrame"] {
+            overflow-x: auto;
+        }
+        .module-tab { padding: 0.6rem; }
+        .player-card { padding: 1rem; border-left-width: 6px; }
+    }
+
+    /* ===== Panel 360 - tarjetas dark mobile-first ===== */
+    .u360-hdr { background: linear-gradient(135deg,#000 0%,#212529 100%); border-radius: 16px; padding: 1rem 1.2rem; margin-bottom: 1rem; display:flex; align-items:center; gap:.9rem; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+    .u360-hdr-ico { width:48px; height:48px; flex:none; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem; }
+    .u360-hdr-t { color:#fff; margin:0; font-family:'Montserrat',sans-serif; font-weight:800; text-transform:uppercase; font-size:clamp(.95rem,4.2vw,1.6rem); line-height:1.15; letter-spacing:.5px; }
+    .u360-hdr-s { color:#bbb; margin:.2rem 0 0 0; font-size:clamp(.72rem,3vw,.95rem); text-transform:uppercase; letter-spacing:1px; }
+    .u360-hero { background: linear-gradient(135deg,#000 0%,#2d2d2d 100%); border-radius:16px; padding:1rem; display:flex; align-items:center; gap:1rem; color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.25); }
+    .u360-photo { width:92px; height:92px; flex:none; border-radius:14px; border:2px solid #fff; object-fit:cover; background:#1c1c1c; }
+    .u360-photo-ph { display:flex; align-items:center; justify-content:center; font-size:2.6rem; }
+    .u360-hero-info { min-width:0; flex:1; }
+    .u360-kicker { font-size:.7rem; letter-spacing:2px; text-transform:uppercase; color:#aaa; font-weight:600; }
+    .u360-name { font-family:'Montserrat',sans-serif; font-weight:900; text-transform:uppercase; font-size:clamp(1.05rem,5.2vw,1.9rem); line-height:1.1; word-break:break-word; margin:.15rem 0 .5rem 0; color:#fff; }
+    .u360-chips { display:flex; flex-wrap:wrap; gap:.35rem; }
+    .u360-chip { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); border-radius:999px; padding:.2rem .65rem; font-size:.74rem; color:#fff; white-space:nowrap; }
+    .u360-chip b { color:#aaa; font-weight:600; margin-right:.2rem; }
+    .u360-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; margin:.6rem 0 1.2rem 0; }
+    .u360-stat { background:linear-gradient(135deg,#111 0%,#2d2d2d 100%); border-radius:12px; padding:.8rem .4rem; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+    .u360-stat-l { font-size:.68rem; letter-spacing:1.5px; text-transform:uppercase; color:#aaa; font-weight:600; margin-bottom:.35rem; }
+    .u360-stat-v { font-family:'Montserrat',sans-serif; font-weight:900; font-size:clamp(1rem,4.6vw,1.6rem); color:#fff; line-height:1.1; white-space:nowrap; }
+    .u360-h { font-family:'Montserrat',sans-serif; font-weight:800; text-transform:uppercase; letter-spacing:1px; font-size:1.05rem; color:#000; margin:.4rem 0 .2rem 0; }
+    .u360-sub { font-family:'Montserrat',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:1px; font-size:.8rem; color:#6c757d; margin:1rem 0 .3rem 0; }
+    .u360-card { background:linear-gradient(135deg,#0d0d0d 0%,#2a2a2a 100%); border-radius:16px; border-left:6px solid var(--acc,#fff); padding:1rem 1.1rem; margin-top:.4rem; color:#fff; box-shadow:0 6px 18px rgba(0,0,0,.22); }
+    .u360-card-t { display:flex; align-items:center; gap:.6rem; font-family:'Montserrat',sans-serif; font-weight:800; text-transform:uppercase; letter-spacing:1px; font-size:.95rem; color:var(--acc,#fff); margin-bottom:.4rem; }
+    .u360-ico { font-size:1.4rem; }
+    .u360-row { display:flex; justify-content:space-between; align-items:center; gap:.8rem; padding:.75rem 0; border-bottom:1px solid rgba(255,255,255,.1); min-height:44px; }
+    .u360-row:last-child { border-bottom:none; }
+    .u360-row-l { color:#b5b5b5; font-size:.88rem; }
+    .u360-row-v { color:#fff; font-weight:700; font-size:1rem; text-align:right; word-break:break-word; }
+    .u360-empty { color:#cfcfcf; font-size:.92rem; line-height:1.45; padding:.4rem 0 .2rem 0; }
+    .u360-foot { color:#6c757d; font-size:.75rem; text-align:center; margin:1.2rem 0 .4rem 0; }
+    .stTabs [role="tablist"] { gap:6px; border-bottom:none !important; }
+    .stTabs [data-testid="stTab"] { flex:1 1 0; justify-content:center; min-height:46px; height:46px; border-radius:12px; background:#f1f3f5; border:1px solid #dee2e6; }
+    .stTabs [data-testid="stTab"] p { margin:0; font-weight:700; color:#000; white-space:nowrap; }
+    .stTabs [data-testid="stTab"][aria-selected="true"] { background:linear-gradient(135deg,#000 0%,#2d2d2d 100%); border-color:#000; }
+    .stTabs [data-testid="stTab"][aria-selected="true"] p { color:#fff; }
+    .stTabs .react-aria-SelectionIndicator, .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display:none !important; }
+    @media (max-width: 768px) {
+        .u360-hero { padding:.85rem; gap:.8rem; }
+        .u360-photo { width:78px; height:78px; }
+        .stTabs [data-testid="stTab"] { padding: 0 .3rem; }
+        .stTabs [data-testid="stTab"] p { font-size:.85rem; }
     }
     </style>
     """, unsafe_allow_html=True)
+
+
+def aplicar_layout_movil(fig, height=320):
+    """Ajusta un grafico plotly para pantallas chicas (no altera datos)."""
+    fig.update_layout(
+        height=height,
+        margin=dict(l=10, r=10, t=50, b=10),
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
+        title=dict(font=dict(size=14)),
+    )
+    return fig
 
 
 def obtener_jugadores_por_categoria(df_combinado, categoria_seleccionada, col_categoria):
@@ -641,196 +752,355 @@ def obtener_datos_jugador(df_combinado, jugador_seleccionado):
 
 
 
+# ---------------------------------------------------------------------------
+# PRESENTACION (mobile-first): ficha + areas de seguimiento
+# ---------------------------------------------------------------------------
+import html as _html
+import base64 as _b64
+
+ACENTO_FISICA = "#ff9800"
+ACENTO_MEDICA = "#ef5350"
+ACENTO_NUTRI = "#66bb6a"
+
+
+def _esc(valor):
+    return _html.escape(str(valor)) if valor is not None else ""
+
+
+def _buscar_foto_path(nombre_jugador, dni_jugador):
+    """Devuelve la ruta de la foto del jugador (por DNI o nombre) o None."""
+    dni_limpio = str(dni_jugador).strip().replace('.', '') if dni_jugador else None
+    nombre_limpio = str(nombre_jugador).strip() if nombre_jugador else None
+    for base_dir in [os.path.join(os.getcwd(), 'src', 'assets', 'fotos_jugadores'),
+                     os.path.join(os.getcwd(), 'assets', 'fotos_jugadores')]:
+        if not os.path.exists(base_dir):
+            continue
+        for ident in (dni_limpio, nombre_limpio):
+            if not ident:
+                continue
+            for ext in ['.jpg', '.jpeg', '.png', '.webp']:
+                p = os.path.join(base_dir, f"{ident}{ext}")
+                if os.path.exists(p):
+                    return p
+    return None
+
+
+def _foto_data_uri(nombre_jugador, dni_jugador):
+    p = _buscar_foto_path(nombre_jugador, dni_jugador)
+    if not p:
+        return None
+    try:
+        ext = os.path.splitext(p)[1].lower().lstrip('.')
+        mime = {'jpg': 'jpeg', 'jpeg': 'jpeg', 'png': 'png', 'webp': 'webp'}.get(ext, 'jpeg')
+        with open(p, 'rb') as f:
+            return f"data:image/{mime};base64," + _b64.b64encode(f.read()).decode()
+    except Exception:
+        return None
+
+
+def _fila_dato(etiqueta, valor, color_valor=None):
+    estilo = f' style="color:{color_valor}"' if color_valor else ''
+    return (f'<div class="u360-row"><span class="u360-row-l">{_esc(etiqueta)}</span>'
+            f'<span class="u360-row-v"{estilo}>{valor}</span></div>')
+
+
+def _tarjeta_area(icono, titulo, acento, filas_html, vacio_msg=None):
+    cuerpo = filas_html if not vacio_msg else f'<div class="u360-empty">{_esc(vacio_msg)}</div>'
+    return (f'<div class="u360-card" style="--acc:{acento}">'
+            f'<div class="u360-card-t"><span class="u360-ico">{icono}</span>{_esc(titulo)}</div>'
+            f'{cuerpo}</div>')
+
+
 def mostrar_ficha_personal_simple(datos_jugador):
-    """Muestra la ficha personal del jugador usando solo componentes nativos de Streamlit"""
+    """Ficha personal del jugador: tarjeta hero + 3 indicadores (mobile-first)."""
     if datos_jugador.empty:
         st.warning("No se encontraron datos del jugador")
         return
-    
-    # Obtener datos básicos usando las columnas exactas del CAR
+
     jugador_nombre = None
     dni = None
     categoria = None
     posicion = None
     peso = None
     altura = None
-    
-    # Buscar en todas las filas del jugador para obtener la información más completa
+
     for _, fila in datos_jugador.iterrows():
-        # Nombre del jugador
         if pd.notna(fila.get('Nombre completo del jugador')):
             jugador_nombre = fila['Nombre completo del jugador']
         elif pd.notna(fila.get('Nombre y Apellido')):
             jugador_nombre = fila['Nombre y Apellido']
         elif pd.notna(fila.get('Nombre')) and pd.notna(fila.get('Apellido')):
             jugador_nombre = f"{fila['Nombre']} {fila['Apellido']}"
-        
-        # DNI
+
         if pd.notna(fila.get('DNI')):
             dni = fila['DNI']
         elif pd.notna(fila.get('Dni')):
             dni = fila['Dni']
         elif pd.notna(fila.get('Por Favor completa el Dni')):
             dni = fila['Por Favor completa el Dni']
-        
-        # Categoría
+
         if pd.notna(fila.get('Categoria')):
             categoria = fila['Categoria']
         elif pd.notna(fila.get('Categoría')):
             categoria = fila['Categoría']
-        
-        # Posición
+
         if pd.notna(fila.get('Posicion')):
             posicion = fila['Posicion']
         elif pd.notna(fila.get('Posición del jugador')):
             posicion = fila['Posición del jugador']
         elif pd.notna(fila.get('Posición')):
             posicion = fila['Posición']
-    
-    # DETERMINACIÓN DE PESO Y ALTURA (BÚSQUEDA EXHAUSTIVA)
-    # Buscamos en TODOS los registros del jugador, priorizando Nutrición
-    # Columnas probables para cada métrica
+
     cols_peso = [c for c in datos_jugador.columns if 'peso' in str(c).lower()]
     cols_talla = [c for c in datos_jugador.columns if any(p in str(c).lower() for p in ['talla', 'altura', 'estatura'])]
-    
-    # Prioridad: Registros de nutrición ordenados por fecha
     datos_buscar = datos_jugador.sort_index(ascending=False)
-    
+
     for _, fila in datos_buscar.iterrows():
-        # Peso
         if peso is None:
-            # 1. Intentar columnas conocidas de nutrición
             for c in ['Peso (kg): [Número con decimales 88,5]', 'Peso']:
                 val = normalizar_valor_numerico(fila.get(c))
-                if val and val > 0: 
+                if val and val > 0:
                     peso = val
                     break
-            # 2. Intentar cualquier columna que diga "peso"
             if peso is None:
                 for c in cols_peso:
                     val = normalizar_valor_numerico(fila.get(c))
                     if val and val > 0:
                         peso = val
                         break
-        
-        # Altura
         if altura is None:
-            # 1. Prioridad absoluta a "Talla (cm): [Número]" o "Talla"
             for c in ['Talla (cm): [Número]', 'Talla', 'Altura']:
                 val = normalizar_valor_numerico(fila.get(c))
                 if val and val > 0:
                     altura = val
                     break
-            # 2. Intentar cualquier columna que diga "talla" o "altura"
             if altura is None:
                 for c in cols_talla:
                     val = normalizar_valor_numerico(fila.get(c))
                     if val and val > 0:
                         altura = val
                         break
-        
         if peso is not None and altura is not None:
             break
-    
+
     if not jugador_nombre:
         jugador_nombre = "Jugador sin nombre"
-    
-    # HEADER DEL PERFIL
-    st.subheader("👤 PERFIL DEL JUGADOR")
-    
-    with st.container():
-        col_avatar, col_info = st.columns([1, 3])
-        
-        with col_avatar:
-             mostrar_foto_jugador(jugador_nombre, dni)
-             
-             st.markdown("<div style='text-align: center; font-size: 0.9rem; margin-top: 0.5rem;'><strong>CLUB UNIVERSITARIO</strong></div>", unsafe_allow_html=True)
-             st.markdown("<div style='text-align: center; font-size: 0.9rem;'><strong>DE LA PLATA</strong></div>", unsafe_allow_html=True)
-        
-        with col_info:
-            st.markdown(f"""
-            <div style="
-                font-size: 3rem;
-                font-weight: 900;
-                color: #000000;
-                margin-bottom: 1rem;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-                line-height: 1.1;
-                text-align: center;
-            ">{jugador_nombre}</div>
-            """, unsafe_allow_html=True)
-            
-            # MÉTRICAS CON ESTILO PERSONALIZADO (SIN EMOJIS)
-            info_col1, info_col2, info_col3 = st.columns(3)
-            
-            with info_col1:
-                st.markdown(f"""
-                <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 10px;">
-                    <div style="font-size: 0.85rem; color: #6c757d; font-weight: 600; margin-bottom: 0.5rem;">DNI</div>
-                    <div style="font-size: 1.8rem; color: #000000; font-weight: 800;">{dni if dni else "N/A"}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with info_col2:
-                st.markdown(f"""
-                <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 10px;">
-                    <div style="font-size: 0.85rem; color: #6c757d; font-weight: 600; margin-bottom: 0.5rem;">CATEGORÍA</div>
-                    <div style="font-size: 1.8rem; color: #000000; font-weight: 800;">{categoria if categoria else "N/A"}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with info_col3:
-                st.markdown(f"""
-                <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 10px;">
-                    <div style="font-size: 0.85rem; color: #6c757d; font-weight: 600; margin-bottom: 0.5rem;">POSICIÓN</div>
-                    <div style="font-size: 1.8rem; color: #000000; font-weight: 800;">{posicion if posicion else "N/A"}</div>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # SEGUNDA FILA - INFORMACIÓN FÍSICA (SIN EMOJIS)
-    col_peso, col_altura, col_estado = st.columns(3)
-    
-    # PRE-CALCULAR STRINGS DE VISUALIZACIÓN PARA EVITAR ERRORES DE TIPO
+
     try:
-        peso_str = f"{float(peso):.1f} kg" if peso else "N/A"
-    except:
-        peso_str = str(peso) if peso else "N/A"
-        
+        peso_str = f"{float(peso):.1f} kg" if peso else "—"
+    except Exception:
+        peso_str = str(peso) if peso else "—"
     try:
-        altura_str = f"{float(altura):.1f} cm" if altura else "N/A"
-    except:
-        altura_str = str(altura) if altura else "N/A"
-    
-    with col_peso:
-        st.markdown(f"""
-        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
-            <div style="font-size: 0.9rem; color: #6c757d; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 1px; font-family: 'Inter', sans-serif;">PESO</div>
-            <div style="font-size: 2.2rem; color: #000000; font-weight: 900; font-family: 'Montserrat', sans-serif; line-height: 1;">{peso_str}</div>
+        altura_str = f"{float(altura):.0f} cm" if altura else "—"
+    except Exception:
+        altura_str = str(altura) if altura else "—"
+
+    foto = _foto_data_uri(jugador_nombre, dni)
+    if foto:
+        foto_html = f'<img class="u360-photo" src="{foto}" alt="Foto del jugador">'
+    else:
+        foto_html = '<div class="u360-photo u360-photo-ph">👤</div>'
+
+    chips = ""
+    if dni:
+        chips += f'<span class="u360-chip"><b>DNI</b> {_esc(dni)}</span>'
+    if categoria:
+        chips += f'<span class="u360-chip"><b>CAT.</b> {_esc(categoria)}</span>'
+    if posicion:
+        chips += f'<span class="u360-chip"><b>POS.</b> {_esc(posicion)}</span>'
+    if not chips:
+        chips = '<span class="u360-chip">Datos personales sin completar</span>'
+
+    st.markdown(f"""
+    <div class="u360-hero">
+        {foto_html}
+        <div class="u360-hero-info">
+            <div class="u360-kicker">Mi ficha</div>
+            <div class="u360-name">{_esc(jugador_nombre)}</div>
+            <div class="u360-chips">{chips}</div>
         </div>
-        """, unsafe_allow_html=True)
-    
-    with col_altura:
-        st.markdown(f"""
-        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
-            <div style="font-size: 0.9rem; color: #6c757d; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 1px; font-family: 'Inter', sans-serif;">ALTURA</div>
-            <div style="font-size: 2.2rem; color: #000000; font-weight: 900; font-family: 'Montserrat', sans-serif; line-height: 1;">{altura_str}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_estado:
-        st.markdown(f"""
-        <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
-            <div style="font-size: 0.9rem; color: #6c757d; font-weight: 600; margin-bottom: 0.8rem; letter-spacing: 1px; font-family: 'Inter', sans-serif;">ESTADO</div>
-            <div style="font-size: 2.2rem; color: #2d7a4d; font-weight: 900; font-family: 'Montserrat', sans-serif; line-height: 1;">Activo</div>
-        </div>
-        """, unsafe_allow_html=True)
+    </div>
+    <div class="u360-stats">
+        <div class="u360-stat"><div class="u360-stat-l">Peso</div><div class="u360-stat-v">{_esc(peso_str)}</div></div>
+        <div class="u360-stat"><div class="u360-stat-l">Altura</div><div class="u360-stat-v">{_esc(altura_str)}</div></div>
+        <div class="u360-stat"><div class="u360-stat-l">Estado</div><div class="u360-stat-v" style="color:#66bb6a">Activo</div></div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
-        
+def _html_area_fisica(datos_fisicos):
+    if datos_fisicos.empty:
+        return _tarjeta_area("💪", "Preparación física", ACENTO_FISICA, "",
+                             "Todavía no hay tests físicos cargados. Cuando el preparador los registre, vas a verlos acá.")
+    tiene_test = 'Test' in datos_fisicos.columns
+    tiene_subtest = 'Subtest' in datos_fisicos.columns
+    tiene_valor = 'valor' in datos_fisicos.columns
+    tiene_unidad = 'unidad' in datos_fisicos.columns
+
+    if not (tiene_test and tiene_valor):
+        return _tarjeta_area("💪", "Preparación física", ACENTO_FISICA, "",
+                             "Todavía no hay resultados de tests para mostrar.")
+
+    def fmt(valor, unidad):
+        unidad = str(unidad).strip() if unidad is not None and pd.notna(unidad) else ''
+        if unidad == '"':
+            return f'{valor}"'
+        return f"{valor} {unidad}".strip() if unidad else str(valor)
+
+    tests_mapeo = {
+        'Banco Plano': ['banco plano', 'pecho', 'banca'],
+        'Dominadas': ['dominadas', 'pullup', 'pull up'],
+        'Test Bronco': ['bronco', 'test bronco'],
+    }
+    filas = ""
+    for test_display, keywords in tests_mapeo.items():
+        resultado = "—"
+        for _, fila in datos_fisicos.iterrows():
+            test_str = str(fila['Test']).lower() if pd.notna(fila['Test']) else ''
+            subtest_str = str(fila['Subtest']).lower() if tiene_subtest and pd.notna(fila['Subtest']) else ''
+            if any(kw in subtest_str for kw in keywords) or any(kw in test_str for kw in keywords):
+                valor = fila['valor'] if pd.notna(fila['valor']) else 'N/A'
+                resultado = fmt(valor, fila['unidad'] if tiene_unidad else '')
+                break
+        filas += _fila_dato(test_display, _esc(resultado))
+    return _tarjeta_area("💪", "Preparación física", ACENTO_FISICA, filas)
+
+
+def _html_area_medica(datos_medicos):
+    if datos_medicos.empty:
+        return _tarjeta_area("🏥", "Área médica", ACENTO_MEDICA, "",
+                             "No tenés registros médicos cargados. ¡Buena señal!")
+    filas = ""
+    estado, color = "🟢 Disponible", "#66bb6a"
+    if '¿Puede participar en entrenamientos?' in datos_medicos.columns:
+        participacion = datos_medicos['¿Puede participar en entrenamientos?'].iloc[-1]
+        if participacion == "Solo entrenamiento diferenciado":
+            estado, color = "🟡 Limitado", "#ffca28"
+        elif participacion == "No puede entrenar":
+            estado, color = "🔴 No disponible", "#ef5350"
+    filas += _fila_dato("Estado actual", estado, color)
+
+    if 'Marca temporal' in datos_medicos.columns:
+        ultimo_control = datos_medicos['Marca temporal'].max()
+        try:
+            fecha = pd.to_datetime(ultimo_control).strftime('%d/%m/%y')
+        except Exception:
+            fecha = _esc(ultimo_control)
+        filas += _fila_dato("Último control", fecha)
+    else:
+        filas += _fila_dato("Último control", "—")
+
+    if 'Tipo de lesión' in datos_medicos.columns:
+        lesion = datos_medicos['Tipo de lesión'].iloc[-1]
+        if pd.notna(lesion) and str(lesion).strip():
+            filas += _fila_dato("Lesión activa", _esc(lesion))
+        else:
+            filas += _fila_dato("Lesión activa", "Ninguna")
+    else:
+        filas += _fila_dato("Lesión activa", "—")
+    return _tarjeta_area("🏥", "Área médica", ACENTO_MEDICA, filas)
+
+
+def _preparar_nutricion(datos_nutricionales):
+    df_nut_ord = datos_nutricionales.copy()
+    col_fecha = next((c for c in df_nut_ord.columns if any(p in str(c).lower() for p in ['marca', 'fecha'])), None)
+    if col_fecha:
+        df_nut_ord[col_fecha] = pd.to_datetime(df_nut_ord[col_fecha], errors='coerce')
+        ordenado = df_nut_ord.dropna(subset=[col_fecha]).sort_values(col_fecha)
+        if not ordenado.empty:
+            df_nut_ord = ordenado
+    return df_nut_ord, col_fecha
+
+
+def _col_peso_nutri(df):
+    col = 'Peso (kg): [Número con decimales 88,5]'
+    if col not in df.columns:
+        col = next((c for c in df.columns if 'peso' in str(c).lower() and 'kg' in str(c).lower()), None)
+    return col
+
+
+def _html_area_nutricion(datos_nutricionales):
+    msg_vacio = "Todavía no hay controles nutricionales cargados. Cuando el nutricionista te evalúe, vas a verlos acá."
+    if datos_nutricionales.empty:
+        return _tarjeta_area("🥗", "Nutrición", ACENTO_NUTRI, "", msg_vacio)
+    df_nut_ord, col_fecha = _preparar_nutricion(datos_nutricionales)
+    if df_nut_ord.empty:
+        return _tarjeta_area("🥗", "Nutrición", ACENTO_NUTRI, "", msg_vacio)
+
+    ultimo = df_nut_ord.iloc[-1]
+    col_peso = _col_peso_nutri(df_nut_ord)
+    peso_val = normalizar_valor_numerico(ultimo.get(col_peso)) if col_peso else None
+
+    col_grasa = '% MA: [Número con decimales]'
+    if col_grasa not in df_nut_ord.columns:
+        col_grasa = next((c for c in df_nut_ord.columns if '%' in str(c).lower() and ('ma' in str(c).lower() or 'adip' in str(c).lower())), None)
+    grasa_val = normalizar_valor_numerico(ultimo.get(col_grasa)) if col_grasa else None
+
+    col_imc = 'IMC'
+    if col_imc not in df_nut_ord.columns:
+        col_imc = next((c for c in df_nut_ord.columns if 'imc' in str(c).lower()), None)
+    imc_val = normalizar_valor_numerico(ultimo.get(col_imc)) if col_imc else None
+
+    fecha_val = ultimo.get(col_fecha) if col_fecha else None
+    try:
+        fecha_dt = pd.to_datetime(fecha_val)
+        meses_es = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
+                    7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+        fecha_str = meses_es.get(fecha_dt.month, "—") if pd.notna(fecha_dt) else "—"
+    except Exception:
+        fecha_str = str(fecha_val) if pd.notna(fecha_val) else "—"
+
+    filas = (_fila_dato("Peso actual", f"{peso_val:.1f} kg" if peso_val else "—")
+             + _fila_dato("% grasa corporal", f"{grasa_val:.1f} %" if grasa_val else "—")
+             + _fila_dato("IMC", f"{imc_val:.1f}" if imc_val else "—")
+             + _fila_dato("Última evaluación", _esc(fecha_str)))
+    return _tarjeta_area("🥗", "Nutrición", ACENTO_NUTRI, filas)
+
+
+def _grafico_peso(datos_nutricionales):
+    """Evolucion del peso (solo si hay 2+ controles). No altera datos."""
+    if datos_nutricionales.empty:
+        return
+    df, col_fecha = _preparar_nutricion(datos_nutricionales)
+    col_peso = _col_peso_nutri(df)
+    if not col_peso:
+        return
+    serie = df.assign(_p=df[col_peso].apply(normalizar_valor_numerico))
+    serie = serie.dropna(subset=['_p'])
+    if len(serie) < 2:
+        return
+    usa_fecha = bool(col_fecha) and serie[col_fecha].notna().all()
+    x = serie[col_fecha] if usa_fecha else list(range(1, len(serie) + 1))
+    fig = go.Figure(go.Scatter(x=x, y=serie['_p'], mode='lines+markers',
+                               line=dict(color=ACENTO_NUTRI, width=3),
+                               marker=dict(size=8, color='#ffffff', line=dict(color=ACENTO_NUTRI, width=2))))
+    fig.update_layout(
+        height=240, margin=dict(l=8, r=8, t=10, b=8), showlegend=False,
+        paper_bgcolor='#111111', plot_bgcolor='#111111', font=dict(color='#e5e5e5', size=12),
+        xaxis=dict(showgrid=False, tickformat='%b %y' if usa_fecha else None, nticks=4, fixedrange=True),
+        yaxis=dict(gridcolor='#2a2a2a', ticksuffix=' kg', fixedrange=True),
+    )
+    st.markdown('<div class="u360-sub">Evolución del peso</div>', unsafe_allow_html=True)
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+
+def crear_panel_areas_unificado(datos_jugador):
+    """Areas de seguimiento en pestañas (Fisica / Medica / Nutricion)."""
+    datos_medicos = datos_jugador[datos_jugador['origen_modulo'] == 'medica']
+    datos_nutricionales = datos_jugador[datos_jugador['origen_modulo'] == 'nutricion']
+    datos_fisicos = datos_jugador[datos_jugador['origen_modulo'] == 'fisica']
+
+    st.markdown('<div class="u360-h">Áreas de seguimiento</div>', unsafe_allow_html=True)
+    tab_f, tab_m, tab_n = st.tabs(["💪 Física", "🏥 Médica", "🥗 Nutrición"])
+    with tab_f:
+        st.markdown(_html_area_fisica(datos_fisicos), unsafe_allow_html=True)
+    with tab_m:
+        st.markdown(_html_area_medica(datos_medicos), unsafe_allow_html=True)
+    with tab_n:
+        st.markdown(_html_area_nutricion(datos_nutricionales), unsafe_allow_html=True)
+        _grafico_peso(datos_nutricionales)
+
+
 def mostrar_modulo_nutricion(datos_nutricionales):
     """Muestra información del módulo de nutrición"""
     if datos_nutricionales.empty:
@@ -879,6 +1149,7 @@ def mostrar_modulo_nutricion(datos_nutricionales):
             fig = px.line(x=range(len(pesos)), y=pesos.values, 
                          title="Evolución del Peso Corporal",
                          labels={'x': 'Evaluación', 'y': 'Peso (kg)'})
+            aplicar_layout_movil(fig)
             st.plotly_chart(fig, use_container_width=True)
     
     # Tabla detallada
@@ -920,6 +1191,7 @@ def mostrar_modulo_medico(datos_medicos):
             fig = px.pie(values=lesiones.values, names=lesiones.index, 
                         title="Distribución por Tipo de Lesión",
                         color_discrete_sequence=px.colors.qualitative.Set3)
+            aplicar_layout_movil(fig)
             st.plotly_chart(fig, use_container_width=True)
     
     # Severidad de lesiones
@@ -930,6 +1202,7 @@ def mostrar_modulo_medico(datos_medicos):
             fig = px.bar(x=severidad.index, y=severidad.values,
                         title="Distribución por Severidad",
                         color_discrete_sequence=['#e53e3e', '#ed8936', '#38a169'])
+            aplicar_layout_movil(fig)
             st.plotly_chart(fig, use_container_width=True)
     
     # Tabla detallada
@@ -1021,255 +1294,35 @@ def mostrar_modulo_fisico(datos_fisicos):
     st.dataframe(datos_fisicos.drop('origen_modulo', axis=1, errors='ignore'), use_container_width=True)
 
 
-def crear_panel_areas_unificado(datos_jugador):
-    """Crea el panel unificado de las 3 áreas con información específica"""
-    
-    # Separar datos por módulo
-    datos_medicos = datos_jugador[datos_jugador['origen_modulo'] == 'medica']
-    datos_nutricionales = datos_jugador[datos_jugador['origen_modulo'] == 'nutricion']
-    datos_fisicos = datos_jugador[datos_jugador['origen_modulo'] == 'fisica']
-    
-    st.markdown("### 📊 ÁREAS DE SEGUIMIENTO")
-    
-    # Crear las 3 columnas principales
-    col1, col2, col3 = st.columns(3)
-    
-    # COLUMNA 1: PREPARACIÓN FÍSICA
-    with col1:
-        contenido_html = '<div style="padding: 1.5rem; background: #ffffff; border-radius: 15px; min-height: 280px; border: 1px solid #e9ecef; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
-        contenido_html += '<h4 style="color: #000000; margin-top: 0; font-family: \'Montserrat\', sans-serif; font-weight: 700; display: flex; align-items: center; gap: 10px;"><span style="font-size: 1.5rem;">💪</span> PREPARACIÓN FÍSICA</h4>'
-        contenido_html += '<div style="margin-top: 1rem; font-family: \'Inter\', sans-serif; color: #4a5568;">'
-        
-        if datos_fisicos.empty:
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Banco Plano:</strong> —</p>'
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Dominadas:</strong> —</p>'
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Test Bronco:</strong> —</p>'
-        else:
-            tiene_test = 'Test' in datos_fisicos.columns
-            tiene_subtest = 'Subtest' in datos_fisicos.columns
-            tiene_valor = 'valor' in datos_fisicos.columns
-            tiene_unidad = 'unidad' in datos_fisicos.columns
-            
-            if tiene_test and tiene_valor:
-                # Mapeo específico según solicitud del usuario
-                tests_mapeo = {
-                    'Banco Plano': ['banco plano', 'pecho', 'banca'],
-                    'Dominadas': ['dominadas', 'pullup', 'pull up'], 
-                    'Test Bronco': ['bronco', 'test bronco']
-                }
-                
-                for test_display, keywords in tests_mapeo.items():
-                    resultado_encontrado = False
-                    
-                    # Priorizar búsqueda en SUBTEST como pidió el usuario
-                    for _, fila in datos_fisicos.iterrows():
-                        test_str = str(fila['Test']).lower() if pd.notna(fila['Test']) else ''
-                        subtest_str = str(fila['Subtest']).lower() if tiene_subtest and pd.notna(fila['Subtest']) else ''
-                        
-                        # Buscar si alguna palabra clave está en Subtest (Prioridad) o Test
-                        if any(kw in subtest_str for kw in keywords) or any(kw in test_str for kw in keywords):
-                            valor = fila['valor'] if pd.notna(fila['valor']) else 'N/A'
-                            unidad = str(fila['unidad']).strip() if tiene_unidad and pd.notna(fila['unidad']) else ''
-                            
-                            # Formatear unidad
-                            if unidad == '"': resultado = f"{valor}\""
-                            elif unidad.lower() == 'kg': resultado = f"{valor} kg"
-                            elif 'km/h' in unidad.lower(): resultado = f"{valor} km/h"
-                            elif unidad.lower() == 's': resultado = f"{valor} s"
-                            else: resultado = f"{valor} {unidad}".strip() if unidad else str(valor)
-                            
-                            contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>{test_display}:</strong> {resultado}</p>'
-                            resultado_encontrado = True
-                            break
-                    
-                    if not resultado_encontrado:
-                        contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>{test_display}:</strong> —</p>'
-            else:
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Banco Plano:</strong> —</p>'
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Dominadas:</strong> —</p>'
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Test Bronco:</strong> —</p>'
-        contenido_html += '</div>'
-        st.markdown(contenido_html, unsafe_allow_html=True)
-    
-    # COLUMNA 2: MEDICINA
-    with col2:
-        contenido_html = '<div style="padding: 1.5rem; background: #ffffff; border-radius: 15px; min-height: 280px; border: 1px solid #e9ecef; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
-        contenido_html += '<h4 style="color: #000000; margin-top: 0; font-family: \'Montserrat\', sans-serif; font-weight: 700; display: flex; align-items: center; gap: 10px;"><span style="font-size: 1.5rem;">🏥</span> MEDICINA</h4>'
-        contenido_html += '<div style="margin-top: 1rem; font-family: \'Inter\', sans-serif; color: #4a5568;">'
-        
-        if datos_medicos.empty:
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> Sin datos</p>'
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> —</p>'
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> —</p>'
-        else:
-            if '¿Puede participar en entrenamientos?' in datos_medicos.columns:
-                participacion = datos_medicos['¿Puede participar en entrenamientos?'].iloc[-1]
-                if participacion == "Solo entrenamiento diferenciado":
-                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🟡 Limitado</p>'
-                elif participacion == "No puede entrenar":
-                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🔴 No disponible</p>'
-                else:
-                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🟢 Disponible</p>'
-            else:
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Estado actual:</strong> 🟢 Disponible</p>'
-            
-            if 'Marca temporal' in datos_medicos.columns:
-                ultimo_control = datos_medicos['Marca temporal'].max()
-                try:
-                    fecha_legible = pd.to_datetime(ultimo_control).strftime('%d/%m/%y')
-                    contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> {fecha_legible}</p>'
-                except:
-                    contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> {ultimo_control}</p>'
-            else:
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Último control:</strong> —</p>'
-            
-            if 'Tipo de lesión' in datos_medicos.columns:
-                lesion_reciente = datos_medicos['Tipo de lesión'].iloc[-1]
-                if pd.notna(lesion_reciente) and lesion_reciente.strip():
-                    contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> {lesion_reciente}</p>'
-                else:
-                    contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> Ninguna</p>'
-            else:
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Lesión activa:</strong> —</p>'
-        
-        contenido_html += '</div>'
-        st.markdown(contenido_html, unsafe_allow_html=True)
-    
-    # COLUMNA 3: NUTRICIÓN
-    with col3:
-        contenido_html = '<div style="padding: 1.5rem; background: #ffffff; border-radius: 15px; min-height: 280px; border: 1px solid #e9ecef; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">'
-        contenido_html += '<h4 style="color: #000000; margin-top: 0; font-family: \'Montserrat\', sans-serif; font-weight: 700; display: flex; align-items: center; gap: 10px;"><span style="font-size: 1.5rem;">🥗</span> NUTRICIÓN</h4>'
-        contenido_html += '<div style="margin-top: 1rem; font-family: \'Inter\', sans-serif; color: #4a5568;">'
-        
-        if datos_nutricionales.empty:
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> — kg</p>'
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> — %</p>'
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> —</p>'
-            contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> —</p>'
-        else:
-            # Ordenar por fecha para asegurar que el último registro es el más reciente
-            df_nut_ord = datos_nutricionales.copy()
-            col_fecha_busqueda = next((c for c in df_nut_ord.columns if any(p in str(c).lower() for p in ['marca', 'fecha'])), None)
-            if col_fecha_busqueda:
-                df_nut_ord[col_fecha_busqueda] = pd.to_datetime(df_nut_ord[col_fecha_busqueda], errors='coerce')
-                df_nut_ord_sorted = df_nut_ord.dropna(subset=[col_fecha_busqueda]).sort_values(col_fecha_busqueda)
-                # Si dropna dejó el df vacío (todas las fechas son NaN), usar el df sin filtrar
-                if not df_nut_ord_sorted.empty:
-                    df_nut_ord = df_nut_ord_sorted
-            
-            if df_nut_ord.empty: # This check is now correctly placed after potential re-assignment
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> — kg</p>'
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> — %</p>'
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> —</p>'
-                contenido_html += '<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> —</p>'
-            else:
-                ultimo_registro = df_nut_ord.iloc[-1]
-                
-                # 1. Peso (Exacto o Flexible)
-                col_peso_f = 'Peso (kg): [Número con decimales 88,5]'
-                if col_peso_f not in df_nut_ord.columns:
-                    col_peso_f = next((c for c in df_nut_ord.columns if 'peso' in str(c).lower() and 'kg' in str(c).lower()), None)
-                
-                peso_val = normalizar_valor_numerico(ultimo_registro.get(col_peso_f))
-                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Peso actual:</strong> {f"{peso_val:.1f}" if peso_val else "—"} kg</p>'
-                
-                # 2. % Grasa (Exacto o Flexible)
-                col_grasa_f = '% MA: [Número con decimales]'
-                if col_grasa_f not in df_nut_ord.columns:
-                    col_grasa_f = next((c for c in df_nut_ord.columns if '%' in str(c).lower() and ('ma' in str(c).lower() or 'adip' in str(c).lower())), None)
-                
-                grasa_val = normalizar_valor_numerico(ultimo_registro.get(col_grasa_f)) if col_grasa_f else None
-                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>% grasa corporal:</strong> {f"{grasa_val:.1f}" if grasa_val else "—"} %</p>'
-                
-                # 3. IMC (Exacto o Flexible)
-                col_imc_f = 'IMC'
-                if col_imc_f not in df_nut_ord.columns:
-                    col_imc_f = next((c for c in df_nut_ord.columns if 'imc' in str(c).lower()), None)
-                
-                imc_val = normalizar_valor_numerico(ultimo_registro.get(col_imc_f))
-                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>IMC:</strong> {f"{imc_val:.1f}" if imc_val else "—"}</p>'
-                
-                # 4. Última evaluación (Mostrar solo el mes)
-                fecha_val = ultimo_registro.get(col_fecha_busqueda) if col_fecha_busqueda else None
-                try:
-                    fecha_dt = pd.to_datetime(fecha_val)
-                    if pd.notna(fecha_dt):
-                        meses_es = {1:'Enero', 2:'Febrero', 3:'Marzo', 4:'Abril', 5:'Mayo', 6:'Junio', 
-                                    7:'Julio', 8:'Agosto', 9:'Septiembre', 10:'Octubre', 11:'Noviembre', 12:'Diciembre'}
-                        fecha_str = meses_es.get(fecha_dt.month, "—")
-                    else:
-                        fecha_str = "—"
-                except:
-                    fecha_str = str(fecha_val) if pd.notna(fecha_val) else "—"
-                contenido_html += f'<p style="margin: 1.1rem 0;">• <strong>Última evaluación:</strong> {fecha_str}</p>'
-        
-        contenido_html += '</div></div>'
-        st.markdown(contenido_html, unsafe_allow_html=True)
-        
-                
-                
 # Modificar la función panel_profesional_jugador()
 def panel_profesional_jugador():
     """Panel principal profesional para la gestión de jugadores"""
     cargar_estilos_profesionales()
     
-    # Header profesional con fondo negro
+    # Header compacto (negro)
     st.markdown("""
-    <div style="
-        background: linear-gradient(135deg, #000000 0%, #212529 100%);
-        padding: 2rem;
-        border-radius: 15px;
-        margin-bottom: 2rem;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        text-align: center;
-    ">
-        <div style="
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 2rem;
-            flex-wrap: wrap;
-        ">
-            <div style="
-                width: 80px;
-                height: 80px;
-                background: white;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 2.5rem;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            ">
-                🏉
-            </div>
-            <div>
-                <h1 style="
-                    color: white;
-                    margin: 0;
-                    font-size: 2.5rem;
-                    font-weight: 800;
-                    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-                ">CLUB UNIVERSITARIO DE LA PLATA</h1>
-                <p style="
-                    color: #ffffff;
-                    margin: 0.5rem 0 0 0;
-                    font-size: 1.2rem;
-                    font-weight: 500;
-                    opacity: 0.9;
-                ">Panel Profesional de Gestión de Jugadores</p>
-            </div>
+    <div class="u360-hdr">
+        <div class="u360-hdr-ico">🏉</div>
+        <div>
+            <div class="u360-hdr-t">Club Universitario de La Plata</div>
+            <div class="u360-hdr-s">Panel 360° del jugador</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Obtener datos integrados
     with st.spinner("🔄 Cargando datos integrados..."):
+        st.session_state['_u360_aviso_mostrado'] = False
         df_combinado = crear_dataframe_integrado()
     
     if df_combinado.empty:
-        st.error("❌ No se pudieron cargar datos de los módulos")
-        st.info("💡 Verifica las credenciales de Google Sheets y la conexión a internet")
+        if _es_jugador():
+            # (si la Base Central estaba vacia, el aviso ya se mostro arriba)
+            if not st.session_state.get('_u360_aviso_mostrado'):
+                aviso_jugador("📡", "No pudimos cargar tu panel", "Intentá de nuevo en unos minutos. Si sigue igual, consultá con el cuerpo técnico.")
+        else:
+            st.error("❌ No se pudieron cargar datos de los módulos")
+            st.info("💡 Verifica las credenciales de Google Sheets y la conexión a internet")
         return
     
     # Identificar si es un jugador (Filtro automático por DNI)
@@ -1292,15 +1345,13 @@ def panel_profesional_jugador():
             if not player_row.empty:
                 col_nombre = buscar_columna_jugador(df_combinado) or df_combinado.columns[0]
                 jugador_seleccionado = player_row.iloc[0][col_nombre]
-                st.info(f"📊 Visualizando ficha de: **{jugador_seleccionado}**")
+                # obtener_datos_jugador espera el formato 'Nombre (DNI: 123)'
+                jugador_seleccionado = f"{jugador_seleccionado} (DNI: {dni_busqueda})"
             else:
-                st.warning(f"⚠️ No se encontraron registros para tu DNI ({user_dni}) en las bases de datos.")
-                if st.button("Reintentar con administrador"):
-                    st.session_state.user['rol'] = 'Administrador'
-                    st.rerun()
+                aviso_jugador("🔎", "No encontramos tus registros", "Todavía no tenemos tus datos cargados. Consultá con el cuerpo técnico.")
                 return
         else:
-            st.error("No se pudo identificar la columna de DNI en los datos.")
+            aviso_jugador("📡", "No pudimos cargar tu panel", "Intentá de nuevo en unos minutos. Si sigue igual, consultá con el cuerpo técnico.")
             return
     else:
         # Selectores superiores para otros roles
@@ -1341,21 +1392,27 @@ def panel_profesional_jugador():
     datos_jugador = obtener_datos_jugador(df_combinado, jugador_seleccionado)
     
     if datos_jugador.empty:
-        st.error("❌ No se encontraron datos para el jugador seleccionado")
+        if is_player and user_dni:
+            aviso_jugador("🔎", "No encontramos tus registros", "Todavía no tenemos tus datos cargados. Consultá con el cuerpo técnico.")
+        else:
+            st.error("❌ No se encontraron datos para el jugador seleccionado")
         return
     
-    st.divider()
-    
+    if not (is_player and user_dni):
+        st.divider()
+
     # FICHA PERSONAL DEL JUGADOR (ANCHO COMPLETO)
     mostrar_ficha_personal_simple(datos_jugador)
-    
-    # SEPARADOR
-    st.divider()
-    
+
     # ÁREA DE SEGUIMIENTO (ANCHO COMPLETO DEBAJO DE LA FICHA)
     crear_panel_areas_unificado(datos_jugador)
-    
-    # Footer con información adicional
+
+    # El jugador solo ve su propia ficha: sin metricas ni descargas de staff
+    if is_player and user_dni:
+        st.markdown(f'<div class="u360-foot">Actualizado: {datetime.now().strftime("%d/%m/%Y %H:%M")}</div>', unsafe_allow_html=True)
+        return
+
+    # Footer con información adicional (staff)
     st.divider()
     col1, col2, col3, col4 = st.columns(4)
     

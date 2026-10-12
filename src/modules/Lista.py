@@ -297,6 +297,27 @@ def main_lista():
         .player-card {
             padding: 14px;
         }
+
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.5rem !important;
+        }
+
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            padding: 0 12px !important;
+            font-size: 14px !important;
+        }
+
+        [data-testid="stDataFrame"] {
+            max-width: 100%;
+            overflow-x: auto;
+        }
     }
     
     @media (max-width: 480px) {

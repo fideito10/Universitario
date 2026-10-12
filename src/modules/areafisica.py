@@ -345,92 +345,42 @@ def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col, test_sel="",
         
     detalle_filtros = f" | {' - '.join(filtros_extra)}" if filtros_extra else ""
     
-    st.markdown(f"## 🏆 Máximo rendimiento - {titulo_test}{detalle_filtros}")
-    
+    st.markdown(f"<div class='fi-sec'>🏆 Ranking · {titulo_test}<small>{detalle_filtros.replace(' | ', '')}</small></div>", unsafe_allow_html=True)
+
+    def _texto_valor(row):
+        jugador_data = df_filtrado[df_filtrado[jugador_col] == row[jugador_col]]
+        valor_display = jugador_data['valor_original'].iloc[0] if not jugador_data.empty else row[valor_col]
+        valor_display_str = str(valor_display)
+        if "'" in valor_display_str:
+            return valor_display_str
+        elif unidad == "Tiempo":
+            return segundos_a_formato_tiempo(row[valor_col])
+        return f"{row[valor_col]:.2f} {unidad}"
+
+    def _fila(prefijo, row, color):
+        fr = ""
+        if es_test_fuerza and 'F. Relativa' in row.index and pd.notna(row['F. Relativa']):
+            fr = f"<div class='fi-fr'>⚡ F. Relativa {row['F. Relativa']:.2f}</div>"
+        return (f"<div class='fi-row' style='border-left:4px solid {color}'>"
+                f"<div class='fi-name'>{prefijo}{row[jugador_col]}</div>"
+                f"<div class='fi-res'>{_texto_valor(row)}{fr}</div></div>")
+
     col_top, col_bottom = st.columns(2)
-    
+
     # ============= CONTENEDOR TOP 3 =============
     with col_top:
-        st.markdown(f"""
-            <div style='background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 150%); 
-                        padding: 15px; 
-                        border-radius: 10px; 
-                        margin-bottom: 20px;
-                        color: white;
-                        text-align: center;
-                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
-                <h3 style='margin:0;'>🔥 MEJORES RESULTADOS</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        html = "<div class='fi-head fi-good'>🔥 Mejores resultados</div>"
         for idx, (_, row) in enumerate(top_3.iterrows(), 1):
-            medalla = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉"
-            
-            # Obtener el valor original guardado
-            jugador_data = df_filtrado[df_filtrado[jugador_col] == row[jugador_col]]
-            valor_display = jugador_data['valor_original'].iloc[0] if not jugador_data.empty else row[valor_col]
-            
-            # DETERMINAR FORMATO DE SALIDA
-            valor_display_str = str(valor_display)
-            if "'" in valor_display_str:
-                # Caso A: Texto original tipo 5'08"
-                texto_valor = valor_display_str
-            elif unidad == "Tiempo":
-                # Caso B: Convertir segundos a formato M'S"
-                texto_valor = segundos_a_formato_tiempo(row[valor_col])
-            else:
-                # Caso C: Valor numérico normal
-                texto_valor = f"{row[valor_col]:.2f} {unidad}"
-            
-            fr_str = ""
-            if es_test_fuerza and 'F. Relativa' in row.index and pd.notna(row['F. Relativa']):
-                fr_str = f"<br><span style='font-size:0.85em;color:#2E7D32;'>⚡ F. Relativa: {row['F. Relativa']:.2f}</span>"
+            medalla = "🥇 " if idx == 1 else "🥈 " if idx == 2 else "🥉 "
+            html += _fila(medalla, row, "#2E7D32")
+        st.markdown(html, unsafe_allow_html=True)
 
-            st.markdown(f"""
-                <div style='background-color: #E8F5E9; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #2E7D32;'>
-                    <strong>{medalla} {row[jugador_col]}</strong><br>
-                    <span style='font-size: 1.2em; font-weight: bold; color: #1B5E20;'>{texto_valor}</span>{fr_str}
-                </div>
-            """, unsafe_allow_html=True)
-    
     # ============= CONTENEDOR BOTTOM 3 =============
     with col_bottom:
-        st.markdown(f"""
-            <div style='background: linear-gradient(135deg, #B71C1C 0%, #C62828 100%); 
-                        padding: 15px; 
-                        border-radius: 10px; 
-                        margin-bottom: 20px;
-                        color: white;
-                        text-align: center;
-                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
-                <h3 style='margin:0;'>⚠️ ZONA DE MEJORA</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        html = "<div class='fi-head fi-bad'>⚠️ Zona de mejora</div>"
         for idx, (_, row) in enumerate(bottom_3.iloc[::-1].iterrows(), 1):
-            # Obtener el valor original guardado
-            jugador_data = df_filtrado[df_filtrado[jugador_col] == row[jugador_col]]
-            valor_display = jugador_data['valor_original'].iloc[0] if not jugador_data.empty else row[valor_col]
-            
-            # DETERMINAR FORMATO DE SALIDA
-            valor_display_str = str(valor_display)
-            if "'" in valor_display_str:
-                texto_valor = valor_display_str
-            elif unidad == "Tiempo":
-                texto_valor = segundos_a_formato_tiempo(row[valor_col])
-            else:
-                texto_valor = f"{row[valor_col]:.2f} {unidad}"
-            
-            fr_str = ""
-            if es_test_fuerza and 'F. Relativa' in row.index and pd.notna(row['F. Relativa']):
-                fr_str = f"<br><span style='font-size:0.85em;color:#C62828;'>⚡ F. Relativa: {row['F. Relativa']:.2f}</span>"
-
-            st.markdown(f"""
-                <div style='background-color: #FFEBEE; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid #C62828;'>
-                    <strong>{row[jugador_col]}</strong><br>
-                    <span style='font-size: 1.2em; font-weight: bold; color: #B71C1C;'>{texto_valor}</span>{fr_str}
-                </div>
-            """, unsafe_allow_html=True)
+            html += _fila("", row, "#C62828")
+        st.markdown(html, unsafe_allow_html=True)
 
 def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col, es_test_fuerza=False):
     """
@@ -511,7 +461,7 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col, es_test_fuerz
     # Como cols_existentes puede tener duplicados lógicos (ej. Categoria y Categoría), filtramos las renombradas finales
     cols_renombradas = [cols_map[c] for c in cols_existentes]
     # Quitamos duplicados manteniendo el orden
-    cols_unicas = list(dict.fromkeys(cols_renombradas))
+    cols_unicas = [c for c in dict.fromkeys(cols_renombradas) if c != 'Categoría']
     
     # Reordenar columnas: Solo información deseada
     # Las renombradas primero, luego Resultado, luego Fecha Test, luego columnas auxiliares (ocultas)
@@ -555,11 +505,11 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col, es_test_fuerz
         except Exception:
             return [''] * len(row)
 
-    st.markdown("### 📋 Tabla de Resultados")
+    st.markdown("<div class='fi-sec'>📋 Tabla de resultados</div>", unsafe_allow_html=True)
     
     # Leyenda
     st.markdown("""
-        <div style='display: flex; gap: 15px; margin-bottom: 10px; font-size: 0.9em;'>
+        <div style='display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; font-size: 0.8em;'>
             <span style='background-color: #C8E6C9; padding: 2px 8px; border-radius: 4px; color: #1B5E20'><b>Verde:</b> > Promedio</span>
             <span style='background-color: #FFF9C4; padding: 2px 8px; border-radius: 4px; color: #F57F17'><b>Amarillo:</b> Promedio</span>
             <span style='background-color: #FFCDD2; padding: 2px 8px; border-radius: 4px; color: #B71C1C'><b>Rojo:</b> < Promedio</span>
@@ -580,7 +530,7 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col, es_test_fuerz
             styler,
             use_container_width=True,
             hide_index=True,
-            height=500,
+            height=int(min(420, 40 + 36 * (len(df_view) + 1))),
             column_config={
                 valor_col: None,
                 "valor_original": None,
@@ -618,31 +568,50 @@ def physical_area():
             font-family: 'Montserrat', Arial, sans-serif !important;
         }
         .titulo-area-fisica {
-            background: #000000;
+            background: linear-gradient(135deg, #000000 0%, #1f1f1f 100%);
             color: #fff;
             border-radius: 16px;
-            padding: 32px 0 16px 0;
+            border-bottom: 4px solid #FF8F00;
+            padding: 22px 8px 16px 8px;
             text-align: center;
-            font-size: 2.5em;
-            font-weight: bold;
-            margin-bottom: 16px;
+            font-size: 2.2em;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
         }
-        .subtitulo-area-fisica {
-            text-align: center;
-            color: #212529;
-            font-size: 1.2em;
-            font-weight: 500;
+        .titulo-area-fisica small { display: block; font-size: 0.34em; font-weight: 500; opacity: .75; letter-spacing: 0; text-transform: none; margin-top: 6px; }
+        .fi-sec { font-size: 0.95rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin: 1rem 0 .5rem 0; padding-left: 8px; border-left: 4px solid #FF8F00; }
+        .fi-sec small { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; opacity: .6; font-size: .75rem; }
+        .fi-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: .2rem 0 .6rem 0; }
+        .fi-chip { background: #111; color: #fff; border-radius: 999px; padding: 4px 12px; font-size: .75rem; }
+        .fi-chip.o { background: #FF8F00; color: #000; font-weight: 700; }
+        .fi-head { border-radius: 12px; padding: 10px; text-align: center; color: #fff; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; font-size: .85rem; margin-bottom: 8px; }
+        .fi-good { background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%); }
+        .fi-bad { background: linear-gradient(135deg, #B71C1C 0%, #C62828 100%); }
+        .fi-row { background: linear-gradient(135deg, #111 0%, #2a2a2a 100%); color: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .fi-name { font-size: .9rem; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+        .fi-res { font-size: 1.05rem; font-weight: 800; text-align: right; white-space: nowrap; color: #FFB74D; }
+        .fi-fr { font-size: .68rem; font-weight: 500; color: #fff; opacity: .75; }
+        .fi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: .4rem 0 .6rem 0; }
+        .fi-card { background: linear-gradient(135deg, #111 0%, #2a2a2a 100%); border-top: 3px solid #FF8F00; border-radius: 14px; padding: 12px 10px; color: #fff; text-align: center; min-width: 0; }
+        .fi-card .l { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; opacity: .8; }
+        .fi-card .v { font-size: 1.4rem; font-weight: 800; margin-top: 4px; line-height: 1.15; color: #fff; }
+        @media (max-width: 768px) {
+            .titulo-area-fisica { font-size: 1.4em; padding: 16px 8px 12px 8px; border-radius: 12px; }
+            .fi-card .v { font-size: 1.25rem; }
         }
         </style>
         <div class='titulo-area-fisica'>
-            🏋️ ÁREA FÍSICA
+            🏋️ Área Física
+            <small>Sistema de Análisis Físico · Club Universitario de La Plata</small>
         </div>
-        <div class='subtitulo-area-fisica'>
-            Sistema de Análisis Físico - Club Universitario de La Plata
-        </div>
-        <hr style='border: 1px solid #000000;'>
     """, unsafe_allow_html=True)
-    
+
+    user = st.session_state.get('user') or {}
+    es_jugador = str(user.get('rol', '')).strip().lower() == "jugador"
+    mi_dni = ''.join(ch for ch in str(user.get('dni', '')).split('.0')[0] if ch.isdigit())
+
     # ID de Google Sheet (Universitario)
     sheet_id = "1sR4wWsA0_nZGS011d6QV84znTnRW4d7iS65y2oBjvYI"
     nombre_hoja = "Base Test"
@@ -707,71 +676,74 @@ def physical_area():
     # ==========================================
     # SISTEMA DE FILTROS CASCADA
     # ==========================================
-    st.markdown("### 🔎 Filtros Interactivos")
+    with st.expander("🔎 Filtros (tocá para cambiar)", expanded=not es_jugador):
     
-    # 1. Categoría
-    categorias = sorted(df[categoria_col].dropna().unique())
-    categoria_sel = st.selectbox("📂 Selecciona la categoría", options=categorias)
-    df_cat = df[df[categoria_col] == categoria_sel]
+        # 1. Categoría
+        categorias = sorted(df[categoria_col].dropna().unique())
+        categoria_sel = st.selectbox("📂 Categoría", options=categorias)
+        df_cat = df[df[categoria_col] == categoria_sel]
 
-    # 2. Test
-    tests = sorted(df_cat[test_col].dropna().unique())
-    test_sel = st.selectbox("🏃 Selecciona el test físico", options=tests)
-    df_test = df_cat[df_cat[test_col] == test_sel]
+        # 2. Test
+        tests = sorted(df_cat[test_col].dropna().unique())
+        test_sel = st.selectbox("🏃 Test físico", options=tests)
+        df_test = df_cat[df_cat[test_col] == test_sel]
 
-    # 3. Grupo y Posición (Layout de columnas)
-    col_grupo, col_pos = st.columns(2)
+        # 3. Grupo y Posición (Layout de columnas)
+        col_grupo, col_pos = st.columns(2)
     
-    # Definición de Grupos de Rugby
-    FORWARDS = ["Pilar", "Hooker", "Segunda Linea", "Segunda Línea", "Tercera Linea", "Tercera Línea", "Octavo", "Pilar Izquierdo", "Pilar Derecho"]
-    BACKS = ["Medio Scrum", "Apertura", "Centro", "Wing", "Fullback"]
+        # Definición de Grupos de Rugby
+        FORWARDS = ["Pilar", "Hooker", "Segunda Linea", "Segunda Línea", "Tercera Linea", "Tercera Línea", "Octavo", "Pilar Izquierdo", "Pilar Derecho"]
+        BACKS = ["Medio Scrum", "Apertura", "Centro", "Wing", "Fullback"]
     
-    with col_grupo:
-        grupo_sel = st.radio(
-            "⚡ Selecciona el grupo",
-            ["Todos", "Forwards", "Backs"],
-            horizontal=True
-        )
+        with col_grupo:
+            grupo_sel = st.radio(
+                "⚡ Grupo",
+                ["Todos", "Forwards", "Backs"],
+                horizontal=True
+            )
 
-    # Filtrar dataframe por grupo
-    if grupo_sel == "Forwards":
-        # Filtrado flexible (case insensitive y parcial)
-        df_grupo = df_test[df_test[posicion_col].astype(str).str.lower().apply(lambda x: any(f.lower() in x for f in FORWARDS))]
-    elif grupo_sel == "Backs":
-        df_grupo = df_test[df_test[posicion_col].astype(str).str.lower().apply(lambda x: any(b.lower() in x for b in BACKS))]
-    else:
-        df_grupo = df_test
+        # Filtrar dataframe por grupo
+        if grupo_sel == "Forwards":
+            # Filtrado flexible (case insensitive y parcial)
+            df_grupo = df_test[df_test[posicion_col].astype(str).str.lower().apply(lambda x: any(f.lower() in x for f in FORWARDS))]
+        elif grupo_sel == "Backs":
+            df_grupo = df_test[df_test[posicion_col].astype(str).str.lower().apply(lambda x: any(b.lower() in x for b in BACKS))]
+        else:
+            df_grupo = df_test
 
-    with col_pos:
-        # Obtener posiciones disponibles en el grupo filtrado
-        posiciones_disponibles = sorted(df_grupo[posicion_col].astype(str).unique())
-        posicion_sel = st.selectbox("🎯 Selecciona la posición específica", options=["Todas"] + posiciones_disponibles)
+        with col_pos:
+            # Obtener posiciones disponibles en el grupo filtrado
+            posiciones_disponibles = sorted(df_grupo[posicion_col].astype(str).unique())
+            posicion_sel = st.selectbox("🎯 Posición", options=["Todas"] + posiciones_disponibles)
 
-    # Filtrar dataframe por posición
-    if posicion_sel != "Todas":
-        df_pos = df_grupo[df_grupo[posicion_col] == posicion_sel]
-    else:
-        df_pos = df_grupo
+        # Filtrar dataframe por posición
+        if posicion_sel != "Todas":
+            df_pos = df_grupo[df_grupo[posicion_col] == posicion_sel]
+        else:
+            df_pos = df_grupo
 
-    # 4. Jugadores
-    jugadores = sorted(df_pos[jugador_col].dropna().unique())
-    st.caption(f"🔍 {len(jugadores)} jugadores disponibles en esta selección")
+        # 4. Jugadores
+        jugadores = sorted(df_pos[jugador_col].dropna().unique())
+        st.caption(f"🔍 {len(jugadores)} jugadores disponibles en esta selección")
     
-    jugadores_sel = st.multiselect("👤 Selecciona jugador/es", options=jugadores)
+        jugadores_sel = st.multiselect("👤 Jugador/es", options=jugadores)
 
-    if jugadores_sel:
-        df_jug = df_pos[df_pos[jugador_col].isin(jugadores_sel)]
-    else:
-        df_jug = df_pos
+        if jugadores_sel:
+            df_jug = df_pos[df_pos[jugador_col].isin(jugadores_sel)]
+        else:
+            df_jug = df_pos
 
-    # 5. Subtest (si aplica)
-    subtests = sorted(df_jug[subtest_col].dropna().unique())
-    subtest_sel = ""
-    if len(subtests) > 0 and any(s != "" for s in subtests):
-        subtest_sel = st.selectbox("⚙️ Selecciona el subtest", options=subtests)
-        df_final = df_jug[df_jug[subtest_col] == subtest_sel]
-    else:
-        df_final = df_jug
+        # 5. Subtest (si aplica)
+        subtests = sorted(df_jug[subtest_col].dropna().unique())
+        subtest_sel = ""
+        if len(subtests) > 0 and any(s != "" for s in subtests):
+            subtest_sel = st.selectbox("⚙️ Subtest", options=subtests)
+            df_final = df_jug[df_jug[subtest_col] == subtest_sel]
+        else:
+            df_final = df_jug
+
+    _chips = [categoria_sel, test_sel] + ([subtest_sel] if subtest_sel else []) + ([posicion_sel] if posicion_sel != "Todas" else []) + ([grupo_sel] if grupo_sel != "Todos" else [])
+    st.markdown("<div class='fi-chips'>" + "".join(f"<span class='fi-chip{' o' if k == 1 else ''}'>{c}</span>" for k, c in enumerate(_chips)) + "</div>", unsafe_allow_html=True)
 
     # ==========================================
     # PROCESAMIENTO Y VISUALIZACIÓN
@@ -809,13 +781,39 @@ def physical_area():
             es_test_fuerza = False
 
     if not df_final.empty:
-        st.markdown("<br>", unsafe_allow_html=True)
-        # 1. Gráfico de Top/Bottom
-        mostrar_grafico_top_bottom(df_final, jugador_col, valor_col, test_sel, subtest_sel, categoria_sel, posicion_sel, es_test_fuerza)
+        # Tarjetas 2x2: resultado propio (jugador) y resumen del grupo
+        unidad_res = df_final['unidad'].iloc[0] if 'unidad' in df_final.columns else ""
 
-        st.markdown("---")
+        def _fmt_res(v, orig=None):
+            if pd.isna(v):
+                return "—"
+            if orig is not None and "'" in str(orig):
+                return str(orig)
+            if unidad_res == "Tiempo":
+                return segundos_a_formato_tiempo(v)
+            return f"{v:.2f} {unidad_res}".strip()
 
-        # 2. Tabla Detallada
-        mostrar_tabla_estilizada(df_final, valor_col, test_col, subtest_col, es_test_fuerza)
+        serie = df_final[valor_col].dropna()
+        cards = []
+        propio = df_final[df_final['DNI_merge'] == mi_dni] if (es_jugador and mi_dni) else df_final.iloc[0:0]
+        if not propio.empty and propio[valor_col].notna().any():
+            mio = propio[valor_col].dropna()
+            mejor = mio.min() if unidad_res == "Tiempo" else mio.max()
+            cards.append(("🙋 Tu resultado", _fmt_res(mio.iloc[-1], propio.loc[mio.index[-1], 'valor_original'])))
+            cards.append(("⭐ Tu mejor marca", _fmt_res(mejor)))
+        if not serie.empty:
+            cards.append(("📊 Promedio", _fmt_res(serie.mean())))
+            cards.append(("👥 Evaluados", str(df_final[jugador_col].nunique())))
+        if cards:
+            st.markdown("<div class='fi-grid'>" + "".join(f"<div class='fi-card'><div class='l'>{l}</div><div class='v'>{v}</div></div>" for l, v in cards[:4]) + "</div>", unsafe_allow_html=True)
+
+        tab_rank, tab_tabla = st.tabs(["🏆 Ranking", "📋 Tabla"])
+        with tab_rank:
+            if len(df_final) >= 3:
+                mostrar_grafico_top_bottom(df_final, jugador_col, valor_col, test_sel, subtest_sel, categoria_sel, posicion_sel, es_test_fuerza)
+            else:
+                st.info("🏋️ Todavía no hay suficientes evaluados para armar el ranking (mínimo 3).")
+        with tab_tabla:
+            mostrar_tabla_estilizada(df_final, valor_col, test_col, subtest_col, es_test_fuerza)
     else:
-        st.info("No hay datos para mostrar con la selección actual.")
+        st.info("🏋️ Todavía no hay resultados para esta selección. Probá con otro test o categoría.")

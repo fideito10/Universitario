@@ -21,7 +21,8 @@ def inject_mobile_meta():
     """Inyecta metadatos para que la app se vea bien en dispositivos móviles (icono PWA)"""
     logo_b64 = get_base64_image("escudo uni.jpg")
     if logo_b64:
-        st.markdown(f"""
+        # components.html ejecuta el JS (st.markdown no ejecuta <script>)
+        components.html(f"""
         <script>
             try {{
                 function updateHeadTag(tagName, attributes) {{
@@ -54,6 +55,9 @@ def inject_mobile_meta():
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }});
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
                 updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
+                updateHeadTag('meta', {{ name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' }});
+                updateHeadTag('meta', {{ name: 'theme-color', content: '#000000' }});
+                updateHeadTag('meta', {{ name: 'format-detection', content: 'telephone=no' }});
                 
                 // Forzar el título del navegador
                 window.parent.document.title = "Universitario - Sistema de Gestión";
@@ -81,14 +85,14 @@ def inject_mobile_meta():
                 }};
                 const stringManifest = JSON.stringify(manifest);
                 const blob = new Blob([stringManifest], {{type: 'application/json'}});
-                const manifestURL = URL.createObjectURL(blob);
+                const manifestURL = window.parent.URL.createObjectURL(blob);
                 updateHeadTag('link', {{ rel: 'manifest', href: manifestURL }});
 
             }} catch (e) {{
                 console.warn("Mobile meta injection failed:", e);
             }}
         </script>
-        """, unsafe_allow_html=True)
+        """, height=0)
 
 # Configuración de la página - DEBE SER EL PRIMER COMANDO DE ST
 st.set_page_config(
@@ -117,7 +121,7 @@ def load_universitario_styles():
     .stApp { font-family: 'Inter', sans-serif !important; background: #FFFFFF; }
 
     /* ===== OCULTAR ELEMENTOS DE STREAMLIT ===== */
-    .stDeployButton { display: none !important; }
+    .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="stToolbar"] { display: none !important; }
     footer { visibility: hidden !important; }
     #MainMenu { visibility: hidden !important; }
 
@@ -252,63 +256,190 @@ def load_universitario_styles():
     /* ===== PLOTLY — responsive ===== */
     .js-plotly-plot { max-width: 100% !important; }
 
-    /* ===== BOTTOM NAV — hidden by default ===== */
+    /* ===== BOTTOM NAV - hidden by default ===== */
     .mobile-bottom-nav { display: none !important; }
 
     /* ==================================================
-       RESPONSIVE — TABLET (≤ 900px)
+       MOBILE (<= 768px) - CSS GLOBAL PARA TODOS LOS MODULOS
+       Clases utiles: .uni-scroll-x (scroll horizontal), .uni-hide-mobile,
+       .uni-show-mobile, .uni-keep-cols (no apilar columnas),
+       .uni-grid-2 (marcador dentro de una columna: fila en 2 por fila),
+       .uni-nav-card (tarjeta de navegacion)
     ================================================== */
-    @media (max-width: 900px) {
-        .main .block-container {
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
+    .uni-show-mobile { display: none !important; }
+    @media (max-width: 768px) {
+        html, body { overflow-x: hidden !important; -webkit-text-size-adjust: 100%; }
+        .stApp { overflow-x: hidden !important; }
+        .uni-hide-mobile { display: none !important; }
+        .uni-show-mobile { display: block !important; }
+
+        /* Chrome de Streamlit */
+        [data-testid="stToolbar"], [data-testid="stDecoration"],
+        [data-testid="stStatusWidget"], .stDeployButton, #MainMenu, footer {
+            display: none !important;
         }
+        [data-testid="stHeader"] { display: none !important; }
+
+        /* Contenedor principal */
+        .main .block-container, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"] {
+            padding: 0.5rem 0.75rem calc(2rem + env(safe-area-inset-bottom)) !important;
+            max-width: 100% !important;
+        }
+        [data-testid="stVerticalBlock"] { gap: 0.75rem !important; }
+
+        /* Columnas apiladas */
+        [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.75rem !important; }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+            width: 100% !important;
+        }
+        /* Excepcion: grilla 2 por fila (navegacion, metricas chicas) */
+        [data-testid="stHorizontalBlock"]:has(.uni-grid-2) > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"]:has(.uni-grid-2) > [data-testid="column"] {
+            min-width: calc(50% - 0.5rem) !important;
+            flex: 1 1 calc(50% - 0.5rem) !important;
+            width: calc(50% - 0.5rem) !important;
+        }
+        /* Excepcion: no apilar */
+        [data-testid="stHorizontalBlock"]:has(.uni-keep-cols) { flex-wrap: nowrap !important; }
+        [data-testid="stHorizontalBlock"]:has(.uni-keep-cols) > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"]:has(.uni-keep-cols) > [data-testid="column"] {
+            min-width: 0 !important; flex: 1 1 0 !important; width: auto !important;
+        }
+
+        /* Tipografia */
+        h1 { font-size: 1.5rem !important; line-height: 1.25 !important; }
+        h2 { font-size: 1.3rem !important; line-height: 1.25 !important; }
+        h3 { font-size: 1.1rem !important; }
+        h4, h5 { font-size: 1rem !important; }
+        [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] li { font-size: 0.95rem; }
+        [data-testid="stMetricValue"] { font-size: 1.4rem !important; }
+        [data-testid="stMetricLabel"] { font-size: 0.8rem !important; }
+        [data-testid="stMetricDelta"] { font-size: 0.75rem !important; }
+        [data-testid="stCaptionContainer"] { font-size: 0.78rem !important; }
+
+        /* Botones y controles tactiles >= 44px */
+        .stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {
+            min-height: 48px !important;
+            height: auto !important;
+            width: 100% !important;
+            font-size: 1rem !important;
+            padding: 0.5rem 1rem !important;
+            border-radius: 10px !important;
+            white-space: normal !important;
+        }
+        .stTextInput input, .stNumberInput input, .stTextArea textarea, .stDateInput input,
+        .stTimeInput input, .stSelectbox [data-baseweb="select"] > div,
+        .stMultiSelect [data-baseweb="select"] > div {
+            min-height: 46px !important;
+            font-size: 16px !important; /* evita zoom automatico en iOS */
+        }
+        .stNumberInput button { min-height: 46px !important; min-width: 40px !important; }
+        .stCheckbox, .stRadio label, .stToggle { min-height: 44px; display: flex; align-items: center; }
+        .stSlider { padding: 0 0.5rem; }
+
+        /* Tabs con scroll horizontal */
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto !important; flex-wrap: nowrap !important;
+            -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important;
+        }
+        .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+        .stTabs [data-baseweb="tab"] {
+            white-space: nowrap !important; min-height: 44px !important;
+            height: 44px !important; padding: 0 0.9rem !important; flex: 0 0 auto !important;
+        }
+
+        /* Tablas / dataframes: scroll horizontal */
+        [data-testid="stDataFrame"], [data-testid="stDataEditor"], [data-testid="stTable"],
+        .stTable, .uni-scroll-x {
+            overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; max-width: 100% !important;
+        }
+        [data-testid="stTable"] table { font-size: 0.8rem; }
+        [data-testid="stMarkdownContainer"] table { display: block; overflow-x: auto; max-width: 100%; }
+
+        /* Imagenes y graficos */
+        img, video, canvas, svg { max-width: 100% !important; }
+        [data-testid="stImage"] img { height: auto !important; }
+        .js-plotly-plot, .plot-container, .plotly, .stPlotlyChart { width: 100% !important; max-width: 100% !important; }
+        [data-testid="stPlotlyChart"], [data-testid="stVegaLiteChart"], [data-testid="stArrowVegaLiteChart"] { overflow-x: auto; }
+
+        /* Expanders, alertas, formularios */
+        [data-testid="stExpander"] summary { min-height: 48px; }
+        [data-testid="stForm"] { padding: 0.75rem !important; }
+        [data-testid="stAlert"] { font-size: 0.9rem; }
+        div[role="dialog"] { max-width: 96vw !important; }
+
+        /* Sidebar como panel tactil */
+        [data-testid="stSidebar"] { width: min(85vw, 320px) !important; min-width: 0 !important; }
+        [data-testid="stSidebar"] .stButton > button {
+            min-height: 48px !important; height: 48px !important; font-size: 0.95rem !important;
+            text-align: left !important; justify-content: flex-start !important;
+        }
+        [data-testid="stSidebarCollapseButton"] button, [data-testid="stExpandSidebarButton"],
+        [data-testid="stSidebarCollapsedControl"] button { min-width: 44px; min-height: 44px; }
+
+        /* Header y cards propios */
+        .main-header { padding: 1rem 0.85rem; border-radius: 12px; margin-bottom: 1rem; }
+        .main-header h1 { font-size: 1.15rem !important; }
+        .main-header h3 { font-size: 0.9rem !important; }
+        .main-header p  { font-size: 0.8rem; }
+        .area-card { padding: 0.9rem; }
+        .metric-card h3 { font-size: 1.5rem; }
+
+        .main-header { padding: 1.1rem 0.9rem !important; }
+    }
+    /* Item actual del menu */
+    .st-key-topnav .stButton > button[kind="primary"] {
+        background: #FFFFFF !important; color: #000 !important; border: 2px solid #000 !important; font-weight: 800 !important;
+    }
+    @media (max-width: 768px) {
+        /* Barra superior fija y compacta */
+        .st-key-topnav { position: sticky; top: 0; z-index: 999; background: rgba(255,255,255,0.97); padding: 0.4rem 0 0.5rem; margin: -0.5rem 0 0.25rem; border-bottom: 1px solid #eee; }
+        .st-key-topnav [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 0.5rem !important; }
+        .st-key-topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }
+        .st-key-topnav .stButton > button { min-height: 48px !important; padding: 0.3rem 0.5rem !important; }
+        .st-key-topnav .stButton > button p { font-size: 0.9rem !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .st-key-topnav [data-testid="stVerticalBlock"] { gap: 0.4rem !important; }
+        .st-key-topmenu { max-height: 60vh; overflow-y: auto; padding-top: 0.25rem; }
     }
 
-    /* ==================================================
-       RESPONSIVE — MOBILE (≤ 640px)
-    ================================================== */
-    @media (max-width: 640px) {
-        /* Espacio para bottom nav */
-        .main .block-container {
-            padding: 0.5rem 0.5rem 5rem !important;
-        }
-
-        .main-header { padding: 1.1rem 0.9rem; border-radius: 10px; }
-        .area-card   { padding: 0.9rem; }
-
-        /* Touch targets grandes en móvil */
-        .stButton > button {
-            height: 50px !important;
-            font-size: 1rem !important;
-            border-radius: 10px !important;
-        }
-        [data-testid="stSidebar"] .stButton > button {
-            height: 48px !important;
-            font-size: 0.95rem !important;
-        }
-        .stTextInput > div > div > input,
-        .stTextArea > div > div > textarea,
-        .stNumberInput > div > div > input {
-            min-height: 48px !important;
-            font-size: 1rem !important;
-        }
-
-        /* Tabs scrollables */
-        .stTabs [data-baseweb="tab-list"] {
-            overflow-x: auto !important;
-            flex-wrap: nowrap !important;
-            -webkit-overflow-scrolling: touch !important;
-            scrollbar-width: none !important;
-        }
-        .stTabs [data-baseweb="tab"] {
-            white-space: nowrap !important;
-            height: 44px !important;
-        }
-
-        /* Charts full width */
-        .js-plotly-plot, .plot-container { width: 100% !important; }
-
+    /* ===== GRILLA DEL HOME ===== */
+    .st-key-navgrid, .st-key-navgrid > [data-testid="stVerticalBlock"] { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    [class*="st-key-navcard_"] { position: relative; }
+    [class*="st-key-navcard_"] [data-testid="stMarkdownContainer"], [class*="st-key-navcard_"] [data-testid="stMarkdown"] { height: auto; }
+    [class*="st-key-navcard_"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
+    .uni-nav-card {
+        background: linear-gradient(135deg, #000000 0%, #2C2C2C 100%); color: #fff; border-radius: 14px;
+        padding: 1.25rem 1.1rem 1.1rem; box-shadow: 0 4px 14px rgba(0,0,0,0.18), inset 0 4px 0 var(--accent, #000); text-align: center; transition: transform .15s ease;
+    }
+    [class*="st-key-navcard_"]:hover .uni-nav-card { transform: translateY(-3px); }
+    .uni-nav-icon { font-size: 1.9rem; margin-bottom: 0.4rem; }
+    .uni-nav-label { font-weight: 800; font-size: 0.95rem; color: #fff; text-transform: uppercase; letter-spacing: .4px; line-height: 1.2; margin-bottom: 0.3rem; }
+    .uni-nav-desc { font-size: 0.78rem; color: rgba(255,255,255,.65); line-height: 1.4; }
+    .uni-nav-go { margin-top: .6rem; font-size: .72rem; font-weight: 700; letter-spacing: 1px; color: var(--accent, #fff); }
+    /* boton invisible que cubre toda la tarjeta */
+    [class*="st-key-btn_grid_"] { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; z-index: 2; }
+    [class*="st-key-btn_grid_"] .stButton, [class*="st-key-btn_grid_"] button { width: 100% !important; height: 100% !important; min-height: 100% !important; opacity: 0 !important; cursor: pointer; }
+    .st-key-topnav [data-testid="stElementContainer"]:has(.uni-keep-cols), .st-key-topnav [data-testid="stMarkdown"]:has(.uni-keep-cols) { display: none !important; }
+    .main-header h1, .main-header h3 { padding: 0 !important; margin: 0 !important; }
+    .main-header h3 { margin-top: .3rem !important; }
+    .main-header img { display: block; margin: 0 auto 0.75rem; }
+    .main-header h1 { letter-spacing: .5px; text-transform: uppercase; line-height: 1.25; }
+    .main-header .uni-greet { display: inline-block; margin-top: .7rem; padding: .35rem .9rem; border-radius: 999px; background: rgba(255,255,255,.12); font-size: .85rem; color: #fff; }
+    @media (max-width: 768px) {
+        .st-key-navgrid, .st-key-navgrid > [data-testid="stVerticalBlock"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 0.6rem !important; }
+        .st-key-navgrid > *:last-child:nth-child(odd) { grid-column: 1 / -1; }
+        .uni-nav-card { padding: 1.1rem 0.6rem 1rem !important; }
+        .uni-nav-card .uni-nav-icon { font-size: 1.7rem !important; margin-bottom: 0.3rem !important; }
+        .uni-nav-card .uni-nav-label { font-size: 0.78rem !important; }
+        .uni-nav-card .uni-nav-desc, .uni-nav-card .uni-nav-go { display: none; }
+        .main-header h1 { font-size: 1.05rem !important; }
+    }
+    @media (max-width: 380px) {
+        .main .block-container, [data-testid="stMainBlockContainer"] { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+        h1 { font-size: 1.3rem !important; }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -343,7 +474,10 @@ def login_page():
     
     /* Ocultar elementos de Streamlit */
     .stApp > header {{visibility: hidden;}}
-    .stDeployButton {{display: none;}}
+    .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="stToolbar"], [data-testid="stHeader"], [data-testid="stDecoration"] {{display: none !important;}}
+    .login-title, .login-title h1, .login-title h2, .login-subtitle {{text-align: center !important; width: 100%;}}
+    .forgot-password {{text-align: center;}}
+    .forgot-password a {{color: rgba(255,255,255,0.9) !important; text-shadow: 0 1px 4px rgba(0,0,0,0.8); font-size: 0.9rem; display: inline-block; padding: 0.5rem;}}
     footer {{visibility: hidden;}}
     #MainMenu {{visibility: hidden;}}
     
@@ -543,12 +677,39 @@ def login_page():
         
         .stTextInput > div > div > input {{
             padding: 0.6rem 0.75rem;
-            font-size: 0.9rem;
+            font-size: 16px;
+            min-height: 48px;
+            max-width: 100%;
         }}
-        
+
+        .stTextInput > div {{
+            max-width: 100%;
+        }}
+
         .stButton > button {{
             padding: 0.75rem 1.5rem;
             font-size: 1rem;
+            min-height: 50px;
+            width: 100%;
+            max-width: 100%;
+        }}
+
+        /* Columna del boton INGRESAR a ancho completo */
+        div[data-testid="stHorizontalBlock"] {{
+            flex-wrap: wrap;
+        }}
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }}
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:not(:has(.stButton)),
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:not(:has(.stButton)) {{
+            display: none !important;
+        }}
+
+        .main .block-container {{
+            padding-bottom: calc(2rem + env(safe-area-inset-bottom));
         }}
     }}
     
@@ -658,19 +819,10 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
 
-def dashboard_main():
-    """Dashboard principal del Club Universitario"""
-    auth_manager = AuthManager()
-
-    # Header
-    logo_b64 = get_base64_image("escudo uni.jpg")
-    img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:clamp(80px,15vw,130px); margin-bottom:0.75rem; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">' if logo_b64 else ""
-
-    st.markdown(f'<div class="main-header">{img_html}<h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1><h3>Sistema de Gestión Deportiva</h3><p>Bienvenido, <strong>{st.session_state.user["nombre"]}</strong> · {st.session_state.user["rol"]}</p></div>', unsafe_allow_html=True)
-
-    # All modules info
-    all_modules_info = [
-        {"id": "perfil",       "icon": "👤", "label": "Mi Perfil" if st.session_state.user.get('rol') == "Jugador" else "Perfil", "color": "#000000",
+def get_modules_info(rol):
+    """Catálogo de módulos (usado por la grilla del inicio y por el menú superior)."""
+    return [
+        {"id": "perfil",       "icon": "👤", "label": "Mi Perfil" if rol == "Jugador" else "Perfil", "color": "#000000",
          "desc": "Información personal, datos de contacto y ficha técnica."},
         {"id": "medica",       "icon": "🏥", "label": "Área Médica",    "color": "#dc3545",
          "desc": "Registro de lesiones, historial clínico y seguimiento de recuperación."},
@@ -694,34 +846,86 @@ def dashboard_main():
          "desc": "Control de asistencia a entrenamientos y partidos."},
     ]
 
-    allowed = [m for m in all_modules_info if auth_manager.has_permission(m["id"])]
+
+def render_top_nav(auth_manager, current_page):
+    """Barra fija: [Inicio] [Menu]; el menu se despliega debajo en 2 columnas (pensado para el pulgar)."""
+    rol = st.session_state.user.get('rol')
+    allowed = [m for m in get_modules_info(rol) if auth_manager.has_permission(m["id"])]
+    actual = next((m for m in allowed if m["id"] == current_page), None)
+    if st.session_state.get("_menu_for") != current_page:
+        st.session_state["_menu_for"] = current_page
+        st.session_state["menu_open"] = False
+    abierto = st.session_state.get("menu_open", False)
+
+    with st.container(key="topnav"):
+        col_home, col_menu = st.columns(2)
+        with col_home:
+            st.markdown('<span class="uni-keep-cols"></span>', unsafe_allow_html=True)
+            if st.button("🏠 Inicio", use_container_width=True, key="topnav_home"):
+                st.session_state.menu_open = False
+                st.session_state.current_page = "dashboard"
+                st.rerun()
+        with col_menu:
+            lbl = ("✕ Cerrar" if abierto else "☰ " + (actual["label"] if actual else "Menú"))
+            if st.button(lbl, use_container_width=True, key="topnav_toggle"):
+                st.session_state.menu_open = not abierto
+                st.rerun()
+        if abierto:
+            with st.container(key="topmenu"):
+                for i in range(0, len(allowed), 2):
+                    cols = st.columns(2)
+                    for c, m in zip(cols, allowed[i:i + 2]):
+                        with c:
+                            if m is allowed[i]:
+                                st.markdown('<span class="uni-keep-cols"></span>', unsafe_allow_html=True)
+                            if st.button(f"{m['icon']} {m['label']}", use_container_width=True, key=f"topnav_{m['id']}",
+                                         type="primary" if m["id"] == current_page else "secondary"):
+                                st.session_state.menu_open = False
+                                st.session_state.current_page = m["id"]
+                                st.rerun()
+
+
+def render_bottom_nav():
+    """Botón para volver al inicio al final de cada pantalla."""
+    st.markdown("---")
+    if st.button("🏠 Volver al inicio", use_container_width=True, key="bottomnav_home"):
+        st.session_state.current_page = "dashboard"
+        st.rerun()
+
+
+def dashboard_main():
+    """Dashboard principal del Club Universitario"""
+    auth_manager = AuthManager()
+
+    # Header
+    logo_b64 = get_base64_image("escudo uni.jpg")
+    img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:clamp(80px,15vw,130px); margin-bottom:0.75rem; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">' if logo_b64 else ""
+
+    st.markdown(f'<div class="main-header">{img_html}<h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1><h3>Sistema de Gestión Deportiva</h3><div class="uni-greet">Bienvenido, <strong>{st.session_state.user["nombre"]}</strong> · {st.session_state.user["rol"]}</div></div>', unsafe_allow_html=True)
+
+    allowed = [m for m in get_modules_info(st.session_state.user.get('rol')) if auth_manager.has_permission(m["id"])]
 
     if not allowed:
         st.info("No tenés módulos habilitados para tu rol.")
         return
 
 
-    # --- Grilla de tarjetas con botones Streamlit ---
-    cols = st.columns(3)
-    for idx, m in enumerate(allowed):
-        with cols[idx % 3]:
-            st.markdown(f"""
-                <div style='background: #fff; border-radius: 14px; padding: 1.25rem 1.1rem 1.1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #efefef; border-top: 4px solid {m['color']}; margin-bottom: 18px; min-height: 140px;'>
-                    <div style='font-size:1.85rem; margin-bottom:0.5rem'>{m['icon']}</div>
-                    <div style='font-weight:700; font-size:0.97rem; color:#111; margin-bottom:0.3rem; line-height:1.2'>{m['label']}</div>
-                    <div style='font-size:0.79rem; color:#666; line-height:1.4'>{m['desc']}</div>
-                    <div style='margin-top:1rem;'>
-                        <form action="#" method="post">
-                        </form>
-                        <div style='text-align:center;'>
-                        {st.button('Ir a ' + m['label'], key='btn_grid_' + m['id'], use_container_width=True)}
-                        </div>
-                    </div>
+    # --- Grilla de tarjetas: cada tarjeta es un unico elemento clickeable (boton transparente encima) ---
+    with st.container(key="navgrid"):
+        for m in allowed:
+            with st.container(key="navcard_" + m['id']):
+                acc = m['color'] if m['color'] != '#000000' else '#ffffff'
+                st.markdown(f"""
+                <div class="uni-nav-card" style="--accent:{acc};">
+                    <div class="uni-nav-icon">{m['icon']}</div>
+                    <div class="uni-nav-label">{m['label']}</div>
+                    <div class="uni-nav-desc">{m['desc']}</div>
+                    <div class="uni-nav-go">ABRIR →</div>
                 </div>
-            """, unsafe_allow_html=True)
-            if st.session_state.get('btn_grid_' + m['id']):
-                st.session_state.current_page = m['id']
-                st.rerun()
+                """, unsafe_allow_html=True)
+                if st.button('Ir a ' + m['label'], key='btn_grid_' + m['id'], use_container_width=True):
+                    st.session_state.current_page = m['id']
+                    st.rerun()
 
     # Footer
     st.markdown("---")
@@ -835,6 +1039,9 @@ def main():
             st.session_state.current_page = "dashboard"
             st.rerun()
 
+        if page != "dashboard":
+            render_top_nav(auth_manager, page)
+
         if page == "dashboard":
             dashboard_main()
         elif page == "medica":
@@ -875,6 +1082,9 @@ def main():
         elif page == "lista":
             from src.modules.Lista import main_lista
             main_lista()
+
+        if page != "dashboard":
+            render_bottom_nav()
 
 if __name__ == "__main__":
     main()
