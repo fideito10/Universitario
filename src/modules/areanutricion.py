@@ -133,6 +133,29 @@ def style_nutricion_df(df):
 
     return df.style.apply(highlight_rows, axis=1)
 
+# Encabezados reales de la hoja (ej. "% MA: [Número con decimales]", " kg MM: [...]"):
+# se toma solo el texto antes de ":" y se normaliza, así el sufijo del Form no molesta.
+_CAMPOS_SHEET = {
+    'peso':   ['pesokg'],
+    'imc':    ['imc'],
+    'pct_ma': ['ma', 'masaadiposa', 'masaadiposa'],
+    'pct_mm': ['mm'],
+    'kg_mm':  ['kgmm', 'cuantoskilosdemasamuscular', 'kilosmasamuscular', 'masamuscular'],
+    'kg_mo':  ['kgdemo', 'kgmo', 'masaosea'],
+}
+
+def _base_col(c):
+    return norm(str(c).split(':')[0].split('[')[0])
+
+def buscar_col(df, campo):
+    """Devuelve la columna del DataFrame que corresponde al campo (por nombre exacto normalizado)."""
+    bases = {c: _base_col(c) for c in df.columns}
+    for clave in _CAMPOS_SHEET.get(campo, []):
+        for c, b in bases.items():
+            if b == clave:
+                return c
+    return None
+
 def obtener_columna_fecha(df):
     posibles = ['Marca temporal', 'Fecha']
     for col in df.columns:
@@ -221,38 +244,24 @@ def grafico_torta_antropometria(df_hist):
     
     ultimo = df_copy.iloc[-1] if not df_copy.empty else df_hist.iloc[-1]
 
+    def _v(campo):
+        c = buscar_col(df_hist, campo)
+        return to_num(ultimo.get(c)) if c else 0.0
+
+    v_peso = _v('peso')
+    v_pct_ma = _v('pct_ma')
+    v_osea = _v('kg_mo')
+
+    # Masa muscular: "kg MM"; si está vacío, "Cuantos kilos de Masa Muscular"
     v_muscular = 0.0
-    v_osea = 0.0
-    v_adiposa = 0.0
-    v_peso = 0.0
-    v_pct_ma = 0.0
+    for clave in _CAMPOS_SHEET['kg_mm']:
+        c = next((c for c in df_hist.columns if _base_col(c) == clave), None)
+        if c and to_num(ultimo.get(c)) > 0:
+            v_muscular = to_num(ultimo.get(c))
+            break
 
-    # Mapeo según especificaciones
-    for c in df_hist.columns:
-        n = norm(c)
-        val = to_num(ultimo.get(c))
-        
-        if 'peso' in n and 'kg' in n: v_peso = val
-        if val <= 0 or n.startswith('z'):
-            continue
-
-        # Columnas de porcentaje (ej. "% Masa Adiposa"): NO son kilos
-        es_pct = '%' in str(c) or 'pct' in n or 'porcentaje' in n
-        if es_pct:
-            if 'adip' in n or n.endswith('ma'):
-                v_pct_ma = val
-            continue
-
-        if any(x in n for x in ['kgmm', 'masamuscular']):
-            v_muscular = val
-        elif any(x in n for x in ['kgmo', 'masaosea', 'kgdemo']):
-            v_osea = val
-        elif any(x in n for x in ['kgma', 'kgmasaadip', 'masaadip']):
-            v_adiposa = val
-
-    # Si no hay KG de grasa pero hay %, calcular
-    if v_adiposa == 0 and v_pct_ma > 0 and v_peso > 0:
-        v_adiposa = v_peso * (v_pct_ma / 100.0)
+    # La hoja no tiene kg de grasa: se calcula con peso y % de masa adiposa
+    v_adiposa = v_peso * (v_pct_ma / 100.0) if v_peso > 0 and v_pct_ma > 0 else 0.0
 
     labels = []
     values = []
@@ -414,7 +423,7 @@ def _find_col(df, *keys, exclude=()):
     return None
 
 def _col_pct_ma(df):
-    return next((c for c in df.columns if ('%' in str(c) or 'pct' in norm(c)) and ('adip' in norm(c) or norm(c).endswith('ma')) and not norm(c).startswith('z')), None)
+    return buscar_col(df, 'pct_ma')
 
 def _fmt_fecha(v):
     d = pd.to_datetime(v, dayfirst=True, errors='coerce')
@@ -436,8 +445,10 @@ def _render_resumen_jugador(df_j):
     prev = d.iloc[-2] if len(d) > 1 else None
     c_peso = next((c for c in d.columns if 'peso' in c.lower() and 'kg' in c.lower()), None)
     c_ma = _col_pct_ma(d)
-    c_mm = next((c for c in d.columns if any(k in norm(c) for k in ['kgmm', 'masamuscular']) and '%' not in str(c) and not norm(c).startswith('z')), None)
-    c_imc = next((c for c in d.columns if norm(c) == 'imc'), None)
+    c_mm = buscar_col(d, 'kg_mm')
+    if c_mm is None or to_num(ult.get(c_mm)) <= 0:
+        c_mm = next((c for c in d.columns if _base_col(c) == 'cuantoskilosdemasamuscular'), c_mm)
+    c_imc = buscar_col(d, 'imc')
     c_obj = next((c for c in d.columns if 'objetivo' in c.lower()), None)
 
     def val(c, suf=""):
