@@ -26,3 +26,11 @@ ENV/
 # IDE
 .vscode/
 .idea/
+
+# Variables locales con secretos (nunca commitear)
+.env
+.env.*
+!.env.example
+
+# Snapshot local de Sheets (datos personales)
+data_snapshot/
