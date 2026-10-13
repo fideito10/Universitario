@@ -5,11 +5,17 @@ import json
 import os
 from datetime import datetime, date
 from google.oauth2 import service_account
-from src.utils.credentials import get_service_account_credentials
+from src.utils.credentials import get_service_account_credentials, get_gspread_client
+from src.utils.cache import cache_si_ok
 
 def get_gcp_credentials():
     """Obtener credenciales usando el módulo centralizado de credenciales."""
     return get_service_account_credentials()
+
+@cache_si_ok(ttl=300, ok=lambda df: not df.empty)
+def _jugadores_cacheados(sheet_id, _manager):
+    return _manager._fetch_players()
+
 
 class JugadoresMaestroManager:
     def __init__(self):
@@ -33,7 +39,7 @@ class JugadoresMaestroManager:
             if not self.credentials:
                 return None
                 
-            gc = gspread.authorize(self.credentials)
+            gc = get_gspread_client() or gspread.authorize(self.credentials)
             
             try:
                 spreadsheet = gc.open_by_key(self.sheet_id)
@@ -87,7 +93,10 @@ class JugadoresMaestroManager:
             return None
     
     def get_all_players(self):
-        """Obtener todos los jugadores de la hoja maestra"""
+        """Obtener todos los jugadores de la hoja maestra (cache 5 min)"""
+        return _jugadores_cacheados(self.sheet_id, self)
+
+    def _fetch_players(self):
         worksheet = self.connect_to_sheet()
         if not worksheet:
             return pd.DataFrame()
@@ -101,7 +110,7 @@ class JugadoresMaestroManager:
     
     def dni_exists(self, dni):
         """Verificar si un DNI ya existe"""
-        df = self.get_all_players()
+        df = self._fetch_players()
         if df.empty:
             return False
         return str(dni) in df['DNI'].astype(str).values
@@ -152,6 +161,7 @@ class JugadoresMaestroManager:
             for i, cell_dni in enumerate(dni_column[1:], 2):
                 if str(cell_dni) == str(dni):
                     worksheet.update_cell(i, 8, new_status)
+                    st.cache_data.clear()
                     st.success(f"✅ Estado actualizado para DNI: {dni}")
                     return True
             

@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-from src.sheets.google_sheets_manager import GoogleSheetsManager
+from src.sheets.google_sheets_manager import get_sheets_manager
 
 def calculate_wellness_score(rpe, sueno, doms):
     # Normalizamos el RPE (1-10) a una escala de 1-5
@@ -74,11 +74,23 @@ div[data-baseweb="select"] > div { min-height: 48px; }
 """
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _leer_wellness(sheet_id, _gsm):
+    ws = _gsm.client.open_by_key(sheet_id).worksheet("Wellness_Jugador")
+    return pd.DataFrame(ws.get_all_records())
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _leer_maestro(sheet_id, _gsm):
+    ws = _gsm.client.open_by_key(sheet_id).worksheet("Jugadores_Maestro")
+    return pd.DataFrame(ws.get_all_records())
+
+
 def wellness_module():
     st.markdown(WELL_CSS, unsafe_allow_html=True)
     _hero("📝 Wellness", "Contanos cómo estás hoy · 30 segundos")
 
-    gsm = GoogleSheetsManager()
+    gsm = get_sheets_manager()
     if not gsm.sheet_config.get("sheet_id"):
         gsm.sheet_config["sheet_id"] = "1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw"
 
@@ -118,8 +130,9 @@ def wellness_module():
                 try:
                     spreadsheet = gsm.client.open_by_key(gsm.sheet_config["sheet_id"])
                     worksheet = spreadsheet.worksheet("Wellness_Jugador")
-                    row = [len(worksheet.get_all_values()), timestamp, user.get('email', 'N/A'), user['nombre'], rpe, sueno, doms, score, fecha]
+                    row = [len(worksheet.col_values(1)), timestamp, user.get('email', 'N/A'), user['nombre'], rpe, sueno, doms, score, fecha]
                     worksheet.append_row(row)
+                    _leer_wellness.clear()
                     st.markdown(f"<div class='well-score'>✅ ¡Enviado!<b style='color:{get_status_color(score)}'>{score}</b>Tu score de hoy (de 5)</div>", unsafe_allow_html=True)
                 except Exception:
                     st.warning("No pudimos guardar tu registro ahora. Revisá tu conexión e intentá de nuevo en un momento.")
@@ -128,9 +141,7 @@ def wellness_module():
         st.markdown("<div class='well-card' style='border-left-color:#fff'><h3>📊 Tu evolución</h3></div>", unsafe_allow_html=True)
         shown = False
         try:
-            spreadsheet = gsm.client.open_by_key(gsm.sheet_config["sheet_id"])
-            ws_wellness = spreadsheet.worksheet("Wellness_Jugador")
-            df = pd.DataFrame(ws_wellness.get_all_records())
+            df = _leer_wellness(gsm.sheet_config["sheet_id"], gsm)
             if not df.empty:
                 df_p = df[df['Nombre_Jugador'] == user['nombre']]
                 if not df_p.empty:
@@ -150,12 +161,8 @@ def wellness_module():
         with tab2:
             st.markdown("<div class='well-card'><h3>🏁 Semáforo por categoría</h3></div>", unsafe_allow_html=True)
             try:
-                spreadsheet = gsm.client.open_by_key(gsm.sheet_config["sheet_id"])
-                ws_master = spreadsheet.worksheet("Jugadores_Maestro")
-                ws_well = spreadsheet.worksheet("Wellness_Jugador")
-                
-                df_master = pd.DataFrame(ws_master.get_all_records())
-                df_well = pd.DataFrame(ws_well.get_all_records())
+                df_master = _leer_maestro(gsm.sheet_config["sheet_id"], gsm)
+                df_well = _leer_wellness(gsm.sheet_config["sheet_id"], gsm)
                 
                 if not df_master.empty:
                     categorias = sorted(df_master['Division'].unique())

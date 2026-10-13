@@ -8,8 +8,10 @@ import streamlit.components.v1 as components
 import os
 from datetime import datetime
 import base64
-from src.security.auth import AuthManager
+from src.security.auth import AuthManager, get_auth_manager
+from src.utils.cache import cache_si_ok
 
+@cache_si_ok(ttl=3600)
 def get_base64_image(image_path):
     try:
         with open(image_path, "rb") as img_file:
@@ -446,7 +448,7 @@ def load_universitario_styles():
 
 
 def login_page():
-    bg_image = get_base64_image("Fondo.JPG")
+    bg_image = get_base64_image("assets/fondo_login.jpg")
     
     # CSS personalizado para el login con imagen de fondo
     if bg_image:
@@ -748,7 +750,7 @@ def login_page():
     """, unsafe_allow_html=True)
     
     # Formulario de login (sin contenedor blanco)
-    auth_manager = AuthManager()
+    auth_manager = get_auth_manager()
 
     # Inyectar atributos autocomplete para que Safari/Chrome ofrezca Face ID / Touch ID
     st.markdown("""
@@ -895,7 +897,7 @@ def render_bottom_nav():
 
 def dashboard_main():
     """Dashboard principal del Club Universitario"""
-    auth_manager = AuthManager()
+    auth_manager = get_auth_manager()
 
     # Header
     logo_b64 = get_base64_image("escudo uni.jpg")
@@ -951,7 +953,7 @@ def main():
     else:
         # Usuario autenticado: cargar estilos y mostrar app
         load_universitario_styles()
-        auth_manager = AuthManager()
+        auth_manager = get_auth_manager()
         user = st.session_state.user
 
         # Verificar navegación por parámetros de URL (desde los botones del dashboard)
@@ -1049,8 +1051,6 @@ def main():
             main_streamlit()
         elif page == "nutricion":
             import src.modules.areanutricion as mod_nutricion
-            import importlib
-            importlib.reload(mod_nutricion)
             if hasattr(mod_nutricion, 'main_nutricion'):
                 mod_nutricion.main_nutricion()
             else:

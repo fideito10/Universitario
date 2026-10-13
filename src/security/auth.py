@@ -258,3 +258,16 @@ class AuthManager:
             
         user_rol = normalize_text(st.session_state.user.get('rol', ''))
         return any(normalize_text(r) == user_rol for r in target_roles)
+
+@st.cache_resource(show_spinner=False)
+def _build_auth_manager():
+    return AuthManager()
+
+
+def get_auth_manager() -> AuthManager:
+    """Instancia compartida (no guarda estado por usuario: usa st.session_state)."""
+    am = _build_auth_manager()
+    if not am.gs_manager.credentials_loaded:
+        _build_auth_manager.clear()
+        am = _build_auth_manager()
+    return am

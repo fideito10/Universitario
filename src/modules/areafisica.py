@@ -9,7 +9,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 from src.modules.administracion import JugadoresMaestroManager
-from src.utils.credentials import get_credentials_dict
+from src.utils.credentials import get_credentials_dict, get_gspread_client
+from src.utils.cache import cache_si_ok
 
 # ==========================================
 # TESTS DE FUERZA (editar según necesidad)
@@ -32,39 +33,32 @@ def get_google_credentials():
     """
     return get_credentials_dict()
 
-def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.DataFrame:
+@cache_si_ok(ttl=300)
+def _leer_hoja(sheet_id: str, nombre_hoja: str, _creds_info: dict) -> pd.DataFrame:
     """
-    Carga una hoja de Google Sheets usando el sheet_id y el nombre de la pestaña.
+    Lectura cacheada de la hoja. Lanza excepción ante errores (no se cachean).
     """
     SCOPES = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
     
-    try:
-        # Obtener credenciales usando la función mejorada
-        creds_info = get_google_credentials()
-        
-        if creds_info is None:
-            st.error("❌ No se pudieron cargar las credenciales de Google")
-            return pd.DataFrame()
-        
-        # Crear credenciales desde la información obtenida
-        credenciales = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-        
-        gc = gspread.authorize(credenciales)
+    if True:
+        gc = get_gspread_client()
+        if gc is None:
+            credenciales = Credentials.from_service_account_info(_creds_info, scopes=SCOPES)
+            gc = gspread.authorize(credenciales)
         sh = gc.open_by_key(sheet_id)
-        
-        # Obtener todas las pestañas para diagnóstico y búsqueda flexible
-        todas_las_hojas = sh.worksheets()
-        nombres_hojas = [h.title for h in todas_las_hojas]
         
         worksheet = None
         
         # 1. Intentar por nombre exacto
         try:
             worksheet = sh.worksheet(nombre_hoja)
-        except:
+        except Exception:
+            # Listar pestañas solo si el nombre exacto falla
+            todas_las_hojas = sh.worksheets()
+            nombres_hojas = [h.title for h in todas_las_hojas]
             # 2. Intentar búsqueda flexible (sin espacios, sin mayúsculas/minúsculas)
             busqueda = nombre_hoja.strip().lower().replace(" ", "")
             for h in todas_las_hojas:
@@ -120,6 +114,21 @@ def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.
             df = df.drop(columns=cols_to_drop)
         return df
 
+
+def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.DataFrame:
+    """
+    Carga una hoja de Google Sheets usando el sheet_id y el nombre de la pestaña.
+    """
+    try:
+        # Obtener credenciales usando la función mejorada
+        creds_info = get_google_credentials()
+        
+        if creds_info is None:
+            st.error("❌ No se pudieron cargar las credenciales de Google")
+            return pd.DataFrame()
+        
+        return _leer_hoja(sheet_id, nombre_hoja, creds_info)
+
     except gspread.exceptions.SpreadsheetNotFound:
         st.error("❌ Google Sheet no encontrado. Verifica el ID y permisos.")
         return pd.DataFrame()
@@ -133,6 +142,7 @@ def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.
         return pd.DataFrame()
 
 
+@cache_si_ok(ttl=300)
 def obtener_pesos_por_dni() -> pd.DataFrame:
     """
     Carga la hoja de nutrición y retorna un DataFrame con el último peso
@@ -153,8 +163,10 @@ def obtener_pesos_por_dni() -> pd.DataFrame:
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        credenciales = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-        gc = gspread.authorize(credenciales)
+        gc = get_gspread_client()
+        if gc is None:
+            credenciales = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+            gc = gspread.authorize(credenciales)
         sh = gc.open_by_key(SHEET_NUTRICION_ID)
         ws = sh.worksheet(HOJA_NUTRICION)
         data = ws.get_all_values()

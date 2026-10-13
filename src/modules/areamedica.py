@@ -12,7 +12,8 @@ from typing import Dict, List, Optional
 import json
 import sys
 import os
-from src.utils.credentials import get_credentials_dict
+from src.utils.credentials import get_credentials_dict, get_gspread_client
+from src.utils.cache import cache_si_ok
 
 def get_google_credentials():
     """
@@ -44,6 +45,7 @@ creds = None
 
 
 
+@cache_si_ok(ttl=300)
 def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentials_path=None):
     """
     Lee un Google Sheet usando la primera fila como nombres de columnas
@@ -76,7 +78,7 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
         if creds is None:
             creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
         
-        gc = gspread.authorize(creds)
+        gc = get_gspread_client() or gspread.authorize(creds)
         
         # Abrir el Google Sheet
         sh = gc.open_by_key(sheet_id)
@@ -150,6 +152,7 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
             'message': f'Error inesperado: {e}'
         }
 
+@cache_si_ok(ttl=300)
 def create_dataframe_from_sheet(sheet_id=None, worksheet_name=None):
     """
     Crea un DataFrame de pandas desde el Google Sheet
@@ -397,7 +400,7 @@ def append_google_sheet_row(sheet_id, worksheet_name, row_data, credentials_dict
         "https://www.googleapis.com/auth/drive"
     ]
     creds = Credentials.from_service_account_info(credentials_dict, scopes=scopes)
-    gc = gspread.authorize(creds)
+    gc = get_gspread_client() or gspread.authorize(creds)
     sh = gc.open_by_key(sheet_id)
     
     ws = None
@@ -411,6 +414,7 @@ def append_google_sheet_row(sheet_id, worksheet_name, row_data, credentials_dict
         ws = sh.get_worksheet(0)
         
     ws.append_row(row_data, value_input_option="USER_ENTERED")
+    st.cache_data.clear()
     return True
 # Agregar después de la función mostrar_graficos_interactivos:
 

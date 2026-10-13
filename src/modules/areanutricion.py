@@ -8,7 +8,8 @@ import re
 from google.oauth2.service_account import Credentials
 import gspread
 import json
-from src.utils.credentials import get_credentials_dict
+from src.utils.credentials import get_credentials_dict, get_gspread_client
+from src.utils.cache import cache_si_ok
 
 # =============================================================================
 # 🔧 CONFIGURACIÓN DE CONEXIÓN Y CREDENCIALES
@@ -20,11 +21,12 @@ def get_google_credentials():
     """
     return get_credentials_dict()
 
+@cache_si_ok(ttl=300)
 def read_google_sheet_as_df(sheet_id, worksheet_name):
     try:
         creds_info = get_google_credentials()
         if not creds_info: return None
-        gc = gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
+        gc = get_gspread_client() or gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
         sh = gc.open_by_key(sheet_id)
         worksheet = sh.worksheet(worksheet_name)
         # Usar get_all_values() para obtener strings puros y evitar errores de interpretación de comas/puntos
@@ -37,11 +39,12 @@ def read_google_sheet_as_df(sheet_id, worksheet_name):
         st.error(f"❌ Error leyendo Sheet: {str(e)}")
         return None
 
+@cache_si_ok(ttl=300, ok=lambda r: bool(r))
 def conectar_base_central():
     DATABASE_SHEET_ID = '1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw'
     try:
         creds_info = get_google_credentials()
-        gc = gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
+        gc = get_gspread_client() or gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
         sh = gc.open_by_key(DATABASE_SHEET_ID)
         ws = sh.get_worksheet(0)
         data = ws.get_all_records()
@@ -62,12 +65,11 @@ def conectar_base_central():
 def guardar_reporte_seguro(row_data):
     try:
         creds_info = get_google_credentials()
-        gc = gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
+        gc = get_gspread_client() or gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
         sh = gc.open_by_key('1CpAklgxgcVJrIWRWt-yJW4u6EkTcIeQqqp87kllsUqo')
         ws = sh.worksheet("Respuestas de formulario 1")
-        values = ws.get_all_values()
-        next_row = len(values) + 1
-        ws.insert_row(row_data, index=next_row, value_input_option="RAW")
+        ws.append_row(row_data, value_input_option="RAW")
+        st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"❌ Error al guardar en Sheets: {str(e)}")

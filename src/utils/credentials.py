@@ -102,3 +102,23 @@ def get_service_account_credentials(scopes=None):
         )
     except Exception:
         return None
+
+
+@st.cache_resource(show_spinner=False)
+def _build_gspread_client():
+    import gspread
+    creds = get_service_account_credentials()
+    if creds is None:
+        raise RuntimeError("No se encontraron credenciales de Google")
+    return gspread.authorize(creds)
+
+
+def get_gspread_client():
+    """
+    Cliente gspread compartido (una sola autorización por proceso).
+    Retorna None si no hay credenciales (el fallo no queda cacheado).
+    """
+    try:
+        return _build_gspread_client()
+    except Exception:
+        return None

@@ -8,6 +8,7 @@ import google.generativeai as genai
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from src.utils.credentials import get_credentials_dict, get_service_account_credentials
+from src.utils.credentials import get_gspread_client as _cliente_compartido
 
 # Configuración de página si se ejecuta directo
 def check_standalone():
@@ -29,7 +30,7 @@ def get_gspread_client():
     creds = get_service_account_credentials()
     if not creds:
         return None
-    return gspread.authorize(creds)
+    return _cliente_compartido() or gspread.authorize(creds)
 
 def get_gemini_api_key():
     """Obtiene la Gemini API Key desde secrets o variables de entorno."""

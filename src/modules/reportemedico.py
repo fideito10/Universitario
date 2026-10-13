@@ -11,6 +11,7 @@ from datetime import datetime
 import sys
 import os
 from src.utils.credentials import get_credentials_dict
+from src.utils.cache import cache_si_ok
 
 # =============================================================================
 # 🔧 FUNCIONES AUXILIARES CORREGIDAS
@@ -23,6 +24,7 @@ def get_google_credentials():
     return get_credentials_dict()
 
 
+@cache_si_ok(ttl=300, ok=lambda r: bool(r))
 def conectar_base_central():
     """Conectar a Base Central - puede ser una hoja diferente"""
     try:
@@ -83,6 +85,7 @@ def normalizar_categoria(cat):
         return "Sin Categoría"
     return cat.strip().upper() 
     
+@cache_si_ok(ttl=300, ok=lambda r: bool(r))
 def conectar_area_medica():
     """Conectar a Área Médica con manejo mejorado de errores"""
     try:

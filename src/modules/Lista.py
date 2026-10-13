@@ -18,14 +18,7 @@ class AsistenciaManager:
             st.session_state.last_request_time = 0
     
     def rate_limit_check(self):
-        """Verificar rate limit - esperar si es necesario"""
-        current_time = time.time()
-        time_since_last = current_time - st.session_state.last_request_time
-        
-        # Esperar mínimo 1 segundo entre requests
-        if time_since_last < 1.0:
-            time.sleep(1.0 - time_since_last)
-        
+        """Registrar el momento del último request (sin espera artificial)"""
         st.session_state.last_request_time = time.time()
     
     def get_or_create_attendance_sheet(self):
@@ -125,12 +118,16 @@ class AsistenciaManager:
                 self.rate_limit_check()
                 
                 # Obtener siguiente fila vacía
-                all_values = sheet.get_all_values()
-                next_row = len(all_values) + 1
+                next_row = len(sheet.col_values(1)) + 1
                 
                 # Insertar todos los datos de una vez
                 range_name = f"A{next_row}:H{next_row + len(rows_to_insert) - 1}"
                 sheet.update(range_name, rows_to_insert)
+                
+                # Invalidar reportes cacheados
+                for k in [k for k in st.session_state.sheets_cache if k.startswith("attendance_report_")]:
+                    del st.session_state.sheets_cache[k]
+                st.cache_data.clear()
                 
                 st.success(f"✅ {len(rows_to_insert)} registros guardados exitosamente")
             
@@ -637,7 +634,6 @@ def mostrar_pasar_lista():
                     st.session_state.attendance_data = {}
                     st.success("¡Lista guardada exitosamente!")
                     st.balloons()
-                    time.sleep(1)
                     st.rerun()
         
         st.markdown("<br>", unsafe_allow_html=True)
