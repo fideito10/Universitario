@@ -131,12 +131,30 @@ def lista_partidos() -> list:
     return repo.lista_partidos()
 
 
-@cache_si_ok(ttl=300, ok=_siempre)
+_PARTIDOS = {"ts": 0.0, "datos": None}
+_PARTIDOS_TTL = 300
+
+
+def _todos_partidos() -> dict:
+    """Todas las pestanas de partidos, en UNA consulta, con TTL propio.
+
+    Cache de modulo (no st.cache_data) para no copiar ~10k filas en cada hit.
+    Es de solo lectura: los llamadores no deben mutar las listas devueltas.
+    """
+    ahora = time.time()
+    if _PARTIDOS["datos"] is None or ahora - _PARTIDOS["ts"] > _PARTIDOS_TTL:
+        _PARTIDOS["datos"] = repo.todos_los_partidos()
+        _PARTIDOS["ts"] = ahora
+    return _PARTIDOS["datos"]
+
+
 def rows_partido(nombre: str) -> list:
-    return repo.rows_partido(nombre)
+    filas = _todos_partidos().get(nombre)
+    return filas if filas is not None else repo.rows_partido(nombre)
 
 
 def limpiar_cache() -> None:
+    _PARTIDOS["datos"] = None
     for fn in (df_medica, df_nutricion, df_fisica, values_medica, lista_partidos,
                rows_partido, minutos_desde_sync):
         try:

@@ -58,7 +58,7 @@ def _build_engine():
         pool_size=3,
         max_overflow=2,
         pool_pre_ping=True,
-        pool_recycle=300,  # Neon suspende conexiones inactivas
+        pool_recycle=1800,  # pre_ping detecta las suspendidas; evita reconectar (~2.5 s) cada 5 min
         connect_args={"connect_timeout": 15},
     )
 

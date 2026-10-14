@@ -26,15 +26,17 @@ from src.data.rows import unique_keys
 # --------------------------------------------------------------------------- acceso
 def _load_raw(source: str) -> tuple[list[str], list[list[str]]]:
     """(headers, filas) tal como estaban en el Sheet (strings, ancho uniforme)."""
+    # Una sola consulta (headers + filas): cada viaje a Neon cuesta ~0.3 s desde lejos
     with connect() as conn:
-        h = conn.execute(text("SELECT headers FROM sheet_headers WHERE source = :s"),
-                         {"s": source}).scalar()
-        if h is None:
-            return [], []
-        keys = unique_keys(h)
-        data = conn.execute(
-            text("SELECT data FROM sheet_rows WHERE source = :s ORDER BY row_num"),
-            {"s": source}).scalars().all()
+        res = conn.execute(text(
+            "SELECT h.headers, r.data FROM sheet_headers h "
+            "LEFT JOIN sheet_rows r ON r.source = h.source "
+            "WHERE h.source = :s ORDER BY r.row_num"), {"s": source}).all()
+    if not res:
+        return [], []
+    h = res[0][0]
+    keys = unique_keys(h)
+    data = [r[1] for r in res if r[1] is not None]
     width = len(h)
     rows = []
     for d in data:
@@ -114,6 +116,32 @@ def df_fisica_base_test() -> pd.DataFrame:
 # --------------------------------------------------------------------------- Partidos
 def rows_partido(nombre: str) -> list[list[str]]:
     return _all_values(S.PARTIDO_PREFIX + nombre)
+
+
+def todos_los_partidos() -> dict[str, list[list[str]]]:
+    """Todas las pestanas de partidos en UNA consulta: {nombre: get_all_values()}.
+
+    Evita 1 consulta por partido (23 viajes a la DB al abrir el analisis en frio).
+    """
+    prefijo = S.PARTIDO_PREFIX
+    with connect() as conn:
+        res = conn.execute(text(
+            "SELECT h.source, h.headers, r.data FROM sheet_headers h "
+            "LEFT JOIN sheet_rows r ON r.source = h.source "
+            "WHERE h.source LIKE :p ORDER BY h.source, r.row_num"),
+            {"p": prefijo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"}).all()
+    out: dict[str, list[list[str]]] = {}
+    keys_por_fuente: dict[str, list[str]] = {}
+    for source, headers, data in res:
+        nombre = source[len(prefijo):]
+        h = list(headers)
+        if nombre not in out:
+            out[nombre] = [h]
+            keys_por_fuente[nombre] = unique_keys(h)
+        if data is not None:
+            r = [str(data.get(k, "")) for k in keys_por_fuente[nombre]]
+            out[nombre].append(r + [""] * (len(h) - len(r)))
+    return out
 
 
 def lista_partidos() -> list[str]:
