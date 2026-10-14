@@ -10,6 +10,8 @@ import gspread
 import json
 from src.utils.credentials import get_credentials_dict, get_gspread_client
 from src.utils.cache import cache_si_ok
+from src.data import backend
+import time
 
 # =============================================================================
 # 🔧 CONFIGURACIÓN DE CONEXIÓN Y CREDENCIALES
@@ -23,6 +25,13 @@ def get_google_credentials():
 
 @cache_si_ok(ttl=300)
 def read_google_sheet_as_df(sheet_id, worksheet_name):
+    # Backend PostgreSQL (DATA_BACKEND=postgres): mismo DataFrame, sin tocar Sheets.
+    if backend.use_postgres():
+        fuente = backend.fuente_para(sheet_id, worksheet_name)
+        if fuente:
+            df_pg = backend.df_de_fuente(fuente)
+            if df_pg is not backend.FALLBACK:
+                return df_pg
     try:
         creds_info = get_google_credentials()
         if not creds_info: return None
@@ -63,15 +72,28 @@ def conectar_base_central():
     except: return []
 
 def guardar_reporte_seguro(row_data):
+    en_db = False
+    if backend.use_postgres():
+        if not backend.mirror_writes():
+            # Destino principal: la base (visible al instante). Sheets solo si la base falla.
+            if backend.registrar_reporte("nutricion", row_data):
+                return True
+        else:
+            en_db = None  # espejo: primero Sheets, luego la DB con mirrored_at
     try:
         creds_info = get_google_credentials()
         gc = get_gspread_client() or gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
         sh = gc.open_by_key('1CpAklgxgcVJrIWRWt-yJW4u6EkTcIeQqqp87kllsUqo')
         ws = sh.worksheet("Respuestas de formulario 1")
         ws.append_row(row_data, value_input_option="RAW")
+        if en_db is None:
+            backend.registrar_reporte("nutricion", row_data, mirrored_at=time.time())
         st.cache_data.clear()
         return True
     except Exception as e:
+        if en_db is None and backend.registrar_reporte("nutricion", row_data):
+            st.warning("⚠️ Reporte guardado en la base; no se pudo copiar a Google Sheets.")
+            return True
         st.error(f"❌ Error al guardar en Sheets: {str(e)}")
         return False
 

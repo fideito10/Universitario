@@ -12,6 +12,7 @@ import sys
 import os
 from src.utils.credentials import get_credentials_dict
 from src.utils.cache import cache_si_ok
+from src.data import backend
 
 # =============================================================================
 # 🔧 FUNCIONES AUXILIARES CORREGIDAS
@@ -454,7 +455,7 @@ def main_reporte_medico():
                 ]
                 google_creds = get_google_credentials()
         # Guardar el reporte
-        if google_creds:
+        if google_creds or backend.use_postgres():
             try:
                 try:
                     from src.modules.areamedica import append_google_sheet_row
@@ -466,7 +467,8 @@ def main_reporte_medico():
                     row_data=nuevo_reporte,
                     credentials_dict=google_creds
                 )
-                st.success("✅ Reporte guardado en Google Sheets")
+                st.success("✅ Reporte guardado" if backend.use_postgres()
+                           else "✅ Reporte guardado en Google Sheets")
                 # Recargar datos médicos para mostrar el historial actualizado
                 datos_medicos = conectar_area_medica()
             except Exception as e:

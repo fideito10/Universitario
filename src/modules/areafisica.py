@@ -11,6 +11,7 @@ import os
 from src.modules.administracion import JugadoresMaestroManager
 from src.utils.credentials import get_credentials_dict, get_gspread_client
 from src.utils.cache import cache_si_ok
+from src.data import backend
 
 # ==========================================
 # TESTS DE FUERZA (editar según necesidad)
@@ -120,6 +121,14 @@ def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.
     Carga una hoja de Google Sheets usando el sheet_id y el nombre de la pestaña.
     """
     try:
+        # Backend PostgreSQL (DATA_BACKEND=postgres): mismo DataFrame, sin tocar Sheets.
+        if backend.use_postgres():
+            fuente = backend.fuente_para(sheet_id, nombre_hoja)
+            if fuente:
+                df_pg = backend.df_de_fuente(fuente)
+                if df_pg is not backend.FALLBACK:
+                    return df_pg
+
         # Obtener credenciales usando la función mejorada
         creds_info = get_google_credentials()
         
@@ -155,26 +164,33 @@ def obtener_pesos_por_dni() -> pd.DataFrame:
     HOJA_NUTRICION = "Respuestas de formulario 1"
 
     try:
-        creds_info = get_google_credentials()
-        if creds_info is None:
-            return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
+        df_nutr = None
+        if backend.use_postgres():
+            df_pg = backend.df_de_fuente("nutricion")
+            if df_pg is not backend.FALLBACK:
+                df_nutr = df_pg.copy()
 
-        SCOPES = [
-            'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive'
-        ]
-        gc = get_gspread_client()
-        if gc is None:
-            credenciales = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-            gc = gspread.authorize(credenciales)
-        sh = gc.open_by_key(SHEET_NUTRICION_ID)
-        ws = sh.worksheet(HOJA_NUTRICION)
-        data = ws.get_all_values()
+        if df_nutr is None:
+            creds_info = get_google_credentials()
+            if creds_info is None:
+                return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
 
-        if not data:
-            return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
+            SCOPES = [
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive'
+            ]
+            gc = get_gspread_client()
+            if gc is None:
+                credenciales = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+                gc = gspread.authorize(credenciales)
+            sh = gc.open_by_key(SHEET_NUTRICION_ID)
+            ws = sh.worksheet(HOJA_NUTRICION)
+            data = ws.get_all_values()
 
-        df_nutr = pd.DataFrame(data[1:], columns=data[0])
+            if not data:
+                return pd.DataFrame(columns=['DNI_merge', 'Peso (kg)'])
+
+            df_nutr = pd.DataFrame(data[1:], columns=data[0])
 
         # Columna DNI (flexible: 'Dni', 'DNI', etc.)
         col_dni = next((c for c in df_nutr.columns if c.strip().lower() == 'dni'), None)

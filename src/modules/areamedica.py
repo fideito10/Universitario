@@ -12,8 +12,10 @@ from typing import Dict, List, Optional
 import json
 import sys
 import os
+import time
 from src.utils.credentials import get_credentials_dict, get_gspread_client
 from src.utils.cache import cache_si_ok
+from src.data import backend
 
 def get_google_credentials():
     """
@@ -55,7 +57,34 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
     # Configuración por defecto
     if sheet_id is None:
         sheet_id = '1ham2WSMQa3eEv0V0TtHcAa55R3WLGoBje6pSOoNxcBQ'
-    
+
+    # Backend PostgreSQL (DATA_BACKEND=postgres): misma estructura de salida, sin tocar Sheets.
+    if backend.use_postgres() and backend.fuente_para(sheet_id, worksheet_name) == "medica":
+        all_data = backend.leer(backend.values_medica)
+        if all_data is not backend.FALLBACK:
+            if not all_data:
+                return {
+                    'success': False,
+                    'data': None,
+                    'columns': None,
+                    'message': 'La hoja está vacía'
+                }
+            columns = all_data[0]
+            data_rows = all_data[1:]
+            structured_data = []
+            for row in data_rows:
+                structured_data.append({c: (row[i] if i < len(row) else '') for i, c in enumerate(columns)})
+            return {
+                'success': True,
+                'data': structured_data,
+                'columns': columns,
+                'raw_data': data_rows,
+                'total_rows': len(data_rows),
+                'sheet_title': 'PostgreSQL',
+                'worksheet_title': 'medica',
+                'message': f'Datos leídos exitosamente: {len(data_rows)} filas, {len(columns)} columnas'
+            }
+
     # Cargar credenciales solo cuando se necesiten
     if creds_info is None:
         creds_info = get_google_credentials()
@@ -394,26 +423,50 @@ def mostrar_graficos_interactivos(df):
 
 
 def append_google_sheet_row(sheet_id, worksheet_name, row_data, credentials_dict):
-    """Agrega una fila a una hoja de Google Sheets. Robustez mejorada para selección de hoja."""
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(credentials_dict, scopes=scopes)
-    gc = get_gspread_client() or gspread.authorize(creds)
-    sh = gc.open_by_key(sheet_id)
+    """Agrega una fila a una hoja de Google Sheets. Robustez mejorada para selección de hoja.
+
+    Con DATA_BACKEND=postgres el reporte médico se inserta directo en la base
+    (visible al instante) y el append a Sheets solo ocurre con MIRROR_WRITES_TO_SHEETS=true
+    o si la base no está disponible.
+    """
+    en_db = False
+    if backend.use_postgres() and sheet_id == backend.S.sheet_id("medica"):
+        espejo = backend.mirror_writes()
+        if not espejo:
+            en_db = backend.registrar_reporte("medica", row_data)
+            if en_db:
+                return True
+        # con espejo: primero Sheets (mirrored_at debe ser posterior al append), luego la DB
+    try:
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(credentials_dict, scopes=scopes)
+        gc = get_gspread_client() or gspread.authorize(creds)
+        sh = gc.open_by_key(sheet_id)
     
-    ws = None
-    if worksheet_name:
-        try:
-            ws = sh.worksheet(worksheet_name)
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ Hoja '{worksheet_name}' no encontrada. Usando la primera hoja.")
+        ws = None
+        if worksheet_name:
+            try:
+                ws = sh.worksheet(worksheet_name)
+            except gspread.exceptions.WorksheetNotFound:
+                st.warning(f"⚠️ Hoja '{worksheet_name}' no encontrada. Usando la primera hoja.")
+                ws = sh.get_worksheet(0)
+        else:
             ws = sh.get_worksheet(0)
-    else:
-        ws = sh.get_worksheet(0)
         
-    ws.append_row(row_data, value_input_option="USER_ENTERED")
+        ws.append_row(row_data, value_input_option="USER_ENTERED")
+    except Exception:
+        # Espejo activo y Sheets fallo: no perder el reporte, queda solo en la base.
+        if (backend.use_postgres() and sheet_id == backend.S.sheet_id("medica")
+                and backend.mirror_writes() and backend.registrar_reporte("medica", row_data)):
+            st.warning("⚠️ Reporte guardado en la base; no se pudo copiar a Google Sheets.")
+            return True
+        raise
+    if backend.use_postgres() and sheet_id == backend.S.sheet_id("medica") and not en_db:
+        if backend.mirror_writes():
+            backend.registrar_reporte("medica", row_data, mirrored_at=time.time())
     st.cache_data.clear()
     return True
 # Agregar después de la función mostrar_graficos_interactivos:

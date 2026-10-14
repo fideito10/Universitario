@@ -905,6 +905,9 @@ def dashboard_main():
 
     st.markdown(f'<div class="main-header">{img_html}<h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1><h3>Sistema de Gestión Deportiva</h3><div class="uni-greet">Bienvenido, <strong>{st.session_state.user["nombre"]}</strong> · {st.session_state.user["rol"]}</div></div>', unsafe_allow_html=True)
 
+    from src.data import backend
+    backend.mostrar_frescura()
+
     allowed = [m for m in get_modules_info(st.session_state.user.get('rol')) if auth_manager.has_permission(m["id"])]
 
     if not allowed:
@@ -1026,6 +1029,9 @@ def main():
                 if st.button("📋 Pasar Lista", use_container_width=True):
                     st.session_state.current_page = "lista"
                     st.rerun()
+
+            from src.data import backend
+            backend.boton_sincronizar(user.get('rol'))
 
             st.markdown("---")
             if st.button("🏠 Volver al Inicio", use_container_width=True, key="btn_volver_inicio_bottom"):

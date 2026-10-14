@@ -249,3 +249,84 @@ py -m pytest tests/test_parity.py -v        # paridad en vivo (requiere credenci
 - Cron/worker de `python -m src.data.sync` y boton "Sincronizar ahora" (`run_sync`) + "actualizado hace X min" (`sync_runs`).
 - Escritura directa de medica/nutricion en `sheet_rows` con `row_num >= APP_ROW_BASE`.
 - Fase 4: escrituras de usuarios/jugadores/wellness/asistencias a Postgres y re-hash de claves.
+
+## 13. Estado Fase 3 (lecturas detras de `DATA_BACKEND`) - 2026-10-12
+
+### Alcance
+
+Solo las fuentes externas / de formulario: **medica, nutricion, fisica_base_test y partidos**.
+`Usuarios`, `Jugadores_Maestro`, `Wellness_Jugador` y `Asistencias` SIGUEN leyendose y escribiendose
+en Sheets (con el cache de Fase 0) hasta la Fase 4: leerlas de la DB mientras se escribe en Sheets
+dejaria datos nuevos invisibles. Auth/login no se toco.
+
+### Variables de entorno
+
+| Variable | Valores | Default | Efecto |
+|---|---|---|---|
+| `DATA_BACKEND` | `sheets` \| `postgres` | `sheets` | `sheets` = comportamiento de siempre. `postgres` = las 4 fuentes de arriba salen de la DB. Se lee de env, `.env` o `st.secrets`. |
+| `MIRROR_WRITES_TO_SHEETS` | `true` \| `false` | `false` | Solo con `postgres`: ademas de insertar en la DB, agrega el reporte (medica/nutricion) al Sheet. |
+| `DATABASE_URL` | cadena Neon | - | Ya existente (Fase 1). |
+
+### Como activar / desactivar / rollback
+
+- **Activar:** DB migrada y sincronizada (`py -m src.data.migrate`, `py -m src.data.sync`), luego en
+  Railway (servicio web) `DATA_BACKEND=postgres` y redeploy/restart. Agregar el servicio `worker`
+  (Procfile: `python -m src.data.sync --loop --every 300`) con las mismas variables
+  (`DATABASE_URL` + credenciales de Google).
+- **Rollback inmediato:** `DATA_BACKEND=sheets` (o borrar la variable) y reiniciar. No hay migracion
+  de datos que deshacer: los modulos vuelven a leer de Sheets. Los reportes cargados desde la app
+  mientras estaba `postgres` y sin espejo viven solo en la DB (`row_num >= 1.000.000`); para no
+  perderlos al volver a `sheets`, activar antes `MIRROR_WRITES_TO_SHEETS=true` o copiarlos a mano.
+- **DB caida:** con `postgres` la app cae sola a Sheets (aviso `st.warning` una vez por sesion) y no
+  reintenta la DB durante 60 s. No requiere accion.
+
+### Que cambio
+
+- `src/data/backend.py`: `use_postgres()`, `mirror_writes()`, wrappers `st.cache_data(ttl=300)` sobre
+  `repo.*`, `fuente_para(sheet_id, pestana)` (mapea a la fuente de `sources.py`; lo que no esta en
+  sources va a Sheets), `leer()` con fallback + circuito de 60 s, `mostrar_frescura()` y
+  `boton_sincronizar()`.
+- Loaders con rama Postgres (misma firma y retorno): `read_google_sheet_with_headers`
+  (areamedica; de ahi salen `create_dataframe_from_sheet`, `obtener_df_medica` y reportemedico),
+  `read_google_sheet_as_df` (areanutricion; de ahi `obtener_df_nutricion`), `cargar_hoja` y
+  `obtener_pesos_por_dni` (areafisica; de ahi `obtener_df_fisica`), `_get_all_matches` y
+  `_load_match_data` (panel_partido; sin reintentos con sleep, reusa `_parse_sheet_data`),
+  `load_all_data` (bot; medica y fisica). Todos los demas pedidos de sheet/pestana no mapeados
+  siguen en Sheets (p.ej. `conectar_base_central` y `Jugadores_Maestro`).
+- Escrituras (`src/data/writer.py`, `insertar_fila` / `insertar_fila_posicional`): con `postgres`,
+  `append_google_sheet_row` (reporte medico) y `guardar_reporte_seguro` (nutricion) insertan en
+  `sheet_rows` (`row_num = max(row_num, 999.999) + 1`, `data` con los headers de `sheet_headers`, DNI
+  normalizado, fecha) en una transaccion con `pg_advisory_xact_lock` (sin estado de sesion) y limpian
+  el cache. Si la DB falla, la escritura cae a Sheets como hoy.
+- Espejo: con `MIRROR_WRITES_TO_SHEETS=true` se hace primero el append a Sheets y luego el insert en
+  la DB marcando `data.__mirrored__` (epoch). El sync borra esa copia local cuando ya leyo la fila
+  desde el Sheet, para que no quede duplicada.
+- Sync: `py -m src.data.sync --loop --every 300` (worker). Boton **Sincronizar ahora** en la barra
+  lateral (solo rol `Administrador` y backend `postgres`; spinner + limpia cache) y texto
+  "Datos actualizados hace X min" en el Home (desde `sync_runs`, la fuente mas atrasada).
+- Procfile: nueva linea `worker:` (la `web:` no cambio).
+
+### Bug de Fase 0 corregido en esta fase
+
+`src/utils/cache.py` (`cache_si_ok`): con Streamlit 1.59 todas las funciones decoradas compartian la
+misma clave de `st.cache_data` (la funcion interna es identica para todas), asi que dos loaders sin
+argumentos devolvian el resultado del otro y las llamadas anidadas se bloqueaban entre si (deadlock
+observado en los tests). Ahora cada funcion cacheada recibe su propio `__qualname__`.
+
+### Tests
+
+- `tests/test_backend.py`: paridad de cada loader (Sheets en vivo vs Postgres), fallback con
+  `DATABASE_URL` invalida, `insertar_fila` y limpieza de espejo en schema temporal.
+- `tests/test_smoke_app.py`: `AppTest` de las pantallas con ambos backends.
+
+### Diferencias conocidas entre backends
+
+- Frescura: con `postgres` los datos de los Forms llegan con hasta 5 min de demora (sync); los
+  reportes cargados desde la app son inmediatos.
+- Hoja medica: hoy tiene solo header (0 filas de datos). `read_google_sheet_with_headers` devuelve
+  `success=True` con `data=[]` en ambos backends (misma estructura, incluida `raw_data`); `main_streamlit`
+  muestra "No se pudieron cargar los datos" en ambos. Hoja totalmente vacia: `success=False` en ambos.
+- `bot.py`: con `postgres` la hoja medica/fisica llega como strings (como `get_all_values`) en lugar
+  de numerica (`get_all_records`); solo cambia el formato del texto que ve el modelo.
+- Con `postgres` y DB sin sincronizar (sin headers) las pantallas ven datos vacios, no caen a Sheets:
+  correr el sync antes de activar el flag.

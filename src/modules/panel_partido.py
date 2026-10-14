@@ -10,6 +10,7 @@ from plotly.subplots import make_subplots
 import gspread
 from src.utils.credentials import get_service_account_credentials, get_gspread_client
 from src.utils.cache import cache_si_ok
+from src.data import backend
 
 # ── Helpers de tiempo para Tiempo Neto de Juego ──
 def _time_to_seconds(t: str) -> float:
@@ -279,6 +280,10 @@ def _parse_sheet_data(rows_list):
 
 @cache_si_ok(ttl=300, ok=lambda r: bool(r))
 def _get_all_matches():
+    if backend.use_postgres():
+        titulos = backend.leer(backend.lista_partidos)
+        if titulos is not backend.FALLBACK:
+            return list(titulos)
     import time
     import random
     max_retries = 3
@@ -302,6 +307,10 @@ def _get_all_matches():
 
 @st.cache_data(ttl=3600)
 def _load_match_data(match_name):
+    if backend.use_postgres():
+        rows = backend.leer(backend.rows_partido, match_name)
+        if rows is not backend.FALLBACK:
+            return _parse_sheet_data(rows)
     import time
     import random
     max_retries = 3

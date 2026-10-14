@@ -1,6 +1,7 @@
 """Sync Google Sheets -> PostgreSQL (espejo de medica, nutricion, fisica y partidos).
 
 Uso:  py -m src.data.sync [--source medica|nutricion|fisica_base_test|partidos|partido:<n>] [--dry-run]
+      py -m src.data.sync --loop --every 300     (worker: Procfile `worker:`)
 
 - UNA llamada values.batchGet por spreadsheet (+ 1 de metadatos).
 - Upsert idempotente en sheet_rows por (source,row_num) segun row_hash; borra filas
@@ -143,7 +144,8 @@ ON CONFLICT (source) DO UPDATE SET headers = EXCLUDED.headers, synced_at = now()
 """)
 
 
-def _apply_source(conn, source: str, headers, rows, dry_run: bool) -> dict:
+def _apply_source(conn, source: str, headers, rows, dry_run: bool,
+                  fetched_at: float | None = None) -> dict:
     existing = {
         r[0]: r[1]
         for r in conn.execute(
@@ -172,6 +174,14 @@ def _apply_source(conn, source: str, headers, rows, dry_run: bool) -> dict:
         )
     conn.execute(_HEADERS_UPSERT,
                  {"source": source, "headers": json.dumps(headers, ensure_ascii=False)})
+    if fetched_at is not None:
+        # Filas que la app inserto Y ademas espejo al Sheet (MIRROR_WRITES_TO_SHEETS):
+        # si el Sheet ya las tenia cuando se leyo, la copia local sobra (evita duplicados).
+        conn.execute(
+            text("DELETE FROM sheet_rows WHERE source = :s AND row_num >= :b "
+                 "AND data->>'__mirrored__' IS NOT NULL "
+                 "AND CAST(data->>'__mirrored__' AS double precision) < :t"),
+            {"s": source, "b": APP_ROW_BASE, "t": fetched_at})
     return stats
 
 
@@ -221,6 +231,7 @@ def _run_logged(label: str, dry_run: bool, work) -> dict:
 def _sync_single(client, name: str, dry_run: bool) -> dict:
     skey, tkey = S.SYNC_SOURCES[name]
     wanted = S.tab_name(tkey)
+    fetched_at = time.time()
     try:
         _, vals = fetch_spreadsheet(
             client, S.sheet_id(skey),
@@ -231,7 +242,7 @@ def _sync_single(client, name: str, dry_run: bool) -> dict:
     values = next(iter(vals.values()), [])
     headers, rows = build_rows(values, mirror_dni=True)
     return _run_logged(name, dry_run,
-                       lambda conn: _apply_source(conn, name, headers, rows, dry_run))
+                       lambda conn: _apply_source(conn, name, headers, rows, dry_run, fetched_at))
 
 
 def _sync_partidos(client, only: str | None, dry_run: bool) -> dict:
@@ -288,15 +299,43 @@ def main(argv=None) -> int:
     ap.add_argument("--source", action="append",
                     help="medica|nutricion|fisica_base_test|partidos|partido:<nombre> (repetible)")
     ap.add_argument("--dry-run", action="store_true", help="no escribe en la DB")
+    ap.add_argument("--loop", action="store_true",
+                    help="modo worker: repite la sincronizacion indefinidamente")
+    ap.add_argument("--every", type=int, default=300, metavar="SEGUNDOS",
+                    help="intervalo entre corridas con --loop (default 300)")
     args = ap.parse_args(argv)
+    if args.loop:
+        return _loop(args)
+    return _once(args)
+
+
+def _once(args) -> int:
     results = run_sync(args.source, args.dry_run)
     bad = 0
     for r in results:
         extra = {k: v for k, v in r.items() if k not in ("source", "status", "error")}
         print(f"{'[dry-run] ' if args.dry_run else ''}{r['source']}: {r['status']} {extra}"
-              + (f" error={r['error']}" if r.get("error") else ""))
+              + (f" error={r['error']}" if r.get("error") else ""), flush=True)
         bad += r["status"] == "error"
     return 1 if bad else 0
+
+
+def _loop(args) -> int:
+    """Worker/cron: una corrida cada --every segundos. Un error no mata el proceso."""
+    every = max(int(args.every), 10)
+    print(f"sync worker: cada {every}s (Ctrl+C para salir)", flush=True)
+    while True:
+        started = time.time()
+        try:
+            _once(args)
+        except SystemExit:
+            raise
+        except Exception as exc:  # DB/Google caidos: reintenta en la proxima vuelta
+            print(f"sync worker: error {type(exc).__name__}: {str(exc)[:200]}", flush=True)
+        try:
+            time.sleep(max(1.0, every - (time.time() - started)))
+        except KeyboardInterrupt:
+            return 0
 
 
 if __name__ == "__main__":

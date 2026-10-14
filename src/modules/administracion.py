@@ -13,8 +13,9 @@ def get_gcp_credentials():
     return get_service_account_credentials()
 
 @cache_si_ok(ttl=300, ok=lambda df: not df.empty)
-def _jugadores_cacheados(sheet_id, _manager):
-    return _manager._fetch_players()
+def _jugadores_cacheados(sheet_id):
+    # No recibe el manager: st.cache_data no puede hashear la instancia
+    return JugadoresMaestroManager()._fetch_players()
 
 
 class JugadoresMaestroManager:
@@ -94,7 +95,7 @@ class JugadoresMaestroManager:
     
     def get_all_players(self):
         """Obtener todos los jugadores de la hoja maestra (cache 5 min)"""
-        return _jugadores_cacheados(self.sheet_id, self)
+        return _jugadores_cacheados(self.sheet_id)
 
     def _fetch_players(self):
         worksheet = self.connect_to_sheet()
