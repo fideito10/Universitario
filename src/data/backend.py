@@ -10,7 +10,9 @@ aviso se muestra una sola vez por sesion y la DB no se reintenta durante
 `_REINTENTO_SEG` segundos (evita colgar cada click con una DB caida).
 
 Las tablas propias de la app (Usuarios, Jugadores_Maestro, Wellness_Jugador,
-Asistencias) NO pasan por aca hasta la Fase 4.
+Asistencias) viven en `src/data/repo_app.py` (Fase 4): con `postgres` se leen y escriben
+ahi, SIN fallback a Sheets (la DB es la fuente de verdad); los modulos solo consultan
+`use_postgres()` / `mirror_writes()` y llaman a `limpiar_cache()` tras escribir.
 """
 from __future__ import annotations
 

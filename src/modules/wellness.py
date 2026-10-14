@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from src.sheets.google_sheets_manager import get_sheets_manager
+from src.data import backend
 
 def calculate_wellness_score(rpe, sueno, doms):
     # Normalizamos el RPE (1-10) a una escala de 1-5
@@ -76,12 +77,18 @@ div[data-baseweb="select"] > div { min-height: 48px; }
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _leer_wellness(sheet_id, _gsm):
+    if backend.use_postgres():
+        from src.data import repo_app
+        return repo_app.leer_wellness()
     ws = _gsm.client.open_by_key(sheet_id).worksheet("Wellness_Jugador")
     return pd.DataFrame(ws.get_all_records())
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _leer_maestro(sheet_id, _gsm):
+    if backend.use_postgres():
+        from src.data import repo_app
+        return repo_app.df_jugadores()
     ws = _gsm.client.open_by_key(sheet_id).worksheet("Jugadores_Maestro")
     return pd.DataFrame(ws.get_all_records())
 
@@ -128,10 +135,23 @@ def wellness_module():
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 fecha = datetime.now().strftime("%Y-%m-%d")
                 try:
-                    spreadsheet = gsm.client.open_by_key(gsm.sheet_config["sheet_id"])
-                    worksheet = spreadsheet.worksheet("Wellness_Jugador")
-                    row = [len(worksheet.col_values(1)), timestamp, user.get('email', 'N/A'), user['nombre'], rpe, sueno, doms, score, fecha]
-                    worksheet.append_row(row)
+                    if backend.use_postgres():
+                        from src.data import repo_app
+                        repo_app.agregar_wellness(
+                            timestamp=timestamp, email=user.get('email', 'N/A'), nombre=user['nombre'],
+                            rpe=rpe, sueno=sueno, doms=doms, score=score, fecha=fecha,
+                            dni=user.get('dni'))
+                        if backend.mirror_writes():
+                            try:
+                                ws = gsm.client.open_by_key(gsm.sheet_config["sheet_id"]).worksheet("Wellness_Jugador")
+                                ws.append_row([len(ws.col_values(1)), timestamp, user.get('email', 'N/A'), user['nombre'], rpe, sueno, doms, score, fecha])
+                            except Exception:
+                                st.warning("Registro guardado en la base; no se pudo copiar a Google Sheets.")
+                    else:
+                        spreadsheet = gsm.client.open_by_key(gsm.sheet_config["sheet_id"])
+                        worksheet = spreadsheet.worksheet("Wellness_Jugador")
+                        row = [len(worksheet.col_values(1)), timestamp, user.get('email', 'N/A'), user['nombre'], rpe, sueno, doms, score, fecha]
+                        worksheet.append_row(row)
                     _leer_wellness.clear()
                     st.markdown(f"<div class='well-score'>✅ ¡Enviado!<b style='color:{get_status_color(score)}'>{score}</b>Tu score de hoy (de 5)</div>", unsafe_allow_html=True)
                 except Exception:

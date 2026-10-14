@@ -52,12 +52,16 @@ def read_google_sheet_as_df(sheet_id, worksheet_name):
 def conectar_base_central():
     DATABASE_SHEET_ID = '1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw'
     try:
-        creds_info = get_google_credentials()
-        gc = get_gspread_client() or gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
-        sh = gc.open_by_key(DATABASE_SHEET_ID)
-        ws = sh.get_worksheet(0)
-        data = ws.get_all_records()
-        df = pd.DataFrame(data)
+        if backend.use_postgres():
+            from src.data import repo_app
+            df = repo_app.df_jugadores()
+        else:
+            creds_info = get_google_credentials()
+            gc = get_gspread_client() or gspread.authorize(Credentials.from_service_account_info(creds_info, scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']))
+            sh = gc.open_by_key(DATABASE_SHEET_ID)
+            ws = sh.get_worksheet(0)
+            data = ws.get_all_records()
+            df = pd.DataFrame(data)
         jugadores = []
         for _, r in df.iterrows():
             nombre = f"{str(r.get('Nombre', '')).strip()} {str(r.get('Apellido', '')).strip()}".strip()

@@ -330,3 +330,117 @@ observado en los tests). Ahora cada funcion cacheada recibe su propio `__qualnam
   de numerica (`get_all_records`); solo cambia el formato del texto que ve el modelo.
 - Con `postgres` y DB sin sincronizar (sin headers) las pantallas ven datos vacios, no caen a Sheets:
   correr el sync antes de activar el flag.
+
+## 14. Estado Fase 4 (datos propios de la app en Postgres) - 2026-10-14
+
+### Alcance
+
+Con `DATA_BACKEND=postgres`, **usuarios, jugadores, wellness y asistencias** (y el login) se leen y
+escriben en la DB, sin tocar Sheets. Con `DATA_BACKEND=sheets` (default) todo queda exactamente como antes.
+
+- `src/data/repo_app.py`: lectura (`df_jugadores`, `usuarios_df`, `leer_wellness`, `leer_asistencias`,
+  `jugadores_str`) que devuelve el MISMO DataFrame que `get_all_records()` (headers originales y su orden
+  desde `sheet_headers` `app:<tabla>`, valores numericos como gspread). Escritura transaccional sin estado
+  de sesion (`pg_advisory_xact_lock`): `agregar_jugador`, `actualizar_estado_jugador`, `dni_existe`,
+  `agregar_wellness`, `agregar_asistencias`, `actualizar_clave`. Tolera DNIs duplicados/vacios (PK = `id`).
+- `src/security/passwords.py`: hash `scrypt$N$r$p$salt_b64$hash_b64` (stdlib, `hmac.compare_digest`).
+- `src/security/auth.py`: con postgres `_get_users_df` y la busqueda por DNI usan la DB; no crea la pestana
+  ni el admin por defecto en Sheets. Logica de login, mensajes y fallback `admin/admin123` sin cambios.
+  Primer login exitoso con clave en texto plano (`clave_es_hash=false`): se re-hashea, se guarda y se
+  borra el texto de `extra`. Con hash el login verifica con scrypt.
+- `administracion.py` (alta, estado, `dni_exists`, `get_all_players`), `wellness.py`, `Lista.py`,
+  `areanutricion.conectar_base_central`, `reportemedico.conectar_base_central` y `bot.load_all_data` usan la DB.
+  `dashboard_360.obtener_df_central`, `areafisica` y `perfil_jugador` pasan por `get_all_players`. Tras cada
+  escritura se llama `backend.limpiar_cache()`. `kpi` no lee datos.
+- `MIRROR_WRITES_TO_SHEETS=true`: ademas de la DB, la misma escritura se hace en Sheets (errores del
+  espejo solo avisan). Default `false`.
+- Sin fallback a Sheets: si la DB falla, la pantalla muestra el error (leer de Sheets mientras la DB
+  recibe las escrituras mostraria datos viejos). El admin de emergencia sigue entrando sin DB.
+- `sync.py` NO toca estas tablas: `ALL_SOURCES = medica, nutricion, fisica_base_test, partidos`, solo
+  escribe `sheet_rows`/`sheet_headers` de esas fuentes y borra solo `partido:*`; `--source jugadores`
+  aborta con "fuente desconocida" (verificado por `test_sync_no_toca_tablas_de_la_app`).
+
+### Runbook de corte (Sheets -> Postgres como fuente de verdad)
+
+Ventana sugerida: 10 minutos fuera de horario de carga.
+
+1. **Pausar escrituras** (avisar al staff): nadie da altas de jugadores, cambia estados, carga wellness
+   ni guarda asistencia desde ese momento hasta el paso 6. La app puede seguir en `DATA_BACKEND=sheets`.
+2. Backup: `py scripts/export_snapshot.py` (JSON local en `data_snapshot/`).
+3. Esquema al dia: `py -m src.data.migrate` (debe decir "sin migraciones pendientes").
+4. Importar: `py scripts/import_app_tables.py --dry-run` y revisar los conteos; luego
+   `py scripts/import_app_tables.py --force` (reemplaza jugadores, usuarios y wellness desde el Sheet;
+   las claves entran con `clave_es_hash=false`). OJO: `--force` borra lo que la DB tenga cargado en esas
+   tablas; no correrlo despues del corte salvo para un rollback deliberado.
+5. Verificar conteos (Sheet de datos = filas - 1 de cabecera; usuarios omite vacios/duplicados):
+   `SELECT (SELECT count(*) FROM jugadores) j, (SELECT count(*) FROM usuarios) u,
+   (SELECT count(*) FROM wellness) w, (SELECT count(*) FROM asistencias) a;`
+   Hoy: 495 / 3 / (filas de Wellness_Jugador) / 0. Opcional: `py -m pytest tests/test_app_tables.py -k paridad`.
+6. **Activar**: en Railway (servicio web) `DATA_BACKEND=postgres` y reiniciar. Probar: login `admin`,
+   login con un usuario de la tabla, login con un DNI de jugador, alta de jugador, wellness, asistencia.
+   Reanudar escrituras. (Opcional durante la primera semana: `MIRROR_WRITES_TO_SHEETS=true` para que
+   Sheets siga recibiendo lo nuevo.)
+7. **Rollback**: `DATA_BACKEND=sheets` y reiniciar. Todo lo cargado en la DB despues del corte
+   (jugadores, wellness, asistencias, claves ya hasheadas) queda SOLO en la DB: si hubo escrituras y no
+   se uso el espejo, copiarlo a mano al Sheet antes de reanudar la carga en modo `sheets`. Las claves
+   siguen valiendo en Sheets porque el Sheet nunca se modifica (la DB guarda el hash aparte).
+   Volver a `postgres` mas tarde NO requiere reimportar (y no conviene: `--force` pisaria lo cargado).
+
+### Diferencias de comportamiento entre backends
+
+- Altas/consulta de DNI: con postgres el DNI se compara normalizado (solo digitos), p.ej. `12.345.678`
+  y `12345678` son el mismo; en Sheets la comparacion era por texto exacto.
+- Clave numerica con ceros a la izquierda (`0123`): en Sheets `get_all_records` la convertia a `123`
+  y no coincidia; en la DB coincide como texto.
+- Cambio de estado con DNI repetido: igual que Sheets, solo el primero.
+- Asistencias: la tabla `asistencias` guarda ademas `fecha`, `dni`, `jugador` tipados; el DataFrame
+  conserva las columnas de la hoja (`Fecha` como `dd/mm/YYYY`).
+- Mensajes de error de DB: solo el tipo de excepcion (no el texto completo).
+- El panel de equipo de `wellness.py` busca la columna `Division` (que no existe en Jugadores_Maestro):
+  falla igual en ambos backends (muestra "No se pudo cargar el panel del equipo"). No se modifico.
+
+### Medición de rendimiento (DATA_BACKEND=postgres, 2026-10-14)
+
+Equipo de desarrollo (Windows) contra Neon `us-east-2` por el endpoint pooler; `streamlit.testing.v1.AppTest`
+con sesion de Administrador, `time.perf_counter`. "Frio" = cache vacio y proceso nuevo; "caliente" = 2da corrida
+con cache de 5 min. Los numeros del frio incluyen cProfile (suma ~10-25%).
+
+| Pantalla | Frio (s) | Caliente (s) | Causa principal del frio |
+|---|---|---|---|
+| login: admin / fallback | 0.00 | 0.00 | sin DB |
+| login: usuario+clave o DNI de jugador | 0.9 (clave mala) / 2.1-2.4 (DNI) | igual (no se cachea) | 2 lecturas (Usuarios + Jugadores) a ~0.4 s por viaje; scrypt 0.04 s |
+| dashboard (home) | 4.3 | 0.6 | 1ra conexion a Neon 2.5 s + consulta de frescura |
+| dashboard_360 | 7.2 | 1.3 | `crear_dataframe_integrado` (4 fuentes, ~7 s reales en frio) |
+| nutricion | 4.3 | 0.9 | 3 lecturas DB (nutricion, jugadores, fisica) |
+| fisica | 3.5 | 0.7 | lectura Base Test (1592 filas) + jugadores |
+| medica | 1.6 | 0.5 | 1 lectura |
+| reporte_medico | 2.7 | 0.6 | 3 lecturas |
+| panel_partido | **33.0** | 0.6 | 23 partidos x ~0.9 s, uno por uno |
+| wellness | 1.6 | 0.2 | 2 lecturas (wellness + maestro) |
+| lista | 1.0 | 0.3 | 1 lectura de jugadores |
+| administracion | 1.4 (antes 3.0) | 0.2 (antes 0.6) | 1 lectura + `format_func` (arreglado) |
+| perfil | 0.2 | 0.2 | no lee datos |
+
+Operaciones mas lentas (de mayor a menor impacto):
+
+1. **Viaje a la DB: ~300-400 ms cada uno** (latencia a us-east-2 + `pool_pre_ping` que agrega un `SELECT 1`
+   por cada checkout). Casi todo el tiempo en frio es `n_consultas x 0.4 s`. Con `repo_app` ya se junto
+   "headers + filas" en 1 consulta (antes 2). El resto (`repo.py`) sigue con 2 consultas por fuente.
+2. **panel_partido en frio: 23 consultas secuenciales** (`rows_partido`, una por pestana, ~0.9 s c/u = 20 s)
+   + 7 s del resto. Fix recomendado (no aplicado): una sola consulta `WHERE source LIKE 'partido:%'`
+   agrupada en Python, o cargar solo el partido elegido.
+3. **Conexion nueva a Neon: 2.5 s** (TLS + despertar el cómputo). `pool_recycle=300` obliga a reconectar
+   cada 5 min de uso; subirlo (p.ej. 1800) o mantener 1 conexion tibia evita ese salto.
+4. **dashboard_360**: ~7 s en frio por 4 lecturas de DB + merge pandas; el `iterrows` de
+   `obtener_jugadores_por_categoria` mide 0.1 s reales (cProfile lo infla), no es el cuello.
+5. **Login por DNI de jugador: 2 lecturas completas** (todos los usuarios + los 495 jugadores) ~2 s.
+   Recomendado (no aplicado): consulta puntual por DNI (`WHERE dni = :d`) = 1 viaje.
+6. `administracion.py` `format_func` del selectbox: 2 filtros de pandas por opcion x 496 jugadores
+   (~1.6 s por rerun). **Arreglado** con un dict DNI -> nombre (3.0 s -> 1.4 s en frio, 0.6 -> 0.2 caliente).
+7. Imagenes base64 / fondo: no aparecen en el perfil (Fase 0 ya lo resolvio: fondo optimizado y cacheado).
+8. Segunda corrida (caliente) de dashboard_360 sigue en ~1.3 s: apply/`iterrows` y armado de graficos
+   en pandas/plotly, no DB.
+
+Aviso de pandas/pyarrow ya existente en ambos backends: `st.dataframe(df_jugadores)` falla la conversion de
+la columna `DNI` por un DNI vacio en el Sheet (mezcla int y ''); Streamlit lo arregla solo y registra un
+traceback. No afecta al usuario.

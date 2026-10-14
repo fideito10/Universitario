@@ -7,6 +7,7 @@ from datetime import datetime, date
 from google.oauth2 import service_account
 from src.utils.credentials import get_service_account_credentials, get_gspread_client
 from src.utils.cache import cache_si_ok
+from src.data import backend
 
 def get_gcp_credentials():
     """Obtener credenciales usando el módulo centralizado de credenciales."""
@@ -98,6 +99,13 @@ class JugadoresMaestroManager:
         return _jugadores_cacheados(self.sheet_id)
 
     def _fetch_players(self):
+        if backend.use_postgres():
+            try:
+                from src.data import repo_app
+                return repo_app.df_jugadores()
+            except Exception as e:
+                st.error(f"❌ Error obteniendo jugadores: {type(e).__name__}")
+                return pd.DataFrame()
         worksheet = self.connect_to_sheet()
         if not worksheet:
             return pd.DataFrame()
@@ -111,13 +119,58 @@ class JugadoresMaestroManager:
     
     def dni_exists(self, dni):
         """Verificar si un DNI ya existe"""
+        if backend.use_postgres():
+            try:
+                from src.data import repo_app
+                return repo_app.dni_existe(dni)
+            except Exception as e:
+                st.error(f"❌ Error verificando DNI: {type(e).__name__}")
+                return False
         df = self._fetch_players()
         if df.empty:
             return False
         return str(dni) in df['DNI'].astype(str).values
     
+    def _row_data(self, player_data):
+        return [
+            str(player_data['dni']),
+            player_data['nombre'],
+            player_data['apellido'],
+            player_data['posicion'],
+            player_data['categoria'],
+            player_data['fecha_nacimiento'].strftime('%d/%m/%Y'),
+            datetime.now().strftime('%d/%m/%Y'),
+            'Activo',
+            player_data.get('email', ''),
+            player_data.get('telefono', '')
+        ]
+
+    def _add_player_pg(self, player_data):
+        """Alta directa en PostgreSQL (con MIRROR_WRITES_TO_SHEETS tambien agrega la fila al Sheet)"""
+        from src.data import repo_app
+        try:
+            repo_app.agregar_jugador(player_data)
+        except repo_app.DniExistente:
+            st.error(f"❌ El DNI {player_data['dni']} ya existe")
+            return False
+        except Exception as e:
+            st.error(f"❌ Error agregando jugador: {type(e).__name__}")
+            return False
+        if backend.mirror_writes():
+            try:
+                worksheet = self.connect_to_sheet()
+                if worksheet:
+                    worksheet.append_row(self._row_data(player_data))
+            except Exception:
+                st.warning("⚠️ Jugador guardado en la base; no se pudo copiar a Google Sheets.")
+        backend.limpiar_cache()
+        st.success(f"✅ Jugador {player_data['nombre']} {player_data['apellido']} agregado exitosamente")
+        return True
+
     def add_player(self, player_data):
         """Agregar nuevo jugador limpio y silencioso"""
+        if backend.use_postgres():
+            return self._add_player_pg(player_data)
         worksheet = self.connect_to_sheet()
         if not worksheet:
             st.error("❌ No se pudo conectar a Google Sheets")
@@ -150,8 +203,34 @@ class JugadoresMaestroManager:
             st.error(f"❌ Error agregando jugador: {e}")
             return False
     
+    def _update_status_pg(self, dni, new_status):
+        from src.data import repo_app
+        try:
+            n = repo_app.actualizar_estado_jugador(dni, new_status)
+        except Exception as e:
+            st.error(f"❌ Error actualizando estado: {type(e).__name__}")
+            return False
+        if not n:
+            st.error(f"❌ No se encontró jugador con DNI: {dni}")
+            return False
+        if backend.mirror_writes():
+            try:
+                worksheet = self.connect_to_sheet()
+                if worksheet:
+                    for i, cell_dni in enumerate(worksheet.col_values(1)[1:], 2):
+                        if str(cell_dni) == str(dni):
+                            worksheet.update_cell(i, 8, new_status)
+                            break
+            except Exception:
+                st.warning("⚠️ Estado guardado en la base; no se pudo copiar a Google Sheets.")
+        backend.limpiar_cache()
+        st.success(f"✅ Estado actualizado para DNI: {dni}")
+        return True
+
     def update_player_status(self, dni, new_status):
         """Actualizar estado de un jugador"""
+        if backend.use_postgres():
+            return self._update_status_pg(dni, new_status)
         worksheet = self.connect_to_sheet()
         if not worksheet:
             return False
@@ -329,10 +408,14 @@ def main_administracion():
             df_players = manager.get_all_players()
             
             if not df_players.empty:
+                # Nombre por DNI calculado una vez (antes: 2 filtros de pandas por opcion, O(n^2))
+                nombre_por_dni = {}
+                for _d, _n, _a in zip(df_players['DNI'], df_players['Nombre'], df_players['Apellido']):
+                    nombre_por_dni.setdefault(_d, f"{_n} {_a}")
                 selected_dni = st.selectbox(
                     "Seleccionar jugador (DNI - Nombre)",
                     options=df_players['DNI'].tolist(),
-                    format_func=lambda x: f"{x} - {df_players[df_players['DNI']==x]['Nombre'].iloc[0]} {df_players[df_players['DNI']==x]['Apellido'].iloc[0]}",
+                    format_func=lambda x: f"{x} - {nombre_por_dni.get(x, '')}",
                     key="select_dni_status"  # ✅ FIX: Agregar key único
                 )
                 

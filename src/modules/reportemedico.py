@@ -35,10 +35,14 @@ def conectar_base_central():
             from areamedica import read_google_sheet_with_headers
 
         # Usar el ID correcto de la hoja base de jugadores
-        result = read_google_sheet_with_headers(
-            sheet_id='1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw',
-            worksheet_name=None  # usar primera hoja o especifica si es necesario
-        )
+        if backend.use_postgres():
+            from src.data import repo_app
+            result = {'success': True, 'data': repo_app.jugadores_str()}
+        else:
+            result = read_google_sheet_with_headers(
+                sheet_id='1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw',
+                worksheet_name=None  # usar primera hoja o especifica si es necesario
+            )
         if not result or not result.get('success'):
             error_msg = result.get('error', 'Error desconocido') if result else 'Sin respuesta'
             st.error(f"❌ Error conectando a Base Central: {error_msg}")

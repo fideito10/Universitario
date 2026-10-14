@@ -62,10 +62,14 @@ def load_all_data():
 
     try:
         # 1. MÓDULO ADMINISTRACIÓN (JUGADORES) - REDUCIDO
-        sheet_admin = client.open_by_key("1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw")
-        ws_jugadores = sheet_admin.worksheet("Jugadores_Maestro")
-        data_jugadores = ws_jugadores.get_all_records()
-        df_jugadores = pd.DataFrame(data_jugadores)
+        if backend.use_postgres():
+            from src.data import repo_app
+            df_jugadores = repo_app.df_jugadores()
+        else:
+            sheet_admin = client.open_by_key("1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw")
+            ws_jugadores = sheet_admin.worksheet("Jugadores_Maestro")
+            data_jugadores = ws_jugadores.get_all_records()
+            df_jugadores = pd.DataFrame(data_jugadores)
         
         if not df_jugadores.empty:
             context_text += f"JUGADORES ({len(df_jugadores)} total):\n"

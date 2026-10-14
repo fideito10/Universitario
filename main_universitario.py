@@ -801,7 +801,8 @@ def login_page():
     """, unsafe_allow_html=True)
     
     # Estado de la conexión (Solo visible para diagnóstico si falla)
-    if not auth_manager.gs_manager.credentials_loaded:
+    from src.data import backend
+    if not backend.use_postgres() and not auth_manager.gs_manager.credentials_loaded:
         st.error("⚠️ Error: No se detectaron credenciales de Google. Los jugadores no podrán ingresar.")
         st.info("Asegúrate de haber configurado las variables GOOGLE_CLIENT_EMAIL y GOOGLE_PRIVATE_KEY en Railway.")
     else:
