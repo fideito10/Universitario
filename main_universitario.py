@@ -4,7 +4,6 @@ Centralización de Módulos: Área Médica, Nutrición y Física
 Desarrollado con Streamlit
 """
 import streamlit as st
-import streamlit.components.v1 as components
 import os
 from datetime import datetime
 import base64
@@ -23,8 +22,8 @@ def inject_mobile_meta():
     """Inyecta metadatos para que la app se vea bien en dispositivos móviles (icono PWA)"""
     logo_b64 = get_base64_image("escudo uni.jpg")
     if logo_b64:
-        # components.html ejecuta el JS (st.markdown no ejecuta <script>)
-        components.html(f"""
+        # st.iframe ejecuta el JS (st.markdown no ejecuta <script>)
+        st.iframe(f"""
         <script>
             try {{
                 function updateHeadTag(tagName, attributes) {{
@@ -94,7 +93,7 @@ def inject_mobile_meta():
                 console.warn("Mobile meta injection failed:", e);
             }}
         </script>
-        """, height=0)
+        """, height=1)
 
 # Configuración de la página - DEBE SER EL PRIMER COMANDO DE ST
 st.set_page_config(
