@@ -55,42 +55,48 @@ def _build_engine():
 
     return create_engine(
         get_database_url(),
-        pool_size=3,
-        max_overflow=2,
-        pool_pre_ping=True,
-        pool_recycle=1800,  # pre_ping detecta las suspendidas; evita reconectar (~2.5 s) cada 5 min
+        pool_size=10,        # sesiones concurrentes + hilo de precalentamiento
+        max_overflow=5,
+        pool_timeout=30,
+        pool_use_lifo=True,  # reutiliza las conexiones mas recientes (las demas caducan solas)
+        pool_pre_ping=True,  # Neon suspende el compute a ~5 min: detecta la conexion muerta y reabre
+        pool_recycle=900,
         connect_args={"connect_timeout": 15},
     )
 
 
-def _in_streamlit() -> bool:
-    try:
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
-
-        return get_script_run_ctx(suppress_warning=True) is not None
-    except Exception:
-        return False
-
-
-def _streamlit_engine():
-    import streamlit as st
-
-    @st.cache_resource(show_spinner=False)
-    def _cached():
-        return _build_engine()
-
-    return _cached()
-
-
 def get_engine():
-    """Engine compartido (st.cache_resource en Streamlit, singleton fuera)."""
+    """Engine compartido por todo el proceso (singleton de modulo).
+
+    No usa st.cache_resource a proposito: asi el hilo de precalentamiento (sin
+    contexto de Streamlit) y las sesiones comparten el MISMO pool.
+    """
     global _engine
-    if _in_streamlit():
-        return _streamlit_engine()
+    if _engine is not None:
+        return _engine
     with _lock:
         if _engine is None:
             _engine = _build_engine()
         return _engine
+
+
+def warm_pool(n: int = 3) -> None:
+    """Abre ``n`` conexiones a la vez y las devuelve al pool (despierta Neon y evita el
+    costo de conexion/TLS en las primeras consultas)."""
+    from sqlalchemy import text
+
+    conns = []
+    try:
+        for _ in range(max(1, n)):
+            c = connect()
+            c.execute(text("SELECT 1"))
+            conns.append(c)
+    finally:
+        for c in conns:
+            try:
+                c.close()
+            except Exception:
+                pass
 
 
 def dispose_engine() -> None:

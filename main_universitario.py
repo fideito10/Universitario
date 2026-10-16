@@ -943,6 +943,13 @@ def dashboard_main():
 
 
 def main():
+    # Precalienta pool de Neon y partidos en segundo plano (una vez por proceso; solo postgres)
+    try:
+        from src.data import warmup
+        warmup.iniciar()
+    except Exception:
+        pass
+
     # Inicializar session state
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
