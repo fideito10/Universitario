@@ -92,7 +92,8 @@ class FormulariosGoogleSheets:
                     raise FileNotFoundError("No se encontró el archivo de credenciales de Google.")
             
             # Autorizar cliente
-            self.gc = gspread.authorize(credentials)
+            from src.utils.credentials import get_gspread_client
+            self.gc = get_gspread_client() or gspread.authorize(credentials)
             self.client = self.gc
             self.credentials_loaded = True
             return True, "Conexión establecida exitosamente"
@@ -157,7 +158,7 @@ class FormulariosGoogleSheets:
                 worksheet = spreadsheet.worksheet(self.sheet_config["worksheet_name"])
                 
                 # Obtener información básica
-                total_rows = len(worksheet.get_all_values())
+                total_rows = len(worksheet.col_values(1))
                 registros = max(0, total_rows - 1)  # Restar 1 por los encabezados
                 
                 return True, f"✅ Conectado: '{spreadsheet.title}' - {registros} registros"
@@ -219,6 +220,7 @@ class FormulariosGoogleSheets:
             worksheet = spreadsheet.worksheet(self.sheet_config["worksheet_name"])
             
             worksheet.append_row(row_data)
+            st.cache_data.clear()
             
             return True, "✅ Registro guardado exitosamente en Google Sheets"
             
@@ -485,7 +487,7 @@ class FormulariosGoogleSheets:
             worksheet = spreadsheet.worksheet(self.sheet_config["worksheet_name"])
             
             # Obtener información básica
-            total_rows = len(worksheet.get_all_values())
+            total_rows = len(worksheet.col_values(1))
             return True, f"✅ Conectado - {max(0, total_rows - 1)} registros"
             
         except Exception as e:

@@ -8,6 +8,8 @@ import google.generativeai as genai
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from src.utils.credentials import get_credentials_dict, get_service_account_credentials
+from src.utils.credentials import get_gspread_client as _cliente_compartido
+from src.data import backend
 
 # Configuración de página si se ejecuta directo
 def check_standalone():
@@ -29,7 +31,7 @@ def get_gspread_client():
     creds = get_service_account_credentials()
     if not creds:
         return None
-    return gspread.authorize(creds)
+    return _cliente_compartido() or gspread.authorize(creds)
 
 def get_gemini_api_key():
     """Obtiene la Gemini API Key desde secrets o variables de entorno."""
@@ -60,10 +62,14 @@ def load_all_data():
 
     try:
         # 1. MÓDULO ADMINISTRACIÓN (JUGADORES) - REDUCIDO
-        sheet_admin = client.open_by_key("1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw")
-        ws_jugadores = sheet_admin.worksheet("Jugadores_Maestro")
-        data_jugadores = ws_jugadores.get_all_records()
-        df_jugadores = pd.DataFrame(data_jugadores)
+        if backend.use_postgres():
+            from src.data import repo_app
+            df_jugadores = repo_app.df_jugadores()
+        else:
+            sheet_admin = client.open_by_key("1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw")
+            ws_jugadores = sheet_admin.worksheet("Jugadores_Maestro")
+            data_jugadores = ws_jugadores.get_all_records()
+            df_jugadores = pd.DataFrame(data_jugadores)
         
         if not df_jugadores.empty:
             context_text += f"JUGADORES ({len(df_jugadores)} total):\n"
@@ -74,10 +80,16 @@ def load_all_data():
         
         # 2. ÁREA MÉDICA - REDUCIDO
         try:
-            sheet_medica = client.open_by_key("1ham2WSMQa3eEv0V0TtHcAa55R3WLGoBje6pSOoNxcBQ")
-            ws_medica = sheet_medica.get_worksheet(0)
-            data_medica = ws_medica.get_all_records()
-            df_medica = pd.DataFrame(data_medica)
+            df_medica = None
+            if backend.use_postgres():
+                df_pg = backend.df_de_fuente("medica")
+                if df_pg is not backend.FALLBACK:
+                    df_medica = df_pg
+            if df_medica is None:
+                sheet_medica = client.open_by_key("1ham2WSMQa3eEv0V0TtHcAa55R3WLGoBje6pSOoNxcBQ")
+                ws_medica = sheet_medica.get_worksheet(0)
+                data_medica = ws_medica.get_all_records()
+                df_medica = pd.DataFrame(data_medica)
             
             if not df_medica.empty:
                 context_text += f"MÉDICO (Últimos 30 casos):\n"
@@ -88,15 +100,24 @@ def load_all_data():
 
         # 3. ÁREA FÍSICA - REDUCIDO
         try:
-            sheet_fisica = client.open_by_key("1sR4wWsA0_nZGS011d6QV84znTnRW4d7iS65y2oBjvYI")
-            ws_fisica = sheet_fisica.worksheet("Base Test")
-            data_fisica = ws_fisica.get_all_records()
-            df_fisica = pd.DataFrame(data_fisica)
+            df_fisica = None
+            if backend.use_postgres():
+                df_pg = backend.df_de_fuente("fisica_base_test")
+                if df_pg is not backend.FALLBACK:
+                    df_fisica = df_pg
+            if df_fisica is None:
+                sheet_fisica = client.open_by_key("1sR4wWsA0_nZGS011d6QV84znTnRW4d7iS65y2oBjvYI")
+                ws_fisica = sheet_fisica.worksheet("Base Test")
+                data_fisica = ws_fisica.get_all_records()
+                df_fisica = pd.DataFrame(data_fisica)
             
             if not df_fisica.empty:
                 context_text += f"FÍSICA (Últimos 50 tests):\n"
                 # Solo últimos 50 registros
-                df_resumen_fis = df_fisica[['Nombre y Apellido', 'Test', 'valor', 'unidad', 'Fecha']].tail(50)
+                # La hoja usa 'Marca temporal' (no 'Fecha'): tomar la que exista
+                col_fecha = next((c for c in ('Fecha', 'Marca temporal') if c in df_fisica.columns), None)
+                cols_fis = ['Nombre y Apellido', 'Test', 'valor', 'unidad'] + ([col_fecha] if col_fecha else [])
+                df_resumen_fis = df_fisica[cols_fis].tail(50)
                 context_text += df_resumen_fis.to_string(index=False)
             else:
                 context_text += "FÍSICA: Sin datos."

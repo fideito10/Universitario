@@ -11,6 +11,8 @@ from datetime import datetime
 import sys
 import os
 from src.utils.credentials import get_credentials_dict
+from src.utils.cache import cache_si_ok
+from src.data import backend
 
 # =============================================================================
 # 🔧 FUNCIONES AUXILIARES CORREGIDAS
@@ -23,6 +25,7 @@ def get_google_credentials():
     return get_credentials_dict()
 
 
+@cache_si_ok(ttl=300, ok=lambda r: bool(r))
 def conectar_base_central():
     """Conectar a Base Central - puede ser una hoja diferente"""
     try:
@@ -32,10 +35,14 @@ def conectar_base_central():
             from areamedica import read_google_sheet_with_headers
 
         # Usar el ID correcto de la hoja base de jugadores
-        result = read_google_sheet_with_headers(
-            sheet_id='1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw',
-            worksheet_name=None  # usar primera hoja o especifica si es necesario
-        )
+        if backend.use_postgres():
+            from src.data import repo_app
+            result = {'success': True, 'data': repo_app.jugadores_str()}
+        else:
+            result = read_google_sheet_with_headers(
+                sheet_id='1Lb-ngyjQQH-CFrrLJMvaVrknTWoGliEyr1-tZAFtQuw',
+                worksheet_name=None  # usar primera hoja o especifica si es necesario
+            )
         if not result or not result.get('success'):
             error_msg = result.get('error', 'Error desconocido') if result else 'Sin respuesta'
             st.error(f"❌ Error conectando a Base Central: {error_msg}")
@@ -83,6 +90,7 @@ def normalizar_categoria(cat):
         return "Sin Categoría"
     return cat.strip().upper() 
     
+@cache_si_ok(ttl=300, ok=lambda r: bool(r))
 def conectar_area_medica():
     """Conectar a Área Médica con manejo mejorado de errores"""
     try:
@@ -451,7 +459,7 @@ def main_reporte_medico():
                 ]
                 google_creds = get_google_credentials()
         # Guardar el reporte
-        if google_creds:
+        if google_creds or backend.use_postgres():
             try:
                 try:
                     from src.modules.areamedica import append_google_sheet_row
@@ -463,7 +471,8 @@ def main_reporte_medico():
                     row_data=nuevo_reporte,
                     credentials_dict=google_creds
                 )
-                st.success("✅ Reporte guardado en Google Sheets")
+                st.success("✅ Reporte guardado" if backend.use_postgres()
+                           else "✅ Reporte guardado en Google Sheets")
                 # Recargar datos médicos para mostrar el historial actualizado
                 datos_medicos = conectar_area_medica()
             except Exception as e:

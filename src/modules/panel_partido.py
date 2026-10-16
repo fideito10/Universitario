@@ -8,7 +8,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import gspread
-from src.utils.credentials import get_service_account_credentials
+from src.utils.credentials import get_service_account_credentials, get_gspread_client
+from src.utils.cache import cache_si_ok
+from src.data import backend
 
 # ── Helpers de tiempo para Tiempo Neto de Juego ──
 def _time_to_seconds(t: str) -> float:
@@ -39,6 +41,16 @@ def _merge_intervals(intervals):
         else:
             merged.append([start, stop])
     return merged
+
+
+@cache_si_ok(ttl=3600)
+def _leer_b64(path: str) -> str:
+    """Lee un archivo y lo devuelve en base64 (cacheado); '' si no se puede leer."""
+    try:
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception:
+        return ""
 
 
 # ── Mapa de escudos ──
@@ -87,8 +99,7 @@ def _get_escudo_b64(team_name: str) -> str:
     path = os.path.join(_ESCUDOS_DIR, filename)
     if not os.path.exists(path):
         return ""
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
+    return _leer_b64(path)
 
 
 # ── MAPA DE DNI Y FOTOS ──
@@ -183,11 +194,7 @@ def _get_foto_b64(nombre_jugador, mapa):
             path = os.path.join(fotos_dir, f"{dni}.png")
             if not os.path.exists(path): return ""
             
-    try:
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    except:
-        return ""
+    return _leer_b64(path)
 
 def _player_card_html(nombre, stat_label, stat_value, color, mapa_dni):
     foto_b64 = _get_foto_b64(nombre, mapa_dni)
@@ -271,7 +278,12 @@ def _parse_sheet_data(rows_list):
         sections[current_cat]["rows"].append(row)
     return sections
 
+@cache_si_ok(ttl=300, ok=lambda r: bool(r))
 def _get_all_matches():
+    if backend.use_postgres():
+        titulos = backend.leer(backend.lista_partidos)
+        if titulos is not backend.FALLBACK:
+            return list(titulos)
     import time
     import random
     max_retries = 3
@@ -280,7 +292,7 @@ def _get_all_matches():
         try:
             creds = get_service_account_credentials()
             if not creds: return []
-            client = gspread.authorize(creds)
+            client = get_gspread_client() or gspread.authorize(creds)
             sh = client.open_by_key(_SHEET_ID)
             return [ws.title for ws in sh.worksheets()]
         except Exception as e:
@@ -295,16 +307,20 @@ def _get_all_matches():
 
 @st.cache_data(ttl=3600)
 def _load_match_data(match_name):
+    if backend.use_postgres():
+        rows = backend.leer(backend.rows_partido, match_name)
+        if rows is not backend.FALLBACK:
+            return _parse_sheet_data(rows)
     import time
     import random
-    max_retries = 5
-    backoff_factor = 2.0
+    max_retries = 3
+    backoff_factor = 1.5
     for attempt in range(max_retries):
         try:
             creds = get_service_account_credentials()
             if not creds:
                 raise ValueError("No se pudieron obtener las credenciales de la cuenta de servicio.")
-            client = gspread.authorize(creds)
+            client = get_gspread_client() or gspread.authorize(creds)
             sh = client.open_by_key(_SHEET_ID)
             rows = sh.worksheet(match_name).get_all_values()
             return _parse_sheet_data(rows)
@@ -312,7 +328,7 @@ def _load_match_data(match_name):
             err_msg = str(e)
             is_rate_limit = "429" in err_msg or "quota" in err_msg.lower() or "limit" in err_msg.lower()
             if is_rate_limit and attempt < max_retries - 1:
-                time.sleep((backoff_factor ** attempt) + random.uniform(0.5, 1.5))
+                time.sleep((backoff_factor ** attempt) + random.uniform(0.1, 0.5))
                 continue
             else:
                 raise e

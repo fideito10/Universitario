@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from src.utils.cache import cache_si_ok
 
 # Importaciones de otros módulos
 try:
@@ -58,8 +59,8 @@ except ImportError:
 def _es_jugador():
     """True si la sesion actual tiene rol Jugador (solo presentacion)."""
     try:
-        from src.security.auth import AuthManager
-        return bool(AuthManager().is_role("Jugador"))
+        from src.security.auth import get_auth_manager
+        return bool(get_auth_manager().is_role("Jugador"))
     except Exception:
         return False
 
@@ -74,6 +75,7 @@ def aviso_jugador(icono, titulo, texto):
         unsafe_allow_html=True)
 
 
+@cache_si_ok(ttl=300)
 def obtener_df_central():
     """Obtiene el DataFrame de la Base Central (Jugadores Maestro) de Universitario"""
     try:
@@ -91,6 +93,7 @@ def obtener_df_central():
     except Exception:
         return pd.DataFrame()
 
+@cache_si_ok(ttl=300)
 def obtener_df_medica():
     """Obtiene el DataFrame del área médica"""
     try:
@@ -104,6 +107,7 @@ def obtener_df_medica():
         return pd.DataFrame()
     except Exception: return pd.DataFrame()
 
+@cache_si_ok(ttl=300)
 def obtener_df_nutricion():
     """Obtiene el DataFrame del área de nutrición (historial completo)"""
     try:
@@ -117,6 +121,7 @@ def obtener_df_nutricion():
         return pd.DataFrame()
     except Exception: return pd.DataFrame()
 
+@cache_si_ok(ttl=300)
 def obtener_df_fisica():
     """Obtiene el DataFrame del área física usando el ID de Universitario"""
     try:
@@ -207,8 +212,7 @@ def buscar_columna_flexible(df, palabras_clave):
             return col
     return None
 
-# Elimino el cache temporalmente para asegurar que veas los datos reales sin errores viejos
-# @st.cache_data
+@cache_si_ok(ttl=300)
 def crear_dataframe_integrado():
     """Combina los datos usando la Base Central de Universitario como fuente de verdad"""
     df_central = obtener_df_central()
@@ -785,10 +789,8 @@ def _buscar_foto_path(nombre_jugador, dni_jugador):
     return None
 
 
-def _foto_data_uri(nombre_jugador, dni_jugador):
-    p = _buscar_foto_path(nombre_jugador, dni_jugador)
-    if not p:
-        return None
+@cache_si_ok(ttl=3600)
+def _foto_data_uri_path(p):
     try:
         ext = os.path.splitext(p)[1].lower().lstrip('.')
         mime = {'jpg': 'jpeg', 'jpeg': 'jpeg', 'png': 'png', 'webp': 'webp'}.get(ext, 'jpeg')
@@ -796,6 +798,13 @@ def _foto_data_uri(nombre_jugador, dni_jugador):
             return f"data:image/{mime};base64," + _b64.b64encode(f.read()).decode()
     except Exception:
         return None
+
+
+def _foto_data_uri(nombre_jugador, dni_jugador):
+    p = _buscar_foto_path(nombre_jugador, dni_jugador)
+    if not p:
+        return None
+    return _foto_data_uri_path(p)
 
 
 def _fila_dato(etiqueta, valor, color_valor=None):
@@ -1326,8 +1335,8 @@ def panel_profesional_jugador():
         return
     
     # Identificar si es un jugador (Filtro automático por DNI)
-    from src.security.auth import AuthManager
-    am = AuthManager()
+    from src.security.auth import get_auth_manager
+    am = get_auth_manager()
     
     user_dni = st.session_state.user.get('dni', '')
     is_player = am.is_role("Jugador")

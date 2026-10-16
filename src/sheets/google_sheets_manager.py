@@ -12,8 +12,22 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 import os
 import json
-from src.utils.credentials import get_credentials_dict, get_service_account_credentials
+from src.utils.credentials import get_credentials_dict, get_service_account_credentials, get_gspread_client
 
+
+
+@st.cache_resource(show_spinner=False)
+def _build_sheets_manager():
+    return GoogleSheetsManager()
+
+
+def get_sheets_manager() -> "GoogleSheetsManager":
+    """Instancia compartida; si no cargó credenciales se reintenta en el próximo rerun."""
+    m = _build_sheets_manager()
+    if not m.credentials_loaded:
+        _build_sheets_manager.clear()
+        m = _build_sheets_manager()
+    return m
 
 
 class GoogleSheetsManager:
@@ -97,7 +111,7 @@ class GoogleSheetsManager:
             if creds is None:
                 return False
 
-            self.client = gspread.authorize(creds)
+            self.client = get_gspread_client() or gspread.authorize(creds)
             self.credentials_loaded = True
             return True
 
@@ -246,7 +260,7 @@ class GoogleSheetsManager:
             worksheet = spreadsheet.worksheet(worksheet_name)
             
             # Obtener información básica
-            total_rows = len(worksheet.get_all_values())
+            total_rows = len(worksheet.col_values(1))
             registros = max(0, total_rows - 1)  # Restar header
             
             return True, f"✅ Conectado a '{spreadsheet.title}' - {registros} registros en '{worksheet_name}'"
@@ -335,8 +349,7 @@ class GoogleSheetsManager:
             worksheet = spreadsheet.worksheet(worksheet_name)
             
             # Generar ID único
-            existing_records = worksheet.get_all_values()
-            next_id = len(existing_records)  # Incluye header, así que es el siguiente ID
+            next_id = len(worksheet.col_values(1))  # Incluye header, así que es el siguiente ID
             
             # Preparar fila de datos
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -366,6 +379,7 @@ class GoogleSheetsManager:
             
             # Agregar a Google Sheets
             worksheet.append_row(row_data)
+            st.cache_data.clear()
             
             return True, f"✅ Registro #{next_id} guardado exitosamente"
             
@@ -426,6 +440,7 @@ class GoogleSheetsManager:
                 
                 if field_col_index:
                     worksheet.update_cell(row_index, field_col_index, value)
+            st.cache_data.clear()
             
             return True, f"✅ Registro {record_id} actualizado"
             

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import unicodedata
 from src.sheets.google_sheets_manager import GoogleSheetsManager
+from src.data.backend import use_postgres
 
 def normalize_text(text):
     """Normaliza texto: elimina acentos, convierte a minúsculas y quita espacios."""
@@ -57,7 +58,14 @@ class AuthManager:
         }
 
     def _get_users_df(self):
-        """Obtiene la tabla de usuarios de Google Sheets"""
+        """Obtiene la tabla de usuarios (PostgreSQL con DATA_BACKEND=postgres, si no Google Sheets)"""
+        if use_postgres():
+            try:
+                from src.data import repo_app
+                return repo_app.usuarios_df(con_estado_clave=True)
+            except Exception as e:
+                st.error(f"Error al cargar usuarios: {type(e).__name__}")
+                return pd.DataFrame()
         try:
             if not self.gs_manager.credentials_loaded:
                 return pd.DataFrame()
@@ -99,7 +107,9 @@ class AuthManager:
         users_df = self._get_users_df()
         valid_user = pd.DataFrame()
         
-        if not users_df.empty:
+        if not users_df.empty and 'Clave_Es_Hash' in users_df.columns:
+            valid_user = self._match_postgres(users_df, username_raw, password_raw)
+        elif not users_df.empty:
             valid_user = users_df[
                 (users_df['Usuario'].astype(str).str.strip() == username_raw) & 
                 (users_df['Clave'].astype(str).str.strip() == password_raw)
@@ -130,27 +140,32 @@ class AuthManager:
 
                 # B. Si no está en Usuarios, buscar en Jugadores_Maestro
                 if valid_user.empty:
-                    if not self.gs_manager.credentials_loaded:
+                    en_pg = use_postgres()
+                    if not en_pg and not self.gs_manager.credentials_loaded:
                         st.warning("⚠️ Sin conexión a Google Sheets. Verificá los secrets en Streamlit Cloud.")
                         return False
                     try:
-                        spreadsheet = self.gs_manager.client.open_by_key(self.sheet_id)
+                        if en_pg:
+                            from src.data import repo_app
+                            master_df = repo_app.df_jugadores()
+                        else:
+                            spreadsheet = self.gs_manager.client.open_by_key(self.sheet_id)
 
-                        # Intentar obtener la hoja (manejar variantes de nombre)
-                        master_sheet = None
-                        for sheet_name in ["Jugadores_Maestro", "Jugadores", "jugadores_maestro", "jugadores"]:
-                            try:
-                                master_sheet = spreadsheet.worksheet(sheet_name)
-                                break
-                            except:
-                                continue
+                            # Intentar obtener la hoja (manejar variantes de nombre)
+                            master_sheet = None
+                            for sheet_name in ["Jugadores_Maestro", "Jugadores", "jugadores_maestro", "jugadores"]:
+                                try:
+                                    master_sheet = spreadsheet.worksheet(sheet_name)
+                                    break
+                                except:
+                                    continue
 
-                        if master_sheet is None:
-                            st.warning("⚠️ No se encontró la hoja 'Jugadores_Maestro' en el Google Sheet.")
-                            return False
+                            if master_sheet is None:
+                                st.warning("⚠️ No se encontró la hoja 'Jugadores_Maestro' en el Google Sheet.")
+                                return False
 
-                        master_records = master_sheet.get_all_records()
-                        master_df = pd.DataFrame(master_records)
+                            master_records = master_sheet.get_all_records()
+                            master_df = pd.DataFrame(master_records)
 
                         if master_df.empty:
                             st.warning("⚠️ La hoja de jugadores está vacía.")
@@ -216,6 +231,32 @@ class AuthManager:
             
         return False
 
+    def _match_postgres(self, users_df, username_raw, password_raw):
+        """Coincidencia exacta usuario+clave (strip) contra la tabla de la DB.
+
+        La clave puede estar en texto plano (`Clave_Es_Hash` False) o hasheada. En el primer
+        login exitoso con clave en texto plano se re-hashea y se guarda (migracion transparente).
+        """
+        from src.security import passwords
+
+        cand = users_df[users_df['Usuario'].astype(str).str.strip() == username_raw]
+        for idx, row in cand.iterrows():
+            stored = str(row['Clave'])
+            if bool(row.get('Clave_Es_Hash', False)):
+                ok = passwords.verify_password(password_raw, stored)
+            else:
+                ok = passwords.equals_plain(stored.strip(), password_raw)
+            if not ok:
+                continue
+            if not bool(row.get('Clave_Es_Hash', False)):
+                try:
+                    from src.data import repo_app
+                    repo_app.actualizar_clave(username_raw, passwords.hash_password(password_raw))
+                except Exception:
+                    pass  # el login sigue valiendo; se re-hasheara en el proximo ingreso
+            return users_df.loc[[idx]]
+        return pd.DataFrame()
+
     def logout(self):
         """Limpia la sesión"""
         for key in list(st.session_state.keys()):
@@ -258,3 +299,16 @@ class AuthManager:
             
         user_rol = normalize_text(st.session_state.user.get('rol', ''))
         return any(normalize_text(r) == user_rol for r in target_roles)
+
+@st.cache_resource(show_spinner=False)
+def _build_auth_manager():
+    return AuthManager()
+
+
+def get_auth_manager() -> AuthManager:
+    """Instancia compartida (no guarda estado por usuario: usa st.session_state)."""
+    am = _build_auth_manager()
+    if not use_postgres() and not am.gs_manager.credentials_loaded:
+        _build_auth_manager.clear()
+        am = _build_auth_manager()
+    return am

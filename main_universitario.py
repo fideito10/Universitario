@@ -8,8 +8,10 @@ import streamlit.components.v1 as components
 import os
 from datetime import datetime
 import base64
-from src.security.auth import AuthManager
+from src.security.auth import AuthManager, get_auth_manager
+from src.utils.cache import cache_si_ok
 
+@cache_si_ok(ttl=3600)
 def get_base64_image(image_path):
     try:
         with open(image_path, "rb") as img_file:
@@ -446,7 +448,7 @@ def load_universitario_styles():
 
 
 def login_page():
-    bg_image = get_base64_image("Fondo.JPG")
+    bg_image = get_base64_image("assets/fondo_login.jpg")
     
     # CSS personalizado para el login con imagen de fondo
     if bg_image:
@@ -748,7 +750,7 @@ def login_page():
     """, unsafe_allow_html=True)
     
     # Formulario de login (sin contenedor blanco)
-    auth_manager = AuthManager()
+    auth_manager = get_auth_manager()
 
     # Inyectar atributos autocomplete para que Safari/Chrome ofrezca Face ID / Touch ID
     st.markdown("""
@@ -799,7 +801,8 @@ def login_page():
     """, unsafe_allow_html=True)
     
     # Estado de la conexión (Solo visible para diagnóstico si falla)
-    if not auth_manager.gs_manager.credentials_loaded:
+    from src.data import backend
+    if not backend.use_postgres() and not auth_manager.gs_manager.credentials_loaded:
         st.error("⚠️ Error: No se detectaron credenciales de Google. Los jugadores no podrán ingresar.")
         st.info("Asegúrate de haber configurado las variables GOOGLE_CLIENT_EMAIL y GOOGLE_PRIVATE_KEY en Railway.")
     else:
@@ -895,13 +898,16 @@ def render_bottom_nav():
 
 def dashboard_main():
     """Dashboard principal del Club Universitario"""
-    auth_manager = AuthManager()
+    auth_manager = get_auth_manager()
 
     # Header
     logo_b64 = get_base64_image("escudo uni.jpg")
     img_html = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:clamp(80px,15vw,130px); margin-bottom:0.75rem; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">' if logo_b64 else ""
 
     st.markdown(f'<div class="main-header">{img_html}<h1>🏉 CLUB UNIVERSITARIO DE LA PLATA</h1><h3>Sistema de Gestión Deportiva</h3><div class="uni-greet">Bienvenido, <strong>{st.session_state.user["nombre"]}</strong> · {st.session_state.user["rol"]}</div></div>', unsafe_allow_html=True)
+
+    from src.data import backend
+    backend.mostrar_frescura()
 
     allowed = [m for m in get_modules_info(st.session_state.user.get('rol')) if auth_manager.has_permission(m["id"])]
 
@@ -951,7 +957,7 @@ def main():
     else:
         # Usuario autenticado: cargar estilos y mostrar app
         load_universitario_styles()
-        auth_manager = AuthManager()
+        auth_manager = get_auth_manager()
         user = st.session_state.user
 
         # Verificar navegación por parámetros de URL (desde los botones del dashboard)
@@ -1025,6 +1031,9 @@ def main():
                     st.session_state.current_page = "lista"
                     st.rerun()
 
+            from src.data import backend
+            backend.boton_sincronizar(user.get('rol'))
+
             st.markdown("---")
             if st.button("🏠 Volver al Inicio", use_container_width=True, key="btn_volver_inicio_bottom"):
                 st.session_state.current_page = "dashboard"
@@ -1049,8 +1058,6 @@ def main():
             main_streamlit()
         elif page == "nutricion":
             import src.modules.areanutricion as mod_nutricion
-            import importlib
-            importlib.reload(mod_nutricion)
             if hasattr(mod_nutricion, 'main_nutricion'):
                 mod_nutricion.main_nutricion()
             else:

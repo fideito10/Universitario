@@ -4,6 +4,7 @@ import gspread
 import time
 from datetime import datetime, date
 from src.modules.administracion import JugadoresMaestroManager
+from src.data import backend
 
 class AsistenciaManager:
     def __init__(self):
@@ -18,14 +19,7 @@ class AsistenciaManager:
             st.session_state.last_request_time = 0
     
     def rate_limit_check(self):
-        """Verificar rate limit - esperar si es necesario"""
-        current_time = time.time()
-        time_since_last = current_time - st.session_state.last_request_time
-        
-        # Esperar mínimo 1 segundo entre requests
-        if time_since_last < 1.0:
-            time.sleep(1.0 - time_since_last)
-        
+        """Registrar el momento del último request (sin espera artificial)"""
         st.session_state.last_request_time = time.time()
     
     def get_or_create_attendance_sheet(self):
@@ -97,8 +91,40 @@ class AsistenciaManager:
             st.error(f"❌ Error con hoja de asistencias: {e}")
             return None
     
+    def _rows(self, attendance_data, fecha, categoria, tipo_actividad):
+        return [[
+            fecha.strftime('%d/%m/%Y'), categoria, tipo_actividad, str(p['dni']),
+            p['nombre'], p['apellido'], p['estado_asistencia'], p.get('observaciones', '')
+        ] for p in attendance_data]
+
+    def _save_attendance_pg(self, attendance_data, fecha, categoria, tipo_actividad):
+        """Guardar asistencia directo en PostgreSQL (espejo opcional a Sheets)"""
+        from src.data import repo_app
+        rows = self._rows(attendance_data, fecha, categoria, tipo_actividad)
+        try:
+            n = repo_app.agregar_asistencias(rows)
+        except Exception as e:
+            st.error(f"❌ Error guardando asistencia: {type(e).__name__}")
+            return False
+        if rows and backend.mirror_writes():
+            try:
+                sheet = self.get_or_create_attendance_sheet()
+                if sheet:
+                    next_row = len(sheet.col_values(1)) + 1
+                    sheet.update(f"A{next_row}:H{next_row + len(rows) - 1}", rows)
+            except Exception:
+                st.warning("⚠️ Asistencia guardada en la base; no se pudo copiar a Google Sheets.")
+        for k in [k for k in st.session_state.sheets_cache if k.startswith("attendance_report_")]:
+            del st.session_state.sheets_cache[k]
+        backend.limpiar_cache()
+        if n:
+            st.success(f"✅ {n} registros guardados exitosamente")
+        return True
+
     def save_attendance(self, attendance_data, fecha, categoria, tipo_actividad):
         """Guardar asistencia en Google Sheets CON RATE LIMITING"""
+        if backend.use_postgres():
+            return self._save_attendance_pg(attendance_data, fecha, categoria, tipo_actividad)
         sheet = self.get_or_create_attendance_sheet()
         if not sheet:
             return False
@@ -125,12 +151,16 @@ class AsistenciaManager:
                 self.rate_limit_check()
                 
                 # Obtener siguiente fila vacía
-                all_values = sheet.get_all_values()
-                next_row = len(all_values) + 1
+                next_row = len(sheet.col_values(1)) + 1
                 
                 # Insertar todos los datos de una vez
                 range_name = f"A{next_row}:H{next_row + len(rows_to_insert) - 1}"
                 sheet.update(range_name, rows_to_insert)
+                
+                # Invalidar reportes cacheados
+                for k in [k for k in st.session_state.sheets_cache if k.startswith("attendance_report_")]:
+                    del st.session_state.sheets_cache[k]
+                st.cache_data.clear()
                 
                 st.success(f"✅ {len(rows_to_insert)} registros guardados exitosamente")
             
@@ -154,16 +184,23 @@ class AsistenciaManager:
             if (time.time() - cache_data['timestamp']) < 120:  # 2 minutos
                 return cache_data['data']
         
-        sheet = self.get_or_create_attendance_sheet()
-        if not sheet:
-            return pd.DataFrame()
+        if backend.use_postgres():
+            sheet = None
+        else:
+            sheet = self.get_or_create_attendance_sheet()
+            if not sheet:
+                return pd.DataFrame()
         
         try:
             # Rate limiting
             self.rate_limit_check()
             
-            data = sheet.get_all_records()
-            df = pd.DataFrame(data)
+            if sheet is None:
+                from src.data import repo_app
+                df = repo_app.leer_asistencias()
+            else:
+                data = sheet.get_all_records()
+                df = pd.DataFrame(data)
             
             if not df.empty and fecha_desde and fecha_hasta:
                 # Filtrar por fechas si se especifican
@@ -632,12 +669,11 @@ def mostrar_pasar_lista():
     if mobile_mode:
         # Layout vertical para móvil - botones más espaciados
         if st.button("💾 GUARDAR LISTA DE ASISTENCIA", use_container_width=True, type="primary"):
-            with st.spinner("💾 Guardando en Google Sheets..."):
+            with st.spinner("💾 Guardando..." if backend.use_postgres() else "💾 Guardando en Google Sheets..."):
                 if manager.save_attendance(attendance_list, fecha, categoria, actividad):
                     st.session_state.attendance_data = {}
                     st.success("¡Lista guardada exitosamente!")
                     st.balloons()
-                    time.sleep(1)
                     st.rerun()
         
         st.markdown("<br>", unsafe_allow_html=True)
@@ -667,7 +703,7 @@ def mostrar_pasar_lista():
         
         with col1:
             if st.button("✅ GUARDAR LISTA", use_container_width=True, type="primary"):
-                with st.spinner("💾 Guardando en Google Sheets..."):
+                with st.spinner("💾 Guardando..." if backend.use_postgres() else "💾 Guardando en Google Sheets..."):
                     if manager.save_attendance(attendance_list, fecha, categoria, actividad):
                         st.session_state.attendance_data = {}
                         st.balloons()
