@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import base64
 from src.security.auth import AuthManager, get_auth_manager
+from src.security import remember
 from src.utils.cache import cache_si_ok
 
 @cache_si_ok(ttl=3600)
@@ -778,6 +779,10 @@ def login_page():
     st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
 
     # Botón centrado usando columnas
+    recordar = False
+    if remember.habilitado():
+        recordar = st.checkbox("Recordarme en este dispositivo", value=True, key="recordar_input")
+
     col_l, col_btn, col_r = st.columns([1, 2, 1])
     with col_btn:
         login_clicked = st.button("INGRESAR", use_container_width=True, key="login_btn")
@@ -785,6 +790,8 @@ def login_page():
     if login_clicked:
         if auth_manager.login(username, password):
             st.success("✅ Acceso exitoso")
+            if recordar:
+                st.session_state["_guardar_cookie"] = remember.crear_token(st.session_state.user.get("username"))
             if st.session_state.user.get('rol') == "Jugador":
                 st.session_state.current_page = "perfil"
             else:
@@ -948,10 +955,25 @@ def main():
         st.session_state.authenticated = False
 
     inject_mobile_meta()
-    
+
+    # "Recordarme": restaurar la sesion desde la cookie (salvo si se acaba de cerrar sesion)
+    if (not st.session_state.authenticated and not st.session_state.get("_borrar_cookie")
+            and remember.habilitado()):
+        usuario_recordado = remember.validar_token(remember.token_de_cookies())
+        if usuario_recordado and get_auth_manager().restore_session(usuario_recordado):
+            rol = st.session_state.user.get('rol')
+            st.session_state.current_page = "perfil" if rol == "Jugador" else "dashboard"
+
+    # Escribir/borrar la cookie pedida por el login o el logout (necesita renderizar JS)
+    token_nuevo = st.session_state.pop("_guardar_cookie", None)
+    if token_nuevo:
+        components.html(remember.js_guardar_cookie(token_nuevo), height=0)
+    if st.session_state.pop("_borrar_cookie", None):
+        components.html(remember.js_borrar_cookie(), height=0)
+
     if 'current_page' not in st.session_state:
         st.session_state.current_page = "dashboard"
-    
+
     if not st.session_state.authenticated:
         login_page()
     else:

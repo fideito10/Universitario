@@ -257,10 +257,35 @@ class AuthManager:
             return users_df.loc[[idx]]
         return pd.DataFrame()
 
+    def restore_session(self, username):
+        """Restablece la sesion de un usuario ya validado por token ("Recordarme").
+
+        Vuelve a buscar al usuario en la tabla (rol y existencia actuales). Si no esta ahi y es un
+        DNI, repite el ingreso de jugador por DNI. No restaura al admin de emergencia.
+        """
+        username = str(username).strip()
+        users_df = self._get_users_df()
+        if not users_df.empty and 'Usuario' in users_df.columns:
+            rows = users_df[users_df['Usuario'].astype(str).str.strip() == username]
+            if not rows.empty:
+                user_data = rows.iloc[0].to_dict()
+                st.session_state.authenticated = True
+                st.session_state.user = {
+                    "username": username,
+                    "rol": str(user_data.get("Rol", "Invitado")).strip(),
+                    "nombre": str(user_data.get("Nombre", "")).strip() or username,
+                    "dni": str(user_data.get("DNI", "")).strip()
+                }
+                return True
+        if username.isdigit():
+            return self.login(username, "")
+        return False
+
     def logout(self):
-        """Limpia la sesión"""
+        """Limpia la sesión (y pide borrar la cookie de "Recordarme")"""
         for key in list(st.session_state.keys()):
             del st.session_state[key]
+        st.session_state["_borrar_cookie"] = True
         st.rerun()
 
     def has_permission(self, page_name):
