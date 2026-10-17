@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 import base64
 from src.security.auth import AuthManager, get_auth_manager
-from src.security import remember
+from src.security import remember, google_login
 from src.utils.cache import cache_si_ok
 
 @cache_si_ok(ttl=3600)
@@ -786,6 +786,13 @@ def login_page():
     col_l, col_btn, col_r = st.columns([1, 2, 1])
     with col_btn:
         login_clicked = st.button("INGRESAR", use_container_width=True, key="login_btn")
+        if google_login.habilitado():
+            if st.button("Entrar con Google", use_container_width=True, key="google_btn"):
+                st.login()
+
+    rechazado = st.session_state.pop("_google_rechazado", None)
+    if rechazado:
+        st.error(f"❌ El mail {rechazado} no está registrado. Pedile al administrador que lo cargue.")
 
     if login_clicked:
         if auth_manager.login(username, password):
@@ -963,6 +970,19 @@ def main():
         if usuario_recordado and get_auth_manager().restore_session(usuario_recordado):
             rol = st.session_state.user.get('rol')
             st.session_state.current_page = "perfil" if rol == "Jugador" else "dashboard"
+
+    # Entrar con Google: el mail verificado debe estar registrado; si no, se cierra la sesion de Google
+    if (not st.session_state.authenticated and not st.session_state.get("_borrar_cookie")
+            and google_login.habilitado() and google_login.esta_logueado()):
+        email_google = google_login.email_verificado()
+        if email_google and get_auth_manager().login_by_email(email_google):
+            rol = st.session_state.user.get('rol')
+            st.session_state.current_page = "perfil" if rol == "Jugador" else "dashboard"
+            if remember.habilitado():
+                st.session_state["_guardar_cookie"] = remember.crear_token(st.session_state.user.get("username"))
+        else:
+            st.session_state["_google_rechazado"] = email_google or "de esa cuenta"
+            st.logout()
 
     # Escribir/borrar la cookie pedida por el login o el logout (necesita renderizar JS)
     token_nuevo = st.session_state.pop("_guardar_cookie", None)
