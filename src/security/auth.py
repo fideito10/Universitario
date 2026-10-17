@@ -281,12 +281,42 @@ class AuthManager:
             return self.login(username, "")
         return False
 
+    def login_by_email(self, email):
+        """Ingreso con Google: el mail ya verificado por Google debe estar registrado.
+
+        Busca en la tabla de usuarios; con DATA_BACKEND=postgres tambien en jugadores (ingresa como
+        Jugador, igual que por DNI). Devuelve True si arma la sesion.
+        """
+        email = str(email or "").strip().lower()
+        if not email:
+            return False
+        users_df = self._get_users_df()
+        if not users_df.empty and 'Email' in users_df.columns and 'Usuario' in users_df.columns:
+            rows = users_df[users_df['Email'].astype(str).str.strip().str.lower() == email]
+            if not rows.empty:
+                return self.restore_session(str(rows.iloc[0]['Usuario']))
+        if use_postgres():
+            try:
+                from src.data import repo_app
+                jug = repo_app.df_jugadores()
+                if not jug.empty and 'Email' in jug.columns and 'DNI' in jug.columns:
+                    rows = jug[jug['Email'].astype(str).str.strip().str.lower() == email]
+                    if not rows.empty:
+                        dni = "".join(filter(str.isdigit, str(rows.iloc[0]['DNI']).split('.')[0]))
+                        if dni:
+                            return self.login(dni, "")
+            except Exception:
+                return False
+        return False
+
     def logout(self):
-        """Limpia la sesión (y pide borrar la cookie de "Recordarme")"""
+        """Limpia la sesión (y pide borrar la cookie de "Recordarme" y cerrar la de Google)"""
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.session_state["_borrar_cookie"] = True
-        st.rerun()
+        from src.security import google_login
+        if not google_login.cerrar():
+            st.rerun()
 
     def has_permission(self, page_name):
         """Verifica si el usuario actual tiene permiso para una página"""
