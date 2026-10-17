@@ -21,8 +21,7 @@ def get_base64_image(image_path):
 
 def inject_mobile_meta():
     """Inyecta metadatos para que la app se vea bien en dispositivos móviles (icono PWA)"""
-    logo_b64 = get_base64_image("escudo uni.jpg")
-    if logo_b64:
+    if os.path.exists("static/manifest.webmanifest"):
         # components.html ejecuta el JS (st.markdown no ejecuta <script>)
         components.html(f"""
         <script>
@@ -43,13 +42,13 @@ def inject_mobile_meta():
                 // Icono para iPhone (Apple Touch Icon)
                 updateHeadTag('link', {{
                     rel: 'apple-touch-icon',
-                    href: 'data:image/jpeg;base64,{logo_b64}'
+                    href: '/app/static/apple-touch-icon.png'
                 }});
 
                 // Icono para Android y otros
                 updateHeadTag('link', {{
                     rel: 'shortcut icon',
-                    href: 'data:image/jpeg;base64,{logo_b64}'
+                    href: '/app/static/icon-192.png'
                 }});
 
                 // Configuración PWA para iPhone
@@ -58,37 +57,14 @@ def inject_mobile_meta():
                 updateHeadTag('meta', {{ name: 'apple-mobile-web-app-title', content: 'Universitario' }});
                 updateHeadTag('meta', {{ name: 'mobile-web-app-capable', content: 'yes' }});
                 updateHeadTag('meta', {{ name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' }});
-                updateHeadTag('meta', {{ name: 'theme-color', content: '#000000' }});
+                updateHeadTag('meta', {{ name: 'theme-color', content: '#1A2C56' }});
                 updateHeadTag('meta', {{ name: 'format-detection', content: 'telephone=no' }});
                 
                 // Forzar el título del navegador
                 window.parent.document.title = "Universitario - Sistema de Gestión";
 
-                // Crear un manifiesto dinámico para que aparezca el logo al instalar
-                const manifest = {{
-                    "name": "Club Universitario de La Plata",
-                    "short_name": "Universitario",
-                    "start_url": "/",
-                    "display": "standalone",
-                    "background_color": "#000000",
-                    "theme_color": "#000000",
-                    "icons": [
-                        {{
-                            "src": "data:image/jpeg;base64,{logo_b64}",
-                            "sizes": "192x192",
-                            "type": "image/jpeg"
-                        }},
-                        {{
-                            "src": "data:image/jpeg;base64,{logo_b64}",
-                            "sizes": "512x512",
-                            "type": "image/jpeg"
-                        }}
-                    ]
-                }};
-                const stringManifest = JSON.stringify(manifest);
-                const blob = new Blob([stringManifest], {{type: 'application/json'}});
-                const manifestURL = window.parent.URL.createObjectURL(blob);
-                updateHeadTag('link', {{ rel: 'manifest', href: manifestURL }});
+                // Manifiesto real (archivo estatico) para que Android lo instale como app
+                updateHeadTag('link', {{ rel: 'manifest', href: '/app/static/manifest.webmanifest' }});
 
             }} catch (e) {{
                 console.warn("Mobile meta injection failed:", e);
