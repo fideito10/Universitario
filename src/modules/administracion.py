@@ -289,8 +289,13 @@ def main_administracion():
     
     manager = JugadoresMaestroManager()
     
-    tab1, tab2, tab3 = st.tabs(["➕ Agregar Jugador", "👥 Ver Jugadores", "⚙️ Gestión"])
-    
+    tab1, tab2, tab3, tab4 = st.tabs(["➕ Agregar Jugador", "👥 Ver Jugadores", "⚙️ Gestión",
+                                      "📱 QR Asistencia"])
+
+    with tab4:
+        from src.modules.checkin import panel_qr_asistencia
+        panel_qr_asistencia()
+
     with tab1:
         st.subheader("➕ Agregar Nuevo Jugador")
         

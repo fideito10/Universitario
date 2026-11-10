@@ -956,6 +956,12 @@ def main():
 
     inject_mobile_meta()
 
+    # QR de asistencia: pagina liviana, sin login ni sidebar (identifica por celu vinculado).
+    if "checkin" in st.query_params:
+        from src.modules.checkin import pantalla_checkin
+        pantalla_checkin()
+        return
+
     # "Recordarme": restaurar la sesion desde la cookie (salvo si se acaba de cerrar sesion)
     if (not st.session_state.authenticated and not st.session_state.get("_borrar_cookie")
             and remember.habilitado()):
