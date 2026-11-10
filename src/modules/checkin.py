@@ -118,7 +118,7 @@ def pantalla_checkin() -> None:
         return
 
     with st.form("chk_vincular"):
-        dni = st.text_input("DNI (sin puntos)", inputmode="numeric")
+        dni = st.text_input("DNI (sin puntos)")
         nac = st.text_input("Fecha de nacimiento (dd/mm/aaaa)", placeholder="dd/mm/aaaa")
         enviar = st.form_submit_button("Marcar presente", type="primary",
                                        use_container_width=True)
@@ -207,7 +207,7 @@ def panel_qr_asistencia() -> None:
     st.subheader("🔄 Reiniciar celulares de un jugador")
     st.caption("Si el jugador cambió de celular, desvinculá los anteriores; "
                "vuelve a vincular con DNI + fecha de nacimiento.")
-    dni = st.text_input("DNI del jugador", key="chk_reset_dni", inputmode="numeric")
+    dni = st.text_input("DNI del jugador", key="chk_reset_dni")
     if dni.strip():
         try:
             disp = repo_checkin.dispositivos_de(dni)
